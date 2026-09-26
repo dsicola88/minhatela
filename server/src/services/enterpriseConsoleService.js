@@ -467,13 +467,20 @@ async function patchCatalogTitle(actorId, contentId, body, meta = {}) {
     `UPDATE videos SET
        is_published = COALESCE($2, is_published),
        is_featured = COALESCE($3, is_featured),
-       monetization = COALESCE($4::monetization_model, monetization),
+       monetization = CASE
+         WHEN $4::text IS NULL OR $4::text = '' THEN monetization
+         ELSE $4::monetization_model
+       END,
        rental_price_kz = CASE WHEN $5::boolean THEN $6 ELSE rental_price_kz END,
-       workflow_status = COALESCE($7::content_workflow, workflow_status),
+       workflow_status = CASE
+         WHEN $7::text IS NULL OR $7::text = '' THEN workflow_status
+         ELSE $7::content_workflow
+       END,
        bunny_video_id = CASE WHEN $8::boolean THEN $9 ELSE bunny_video_id END,
+       coming_soon_at = CASE WHEN $10::boolean THEN $11 ELSE coming_soon_at END,
        updated_at = NOW()
      WHERE id = $1
-     RETURNING id, title, is_published, is_featured, monetization, rental_price_kz, workflow_status, bunny_video_id`,
+     RETURNING id, title, is_published, is_featured, monetization, rental_price_kz, workflow_status, bunny_video_id, coming_soon_at`,
     [
       contentId,
       body.isPublished === undefined ? null : Boolean(body.isPublished),
@@ -486,6 +493,10 @@ async function patchCatalogTitle(actorId, contentId, body, meta = {}) {
       body.workflowStatus || null,
       bunnyVideoId !== undefined,
       bunnyVideoId === undefined ? null : bunnyVideoId,
+      body.clearComingSoon === true || body.comingSoonAt === null,
+      body.comingSoonAt === undefined || body.clearComingSoon === true
+        ? null
+        : body.comingSoonAt,
     ]
   );
   const row = result.rows[0];
