@@ -75,6 +75,24 @@ const env = Object.freeze({
     googleClientId: process.env.GOOGLE_CLIENT_ID || '',
     appleClientId: process.env.APPLE_CLIENT_ID || '',
   }),
+  smtp: Object.freeze({
+    host: process.env.SMTP_HOST || '',
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: process.env.SMTP_SECURE === 'true',
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+    from: process.env.SMTP_FROM || 'MinhaTela <noreply@minhatela.net>',
+    replyTo: process.env.SMTP_REPLY_TO || process.env.MAIL_SUPPORT || '',
+    supportEmail: process.env.MAIL_SUPPORT || 'support@minhatela.net',
+    contactEmail: process.env.MAIL_CONTACT || 'contato@minhatela.net',
+  }),
+  market: Object.freeze({
+    country: process.env.MARKET_COUNTRY || 'AO',
+    timezone: process.env.MARKET_TIMEZONE || 'Africa/Luanda',
+    locale: process.env.MARKET_LOCALE || 'pt-AO',
+    primaryDomain: process.env.PRIMARY_DOMAIN || 'minhatela.net',
+    secondaryDomain: process.env.SECONDARY_DOMAIN || 'minhatela.ao',
+  }),
 });
 
 module.exports = { env };

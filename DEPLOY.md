@@ -61,32 +61,42 @@ Seed manual (one-off no Railway):
 railway run --service api npm --prefix server run seed
 ```
 
-## 3. Vercel (Web)
+## 3. Domínios de produção
 
-1. [vercel.com](https://vercel.com) → **Add New Project** → importa o mesmo repo GitHub
-2. Configuração:
-   - **Root Directory:** `mobile`
-   - **Framework Preset:** Other
-   - **Build Command:** `npx expo export --platform web` (já em `mobile/vercel.json`)
-   - **Output Directory:** `dist`
-   - **Install Command:** `npm ci`
-3. **Environment Variables:**
+| Uso | Domínio |
+|-----|---------|
+| Web (principal) | `https://minhatela.net` (+ `www`) |
+| Web (Angola) | `https://minhatela.ao` (+ `www`) |
+| API | `https://api.minhatela.net` |
+
+**DNS (no registo do domínio):**
+
+- Apex `minhatela.net` / `minhatela.ao` → Vercel `A` `76.76.21.21` (confirmar no painel)
+- `www` → CNAME Vercel (ver Domains no projecto)
+- `api.minhatela.net` → CNAME → o host Railway indicado em `railway domain status`
+- Emails: cria `noreply@` / `support@` / `contato@` e preenche `SMTP_*` no Railway
+
+## 4. Vercel (Web)
+
+1. Project `minhatela` · Root Directory `mobile`
+2. **Environment Variables:**
 
 | Variável | Valor |
 |----------|--------|
-| `EXPO_PUBLIC_API_BASE_URL` | `https://TUAapi.up.railway.app` |
-| `EXPO_PUBLIC_APP_PUBLIC_URL` | `https://teu-app.vercel.app` |
+| `EXPO_PUBLIC_API_BASE_URL` | `https://api.minhatela.net` |
+| `EXPO_PUBLIC_APP_PUBLIC_URL` | `https://minhatela.net` |
 
-4. Deploy → copia o domínio Vercel
-5. Volta ao Railway e actualiza `CORS_ORIGIN` + `APP_PUBLIC_URL` com o domínio Vercel → **Redeploy** API
+3. **Domains:** `minhatela.net`, `www.minhatela.net`, `minhatela.ao`, `www.minhatela.ao`
+4. Railway já tem `CORS_ORIGIN` + `APP_PUBLIC_URL` para `.net` / `.ao`
 
-## 4. Ordem recomendada
+## 5. Ordem recomendada
 
 1. Push GitHub  
-2. Railway (Postgres + API) → obter URL API  
-3. Vercel com `EXPO_PUBLIC_API_BASE_URL`  
-4. Actualizar CORS no Railway  
-5. Login com superadmin  
+2. Railway (Postgres + API + `api.minhatela.net`)  
+3. Vercel + domínios web  
+4. DNS nos registos  
+5. SMTP + Bunny + IBAN  
+6. Login superadmin  
 
 ## 5. Checklist pós-deploy
 
