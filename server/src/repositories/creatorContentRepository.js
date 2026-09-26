@@ -40,7 +40,7 @@ async function createDraft(payload) {
       payload.posterUrl,
       payload.backdropUrl || payload.posterUrl,
       payload.trailerUrl || null,
-      payload.bunnyVideoId || `pending-${slug}`,
+      payload.bunnyVideoId || null,
       payload.monetization || 'avod',
       payload.rentalPriceKz || null,
       payload.durationSeconds || 0,
@@ -102,10 +102,23 @@ async function updateOwnedDraft(contentId, creatorId, patch) {
   return result.rows[0] || null;
 }
 
+async function findOwned(contentId, creatorId) {
+  const result = await query(
+    `SELECT * FROM videos WHERE id = $1 AND creator_id = $2 LIMIT 1`,
+    [contentId, creatorId]
+  );
+  return result.rows[0] || null;
+}
+
+async function findById(contentId) {
+  const result = await query(`SELECT * FROM videos WHERE id = $1 LIMIT 1`, [contentId]);
+  return result.rows[0] || null;
+}
+
 async function listByCreator(creatorId) {
   const result = await query(
     `SELECT id, title, slug, workflow_status, monetization, poster_url,
-            rental_price_kz, duration_seconds, release_year, is_published,
+            bunny_video_id, rental_price_kz, duration_seconds, release_year, is_published,
             submitted_at, reviewed_at, rejection_reason, created_at, updated_at
      FROM videos
      WHERE creator_id = $1
@@ -212,6 +225,8 @@ async function creatorAnalytics(creatorId) {
 module.exports = {
   createDraft,
   updateOwnedDraft,
+  findOwned,
+  findById,
   listByCreator,
   submitForReview,
   listForModeration,

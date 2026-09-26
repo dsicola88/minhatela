@@ -17,6 +17,7 @@ import {
   fetchCreatorStudio,
   createCreatorContent,
   submitCreatorContent,
+  createBunnyVideoSlot,
 } from '../services/creatorStudio';
 import { fetchMyPayouts, requestPayout } from '../services/payouts';
 
@@ -125,6 +126,26 @@ export default function CreatorStudio({ onBack }) {
     try {
       await submitCreatorContent(id);
       await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleCreateBunnySlot() {
+    if (!contentForm.title.trim()) {
+      setError('Indique o título antes de criar o slot Bunny');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      const data = await createBunnyVideoSlot({ title: contentForm.title.trim() });
+      setContentForm((s) => ({ ...s, bunnyVideoId: data.bunnyVideoId || '' }));
+      if (data.upload?.dashboardUrl) {
+        setError(`Slot criado. Faça upload em: ${data.upload.dashboardUrl}`);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -365,8 +386,15 @@ export default function CreatorStudio({ onBack }) {
                       value={contentForm.bunnyVideoId}
                       onChangeText={(v) => setContentForm((s) => ({ ...s, bunnyVideoId: v }))}
                       style={inputStyle}
+                      placeholder="GUID UUID da Stream Library"
                       placeholderTextColor={colors.muted}
                       autoCapitalize="none"
+                    />
+                    <PrimaryButton
+                      label="Criar slot Bunny (depois faça upload)"
+                      loading={busy}
+                      onPress={handleCreateBunnySlot}
+                      style={{ marginTop: 8, marginBottom: 4 }}
                     />
                     <FieldLabel>Monetização (avod | svod | tvod)</FieldLabel>
                     <TextInput

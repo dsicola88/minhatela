@@ -39,7 +39,7 @@ async function listPlans() {
   if (dbPlans?.length) {
     return {
       currency: payments.currency || 'AOA',
-      market: 'AO',
+      market: require('../config/env').env.market.country || 'AO',
       plans: dbPlans.map((p) => ({
         ...p,
         currentDefault: p.isDefault || p.id === 'free',
@@ -63,7 +63,7 @@ async function listPlans() {
   // Fallback estático se migração ainda não aplicada
   return {
     currency: 'AOA',
-    market: 'AO',
+    market: require('../config/env').env.market.country || 'AO',
     plans: [
       {
         id: 'free',

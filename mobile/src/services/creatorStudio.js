@@ -16,9 +16,14 @@ export async function submitCreatorContent(contentId) {
   return api.post(`/api/creator-studio/contents/${contentId}/submit`, {});
 }
 
+export async function createBunnyVideoSlot(payload) {
+  return api.post('/api/creator-studio/bunny/videos', payload);
+}
+
 export default {
   registerCreator,
   fetchCreatorStudio,
   createCreatorContent,
   submitCreatorContent,
+  createBunnyVideoSlot,
 };

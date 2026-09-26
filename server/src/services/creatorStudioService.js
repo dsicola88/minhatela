@@ -33,6 +33,7 @@ function mapContent(row) {
     workflowStatus: row.workflow_status,
     monetization: row.monetization,
     posterUrl: row.poster_url,
+    bunnyVideoId: row.bunny_video_id,
     rentalPriceKz: row.rental_price_kz,
     durationSeconds: row.duration_seconds,
     releaseYear: row.release_year,
@@ -119,8 +120,19 @@ async function createContent(userId, body) {
     assertPositiveKz(body.rentalPriceKz || 0);
   }
 
+  const { assertBunnyVideoId } = require('../utils/bunnyAsset');
+  let bunnyVideoId = null;
+  if (body.bunnyVideoId) {
+    try {
+      bunnyVideoId = assertBunnyVideoId(body.bunnyVideoId);
+    } catch (err) {
+      throw createError(err.status || 400, err.message, err.code || 'VALIDATION');
+    }
+  }
+
   const row = await creatorContentRepository.createDraft({
     ...body,
+    bunnyVideoId,
     creatorId: creator.id,
     creatorDisplayName: creator.display_name,
   });
@@ -130,7 +142,16 @@ async function createContent(userId, body) {
 
 async function updateContent(userId, contentId, body) {
   const creator = await requireActiveCreator(userId);
-  const row = await creatorContentRepository.updateOwnedDraft(contentId, creator.id, body);
+  const patch = { ...body };
+  if (body.bunnyVideoId != null && String(body.bunnyVideoId).trim() !== '') {
+    const { assertBunnyVideoId } = require('../utils/bunnyAsset');
+    try {
+      patch.bunnyVideoId = assertBunnyVideoId(body.bunnyVideoId);
+    } catch (err) {
+      throw createError(err.status || 400, err.message, err.code || 'VALIDATION');
+    }
+  }
+  const row = await creatorContentRepository.updateOwnedDraft(contentId, creator.id, patch);
   if (!row) {
     throw createError(404, 'Rascunho não encontrado ou não editável', 'NOT_FOUND');
   }
@@ -139,6 +160,18 @@ async function updateContent(userId, contentId, body) {
 
 async function submitContent(userId, contentId) {
   const creator = await requireActiveCreator(userId);
+  const current = await creatorContentRepository.findOwned(contentId, creator.id);
+  if (!current) {
+    throw createError(404, 'Conteúdo não pode ser submetido', 'NOT_SUBMISSION');
+  }
+  const { isValidBunnyVideoId } = require('../utils/bunnyAsset');
+  if (!isValidBunnyVideoId(current.bunny_video_id)) {
+    throw createError(
+      400,
+      'Antes de submeter, indique um Bunny Video ID válido (GUID da Stream Library)',
+      'BUNNY_VIDEO_REQUIRED'
+    );
+  }
   const row = await creatorContentRepository.submitForReview(contentId, creator.id);
   if (!row) {
     throw createError(404, 'Conteúdo não pode ser submetido', 'NOT_SUBMISSION');
@@ -201,6 +234,18 @@ async function adminModerateContent(adminId, contentId, { action, rejectionReaso
     throw createError(400, 'Acção inválida', 'VALIDATION');
   }
 
+  if (status === 'published') {
+    const pending = await creatorContentRepository.findById(contentId);
+    const { isValidBunnyVideoId } = require('../utils/bunnyAsset');
+    if (!pending || !isValidBunnyVideoId(pending.bunny_video_id)) {
+      throw createError(
+        400,
+        'Não é possível publicar sem Bunny Video ID válido (GUID Stream)',
+        'BUNNY_VIDEO_REQUIRED'
+      );
+    }
+  }
+
   // Criador NÃO pode aprovar o próprio conteúdo — já garantido por requireRoles admin
   const row = await creatorContentRepository.moderate(contentId, {
     status,
@@ -223,12 +268,37 @@ async function adminModerateContent(adminId, contentId, { action, rejectionReaso
   return { content: mapContent(row) };
 }
 
+async function createBunnySlot(userId, body) {
+  const creator = await requireActiveCreator(userId);
+  const title = String(body.title || '').trim();
+  if (!title) {
+    throw createError(400, 'Título do vídeo Bunny é obrigatório', 'VALIDATION');
+  }
+  const bunnyService = require('./bunnyService');
+  const created = await bunnyService.createVideo({ title });
+  await auditRepository.write({
+    actorId: userId,
+    action: 'BUNNY_VIDEO_CREATED',
+    entity: 'bunny_video',
+    entityId: created.videoId,
+    metadata: { creatorId: creator.id, title },
+  });
+  return {
+    bunnyVideoId: created.videoId,
+    libraryId: created.libraryId,
+    upload: created.upload,
+    message:
+      'Slot Bunny criado. Faça upload do ficheiro no dashboard Stream ou via TUS com as credenciais devolvidas.',
+  };
+}
+
 module.exports = {
   registerCreator,
   getStudioHome,
   createContent,
   updateContent,
   submitContent,
+  createBunnySlot,
   adminListCreators,
   adminReviewCreator,
   adminListContent,

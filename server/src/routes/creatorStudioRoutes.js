@@ -33,6 +33,12 @@ router.post(
   asyncHandler(creatorStudioController.submit)
 );
 
+router.post(
+  '/bunny/videos',
+  rateLimit({ windowMs: 60_000, max: 10 }),
+  asyncHandler(creatorStudioController.createBunnySlot)
+);
+
 const payoutController = require('../controllers/payoutController');
 
 router.get('/payouts', asyncHandler(payoutController.mine));

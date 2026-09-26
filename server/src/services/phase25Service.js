@@ -239,17 +239,36 @@ async function oauthLogin(provider, body, meta = {}) {
     throw createError(400, 'Provider inválido', 'VALIDATION');
   }
 
+  const expectedAud =
+    provider === 'google' ? env.oauth?.googleClientId : env.oauth?.appleClientId;
+  if (!expectedAud) {
+    throw createError(
+      503,
+      'Login social não configurado. Use email e palavra-passe.',
+      'OAUTH_NOT_CONFIGURED'
+    );
+  }
+
   const idToken = body.idToken || body.identityToken || body.token;
   if (!idToken || String(idToken).length < 16) {
     throw createError(400, 'idToken OAuth obrigatório', 'OAUTH_TOKEN_REQUIRED');
   }
 
   const payload = decodeJwtPayload(idToken) || {};
-  const providerSub =
-    body.providerSub ||
-    payload.sub ||
-    body.sub ||
-    crypto.createHash('sha256').update(String(idToken)).digest('hex').slice(0, 32);
+  if (!payload.sub || !payload.aud) {
+    throw createError(401, 'Token OAuth inválido', 'OAUTH_TOKEN_INVALID');
+  }
+  if (String(payload.aud) !== String(expectedAud)) {
+    throw createError(401, 'Token OAuth inválido (audience)', 'OAUTH_AUD_MISMATCH');
+  }
+  if (!payload.exp || payload.exp * 1000 < Date.now()) {
+    throw createError(401, 'Token OAuth expirado', 'OAUTH_EXPIRED');
+  }
+
+  const providerSub = body.providerSub || payload.sub || body.sub;
+  if (!providerSub) {
+    throw createError(401, 'Token OAuth sem subject', 'OAUTH_TOKEN_INVALID');
+  }
 
   let email = (body.email || payload.email || '').toLowerCase().trim();
   const fullName =
@@ -258,17 +277,8 @@ async function oauthLogin(provider, body, meta = {}) {
     [payload.given_name, payload.family_name].filter(Boolean).join(' ') ||
     (email ? email.split('@')[0] : `${provider} user`);
 
-  const expectedAud =
-    provider === 'google' ? env.oauth?.googleClientId : env.oauth?.appleClientId;
-  if (expectedAud && payload.aud && payload.aud !== expectedAud) {
-    throw createError(401, 'Token OAuth inválido (audience)', 'OAUTH_AUD_MISMATCH');
-  }
-  if (expectedAud && payload.exp && payload.exp * 1000 < Date.now()) {
-    throw createError(401, 'Token OAuth expirado', 'OAUTH_EXPIRED');
-  }
-
   if (!email) {
-    email = `${provider}_${providerSub.slice(0, 12)}@oauth.minhatela.ao`;
+    email = `${provider}_${String(providerSub).slice(0, 12)}@oauth.minhatela.ao`;
   }
 
   let identity = await phase25Repository.findOAuthIdentity(provider, providerSub);

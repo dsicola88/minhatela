@@ -97,7 +97,7 @@ function createApp() {
     res.json({
       service: 'minhatela-api',
       status: 'ok',
-      market: 'AO',
+      market: env.market.country,
       timestamp: new Date().toISOString(),
     });
   });
@@ -108,7 +108,8 @@ function createApp() {
       return res.status(ok ? 200 : 503).json({
         ready: ok,
         postgres: ok ? 'ok' : 'down',
-        market: 'AO',
+        market: env.market.country,
+        bunny: env.bunny.libraryId ? 'configured' : 'missing',
         timestamp: new Date().toISOString(),
       });
     } catch (error) {

@@ -451,6 +451,18 @@ async function listCatalog({ q, limit = 40, offset = 0 } = {}) {
 }
 
 async function patchCatalogTitle(actorId, contentId, body, meta = {}) {
+  const { isValidBunnyVideoId } = require('../utils/bunnyAsset');
+  let bunnyVideoId = undefined;
+  if (body.bunnyVideoId !== undefined) {
+    if (body.bunnyVideoId === null || body.bunnyVideoId === '') {
+      bunnyVideoId = null;
+    } else if (!isValidBunnyVideoId(body.bunnyVideoId)) {
+      throw createError(400, 'Bunny Video ID inválido', 'BUNNY_VIDEO_INVALID');
+    } else {
+      bunnyVideoId = String(body.bunnyVideoId).trim();
+    }
+  }
+
   const result = await query(
     `UPDATE videos SET
        is_published = COALESCE($2, is_published),
@@ -458,9 +470,10 @@ async function patchCatalogTitle(actorId, contentId, body, meta = {}) {
        monetization = COALESCE($4::monetization_model, monetization),
        rental_price_kz = CASE WHEN $5::boolean THEN $6 ELSE rental_price_kz END,
        workflow_status = COALESCE($7::content_workflow, workflow_status),
+       bunny_video_id = CASE WHEN $8::boolean THEN $9 ELSE bunny_video_id END,
        updated_at = NOW()
      WHERE id = $1
-     RETURNING id, title, is_published, is_featured, monetization, rental_price_kz, workflow_status`,
+     RETURNING id, title, is_published, is_featured, monetization, rental_price_kz, workflow_status, bunny_video_id`,
     [
       contentId,
       body.isPublished === undefined ? null : Boolean(body.isPublished),
@@ -471,6 +484,8 @@ async function patchCatalogTitle(actorId, contentId, body, meta = {}) {
         ? null
         : Number(body.rentalPriceKz),
       body.workflowStatus || null,
+      bunnyVideoId !== undefined,
+      bunnyVideoId === undefined ? null : bunnyVideoId,
     ]
   );
   const row = result.rows[0];

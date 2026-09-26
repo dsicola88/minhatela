@@ -31,10 +31,16 @@ async function submit(req, res) {
   res.json(result);
 }
 
+async function createBunnySlot(req, res) {
+  const result = await creatorStudioService.createBunnySlot(req.user.id, req.body || {});
+  res.status(201).json(result);
+}
+
 module.exports = {
   register,
   home,
   createContent,
   updateContent,
   submit,
+  createBunnySlot,
 };

@@ -201,6 +201,51 @@ function getPlayerDefaults() {
   });
 }
 
+/**
+ * Cria um vídeo vazio na library Stream (slot para upload TUS / dashboard).
+ * @see https://docs.bunny.net/reference/video_createvideo
+ */
+async function createVideo({ title }) {
+  assertConfigured();
+  if (!env.bunny.apiKey) {
+    throw createError(503, 'API Bunny não configurada', 'BUNNY_API_MISSING');
+  }
+  const libraryId = env.bunny.libraryId;
+  const response = await fetch(`https://video.bunnycdn.com/library/${libraryId}/videos`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      AccessKey: env.bunny.apiKey,
+    },
+    body: JSON.stringify({ title: String(title).slice(0, 250) }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    logger.error('bunny.create_video_failed', {
+      status: response.status,
+      message: payload?.Message || payload?.message,
+    });
+    throw createError(502, 'Falha ao criar vídeo no Bunny Stream', 'BUNNY_CREATE_FAILED');
+  }
+  const videoId = payload.guid || payload.videoId || payload.id;
+  if (!videoId) {
+    throw createError(502, 'Bunny não devolveu GUID do vídeo', 'BUNNY_CREATE_FAILED');
+  }
+  logger.info('bunny.video_created', { videoId, libraryId, title });
+  return {
+    videoId: String(videoId),
+    libraryId: String(libraryId),
+    upload: {
+      libraryId: String(libraryId),
+      videoId: String(videoId),
+      dashboardUrl: `https://dash.bunny.net/stream/${libraryId}/library/videos/${videoId}`,
+      // Upload via dashboard ou TUS com AccessKey da library
+      note: 'Faça upload do ficheiro no dashboard Bunny Stream para este videoId',
+    },
+  };
+}
+
 module.exports = {
   buildEmbedUrl,
   buildHlsUrl,
@@ -208,4 +253,6 @@ module.exports = {
   signDownload,
   getPlayerDefaults,
   createToken,
+  createVideo,
+  assertConfigured,
 };

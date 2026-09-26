@@ -74,7 +74,8 @@ async function startPlayback({
     throw createError(400, 'Não é possível reproduzir a série directamente', 'SERIES_NOT_PLAYABLE');
   }
 
-  if (!row.bunny_video_id) {
+  const { isValidBunnyVideoId } = require('../utils/bunnyAsset');
+  if (!row.bunny_video_id || !isValidBunnyVideoId(row.bunny_video_id)) {
     throw createError(503, 'Asset de vídeo indisponível', 'NO_BUNNY_ASSET');
   }
 
@@ -113,7 +114,9 @@ async function startPlayback({
     await parentalService.assertNotBlocked(profileId, content.seriesId);
   }
 
-  const rightsOk = await contentRepository.hasActiveRights(content.id, 'AO');
+  const { env } = require('../config/env');
+  const territory = env.market?.country || 'AO';
+  const rightsOk = await contentRepository.hasActiveRights(content.id, territory);
   if (!rightsOk) {
     throw createError(403, 'Conteúdo indisponível neste território', 'RIGHTS_DENIED');
   }
