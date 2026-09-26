@@ -8,10 +8,28 @@
  * Overrides via env (recomendado em produção):
  *   SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD, SUPERADMIN_NAME
  */
+const fs = require('fs');
 const path = require('path');
 const { createRequire } = require('module');
-const requireFromServer = createRequire(path.resolve(__dirname, '../../server/package.json'));
-const bcrypt = requireFromServer('bcryptjs');
+
+/** Monorepo local: ../../server; Docker (WORKDIR /app): /app */
+function loadBcrypt() {
+  const candidates = [
+    path.resolve(__dirname, '../../server/package.json'),
+    '/app/package.json',
+  ];
+  for (const pkg of candidates) {
+    if (!fs.existsSync(pkg)) continue;
+    try {
+      return createRequire(pkg)('bcryptjs');
+    } catch (_) {
+      /* try next */
+    }
+  }
+  throw new Error('bcryptjs não encontrado (server/node_modules ou /app/node_modules)');
+}
+
+const bcrypt = loadBcrypt();
 
 const SUPERADMIN = {
   email: process.env.SUPERADMIN_EMAIL || 'minhatela2026@gmail.com',
