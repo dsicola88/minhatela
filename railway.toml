@@ -1,0 +1,13 @@
+# Railway · MinhaTela API
+# Dashboard: New Project → Deploy from GitHub → Root Directory = /
+# Add PostgreSQL plugin e ligar DATABASE_URL automaticamente.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "server/Dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 100
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

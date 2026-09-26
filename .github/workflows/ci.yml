@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  api:
+    name: API smoke
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+      - run: node --check src/index.js
+      - run: node --check scripts/migrate.js
+
+  web:
+    name: Web export
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+      - name: Export web
+        env:
+          CI: "1"
+          EXPO_OFFLINE: "1"
+          EXPO_NO_TELEMETRY: "1"
+          EXPO_PUBLIC_API_BASE_URL: https://example.up.railway.app
+        run: npx expo export --platform web
+      - name: Check dist
+        run: test -f dist/index.html

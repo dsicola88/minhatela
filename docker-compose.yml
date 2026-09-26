@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: minhatela-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: minhatela
+      POSTGRES_USER: minhatela
+      POSTGRES_PASSWORD: minhatela
+    ports:
+      # Host 55432 — evita conflito com outros Postgres Docker locais
+      - "55432:5432"
+    volumes:
+      - minhatela_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U minhatela -d minhatela"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: minhatela-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://minhatela:minhatela@postgres:5432/minhatela
+      API_PORT: 4000
+      NODE_ENV: production
+      MIGRATIONS_DIR: /database/migrations
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./server/uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+volumes:
+  minhatela_pg:

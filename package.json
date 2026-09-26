@@ -1,0 +1,23 @@
+{
+  "name": "minhatela",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MinhaTela — Enterprise OTT platform for Angola",
+  "scripts": {
+    "dev:api": "npm --prefix server run dev",
+    "dev:web": "npm --prefix mobile run web",
+    "dev:mobile": "npm --prefix mobile start",
+    "migrate": "npm --prefix server run migrate",
+    "seed": "npm --prefix server run seed",
+    "smoke": "node server/scripts/smoke.js",
+    "e2e": "node server/scripts/e2e.js",
+    "phase27": "node server/scripts/phase27-security.js",
+    "build:web": "npm --prefix mobile run build:web",
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down",
+    "health": "curl -s http://localhost:4000/health | python3 -m json.tool"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

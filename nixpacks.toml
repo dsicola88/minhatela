@@ -1,0 +1,18 @@
+# Opcional: usar Nixpacks em vez de Dockerfile
+# No Railway, railway.toml está configurado para DOCKERFILE.
+# Para Nixpacks: apaga/ajusta railway.toml e define Root Directory = /.
+
+providers = ["node"]
+
+[variables]
+NODE_ENV = "production"
+MIGRATIONS_DIR = "database/migrations"
+
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+cmds = ["npm ci --omit=dev --prefix server"]
+
+[start]
+cmd = "sh server/scripts/start.sh"
