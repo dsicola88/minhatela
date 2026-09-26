@@ -18,6 +18,7 @@ async function getCommandCenter() {
     contentPending,
     payoutsPending,
     campaignsPending,
+    ticketsOpen,
     activeStreams,
     watchToday,
     recentAudit,
@@ -54,6 +55,10 @@ async function getCommandCenter() {
     query(`SELECT COUNT(*)::int AS c FROM creator_payouts WHERE status = 'pending'`),
     query(`SELECT COUNT(*)::int AS c FROM campaigns WHERE status = 'pending_review'`),
     query(
+      `SELECT COUNT(*)::int AS c FROM support_tickets
+       WHERE status IN ('open', 'in_progress')`
+    ).catch(() => ({ rows: [{ c: 0 }] })),
+    query(
       `SELECT COUNT(*)::int AS c FROM playback_sessions
        WHERE is_active = TRUE
          AND allowed = TRUE
@@ -74,10 +79,16 @@ async function getCommandCenter() {
     content: contentPending.rows[0].c,
     payouts: payoutsPending.rows[0].c,
     campaigns: campaignsPending.rows[0].c,
+    tickets: ticketsOpen.rows[0]?.c || 0,
   };
 
   const attention =
-    queues.payments + queues.creators + queues.content + queues.payouts + queues.campaigns;
+    queues.payments +
+    queues.creators +
+    queues.content +
+    queues.payouts +
+    queues.campaigns +
+    queues.tickets;
 
   return {
     generatedAt: new Date().toISOString(),

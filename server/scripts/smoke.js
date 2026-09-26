@@ -192,6 +192,21 @@ async function run() {
     assert(r.status === 401, `got ${r.status}`);
   });
 
+  await step('GET /api/app/config público', async () => {
+    const r = await req('GET', '/api/app/config');
+    assert(r.status === 200 && r.json?.config, `got ${r.status}`);
+  });
+
+  await step('GET /api/admin/config sem auth → 401', async () => {
+    const r = await req('GET', '/api/admin/config');
+    assert(r.status === 401, `got ${r.status}`);
+  });
+
+  await step('GET /api/admin/tickets sem auth → 401', async () => {
+    const r = await req('GET', '/api/admin/tickets');
+    assert(r.status === 401, `got ${r.status}`);
+  });
+
   await step('GET /metrics sem auth → 401', async () => {
     const r = await req('GET', '/metrics');
     assert(r.status === 401, `got ${r.status}`);

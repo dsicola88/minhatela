@@ -298,4 +298,59 @@ router.get('/surveys/summary', asyncHandler(require('../controllers/phase26Contr
 router.post('/cdn/probe', asyncHandler(require('../controllers/phase26Controller').probeCdn));
 router.get('/cdn/health', asyncHandler(require('../controllers/phase26Controller').cdnHealth));
 
+router.get(
+  '/config',
+  asyncHandler(async (_req, res) => {
+    res.json(await require('../services/appConfigService').adminList());
+  })
+);
+router.get(
+  '/config/:key',
+  asyncHandler(async (req, res) => {
+    res.json(await require('../services/appConfigService').adminGet(req.params.key));
+  })
+);
+router.put(
+  '/config/:key',
+  asyncHandler(async (req, res) => {
+    const result = await require('../services/appConfigService').adminUpsert(
+      req.user.id,
+      req.params.key,
+      req.body,
+      { ip: req.ip }
+    );
+    res.json(result);
+  })
+);
+
+router.get(
+  '/help/articles',
+  asyncHandler(async (req, res) => {
+    res.json(await require('../services/helpService').adminListArticles(req.query.limit));
+  })
+);
+router.post(
+  '/help/articles',
+  asyncHandler(async (req, res) => {
+    const result = await require('../services/helpService').adminUpsertArticle(
+      req.user.id,
+      req.body,
+      { ip: req.ip }
+    );
+    res.status(201).json(result);
+  })
+);
+router.patch(
+  '/help/articles/:id/publish',
+  asyncHandler(async (req, res) => {
+    const result = await require('../services/helpService').adminSetArticlePublished(
+      req.user.id,
+      req.params.id,
+      req.body.isPublished !== false && req.body.published !== false,
+      { ip: req.ip }
+    );
+    res.json(result);
+  })
+);
+
 module.exports = router;

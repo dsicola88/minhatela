@@ -321,7 +321,18 @@ Campanhas AVOD (`pending_review` → `active`). Decision em `GET/POST /api/ads/d
 ```bash
 E2E_DISABLE_RATE_LIMIT=true npm run e2e   # ponta-a-ponta cliente · pagamentos AO · superadmin
 npm run smoke
+E2E_DISABLE_RATE_LIMIT=true npm run phase27
 ```
+
+## Admin Console (empresa)
+
+Login com `admin` / `super_admin` → ícone de escudo na Navbar → `/admin`.
+
+Tabs: Overview · Pagamentos · Atendimento · Moderação · Editorial · Flags · Config/Onboarding · CDN · Catálogo ops · Promos · Live · Auditoria.
+
+- Público: `GET /api/app/config` (onboarding / branding / suporte)
+- Admin: `GET/PUT /api/admin/config/:key` · `GET/POST /api/admin/help/articles`
+- Detalhe: `docs/PHASE_28_ADMIN_CONSOLE.md`
 
 ## Regras
 

@@ -6,6 +6,7 @@ import {
   Linking,
   Modal,
   TextInput,
+  Switch,
   useWindowDimensions,
   RefreshControl,
 } from 'react-native';
@@ -31,6 +32,29 @@ import {
   fetchPromos,
   createPromo,
   setPromoActive,
+  fetchTickets,
+  reviewTicket,
+  fetchHelpArticles,
+  upsertHelpArticle,
+  publishHelpArticle,
+  fetchFeatureFlags,
+  setFeatureFlag,
+  fetchEditorial,
+  createEditorial,
+  updateEditorial,
+  fetchAppConfig,
+  upsertAppConfig,
+  fetchAdminPacks,
+  fetchSurveySummary,
+  fetchAdminPremieres,
+  fetchAdminGifts,
+  createGift,
+  revokeGift,
+  probeCdn,
+  fetchCdnHealth,
+  fetchEncoding,
+  fetchPaymentRisk,
+  fetchExperiments,
 } from '../services/admin';
 import { fetchPendingPayouts, reviewPayout } from '../services/payouts';
 import Focusable from '../tv/Focusable';
@@ -38,11 +62,26 @@ import Focusable from '../tv/Focusable';
 const TABS = [
   { id: 'overview', label: 'Overview', icon: 'grid-outline' },
   { id: 'payments', label: 'Pagamentos', icon: 'card-outline' },
+  { id: 'support', label: 'Atendimento', icon: 'headset-outline' },
   { id: 'moderation', label: 'Moderação', icon: 'shield-checkmark-outline' },
+  { id: 'editorial', label: 'Editorial', icon: 'albums-outline' },
+  { id: 'flags', label: 'Flags', icon: 'toggle-outline' },
+  { id: 'config', label: 'Config / Onboard', icon: 'settings-outline' },
+  { id: 'media', label: 'CDN / Encode', icon: 'cloud-outline' },
+  { id: 'catalog', label: 'Catálogo ops', icon: 'film-outline' },
   { id: 'promos', label: 'Promos', icon: 'pricetag-outline' },
   { id: 'live', label: 'Live', icon: 'radio-outline' },
   { id: 'audit', label: 'Auditoria', icon: 'document-text-outline' },
 ];
+
+const cardStyle = {
+  backgroundColor: '#111',
+  borderWidth: 1,
+  borderColor: colors.border,
+  borderRadius: 6,
+  padding: 16,
+  marginBottom: 12,
+};
 
 function Kpi({ label, value, hint, alert }) {
   return (
@@ -108,6 +147,50 @@ function QueueChip({ label, count, onPress }) {
   );
 }
 
+function SectionTitle({ children }) {
+  return (
+    <Text
+      style={{
+        color: colors.gold,
+        fontWeight: '700',
+        letterSpacing: 1,
+        marginTop: 8,
+        marginBottom: 12,
+      }}
+    >
+      {children}
+    </Text>
+  );
+}
+
+function AuditRow({ item }) {
+  return (
+    <View style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+      <Text style={{ color: colors.text, fontWeight: '700' }}>{item.action}</Text>
+      <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 2 }}>
+        {item.entity}
+        {item.actor?.email ? ` · ${item.actor.email}` : ''}
+        {item.ip ? ` · ${item.ip}` : ''}
+      </Text>
+      <Text style={{ color: colors.muted, fontSize: 11, marginTop: 4 }}>
+        {new Date(item.createdAt).toLocaleString('pt-AO')}
+      </Text>
+    </View>
+  );
+}
+
+function inputStyle(extra = {}) {
+  return {
+    borderWidth: 1,
+    borderColor: colors.border,
+    color: colors.text,
+    padding: 10,
+    borderRadius: 4,
+    marginBottom: 10,
+    ...extra,
+  };
+}
+
 export default function AdminCommandCenter({ onBack }) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -125,15 +208,61 @@ export default function AdminCommandCenter({ onBack }) {
   const [streams, setStreams] = useState([]);
   const [audit, setAudit] = useState([]);
   const [promos, setPromos] = useState([]);
+  const [tickets, setTickets] = useState([]);
+  const [articles, setArticles] = useState([]);
+  const [flags, setFlags] = useState([]);
+  const [collections, setCollections] = useState([]);
+  const [settings, setSettings] = useState([]);
+  const [packs, setPacks] = useState([]);
+  const [surveys, setSurveys] = useState(null);
+  const [premieres, setPremieres] = useState([]);
+  const [gifts, setGifts] = useState([]);
+  const [cdn, setCdn] = useState(null);
+  const [encoding, setEncoding] = useState([]);
+  const [risk, setRisk] = useState([]);
+  const [experiments, setExperiments] = useState([]);
   const [promoForm, setPromoForm] = useState({ code: '', days: '7', max: '1000' });
+  const [articleForm, setArticleForm] = useState({
+    slug: '',
+    title: '',
+    category: 'geral',
+    bodyMd: '',
+  });
+  const [editorialForm, setEditorialForm] = useState({ slug: '', title: '', subtitle: '' });
+  const [giftForm, setGiftForm] = useState({ email: '', days: '30', note: '' });
+  const [configDrafts, setConfigDrafts] = useState({});
   const [busy, setBusy] = useState(null);
   const [rejectTarget, setRejectTarget] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [ticketNotes, setTicketNotes] = useState({});
 
   const load = useCallback(async () => {
     try {
       setError('');
-      const [cc, pay, cr, co, po, ca, live, au, pr] = await Promise.all([
+      const [
+        cc,
+        pay,
+        cr,
+        co,
+        po,
+        ca,
+        live,
+        au,
+        pr,
+        tk,
+        art,
+        fl,
+        ed,
+        cfg,
+        pk,
+        sv,
+        pm,
+        gf,
+        cd,
+        enc,
+        rk,
+        ex,
+      ] = await Promise.all([
         fetchCommandCenter(),
         fetchPendingPayments(),
         fetchPendingCreators(),
@@ -143,6 +272,19 @@ export default function AdminCommandCenter({ onBack }) {
         fetchLiveStreams(),
         fetchAuditLog({ limit: 40 }),
         fetchPromos().catch(() => ({ promos: [] })),
+        fetchTickets(50).catch(() => ({ tickets: [] })),
+        fetchHelpArticles().catch(() => ({ articles: [] })),
+        fetchFeatureFlags().catch(() => ({ flags: [] })),
+        fetchEditorial().catch(() => ({ collections: [] })),
+        fetchAppConfig().catch(() => ({ settings: [] })),
+        fetchAdminPacks().catch(() => ({ packs: [] })),
+        fetchSurveySummary().catch(() => null),
+        fetchAdminPremieres().catch(() => ({ events: [] })),
+        fetchAdminGifts().catch(() => ({ gifts: [] })),
+        fetchCdnHealth().catch(() => null),
+        fetchEncoding().catch(() => ({ items: [] })),
+        fetchPaymentRisk(0).catch(() => ({ transactions: [] })),
+        fetchExperiments().catch(() => ({ experiments: [] })),
       ]);
       setCenter(cc);
       setPayments(pay.transactions || []);
@@ -153,8 +295,26 @@ export default function AdminCommandCenter({ onBack }) {
       setStreams(live.streams || []);
       setAudit(au.items || []);
       setPromos(pr.promos || []);
+      setTickets(tk.tickets || []);
+      setArticles(art.articles || []);
+      setFlags(fl.flags || []);
+      setCollections(ed.collections || []);
+      setSettings(cfg.settings || []);
+      setPacks(pk.packs || pk.items || []);
+      setSurveys(sv);
+      setPremieres(pm.events || pm.premieres || []);
+      setGifts(gf.gifts || []);
+      setCdn(cd);
+      setEncoding(enc.items || enc.queue || []);
+      setRisk(rk.transactions || rk.items || []);
+      setExperiments(ex.experiments || ex.items || []);
+      const drafts = {};
+      (cfg.settings || []).forEach((s) => {
+        drafts[s.key] = JSON.stringify(s.value || {}, null, 2);
+      });
+      setConfigDrafts(drafts);
     } catch (err) {
-      setError(err.message || 'Falha ao carregar Command Center');
+      setError(err.message || 'Falha ao carregar Console Empresa');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -211,10 +371,10 @@ export default function AdminCommandCenter({ onBack }) {
         </Focusable>
         <View style={{ flex: 1 }}>
           <Text style={{ color: colors.red, fontWeight: '800', letterSpacing: 1.2, fontSize: 12 }}>
-            {brand.name.toUpperCase()} · OPS
+            {brand.name.toUpperCase()} · EMPRESA
           </Text>
           <Text style={{ color: colors.text, fontSize: 20, fontWeight: '800' }}>
-            Command Center
+            Console de Gestão
           </Text>
         </View>
         {kpis.attentionRequired > 0 ? (
@@ -329,10 +489,11 @@ export default function AdminCommandCenter({ onBack }) {
             </View>
 
             <Text style={{ color: colors.gold, fontWeight: '700', letterSpacing: 1, marginBottom: 12 }}>
-              FILAS
+              FILAS OPERACIONAIS
             </Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 28 }}>
               <QueueChip label="Pagamentos" count={queues.payments || 0} onPress={() => setTab('payments')} />
+              <QueueChip label="Atendimento" count={queues.tickets || 0} onPress={() => setTab('support')} />
               <QueueChip label="Criadores" count={queues.creators || 0} onPress={() => setTab('moderation')} />
               <QueueChip label="Conteúdo" count={queues.content || 0} onPress={() => setTab('moderation')} />
               <QueueChip label="Payouts" count={queues.payouts || 0} onPress={() => setTab('moderation')} />
@@ -356,7 +517,7 @@ export default function AdminCommandCenter({ onBack }) {
               Pagamentos pendentes
             </Text>
             <Text style={{ color: colors.muted, marginBottom: 20 }}>
-              Confirmação manual IBAN / Multicaixa — dispara notificação ao cliente.
+              Confirmação manual IBAN / Multicaixa — dispara entitlement e notificação.
             </Text>
             {payments.length === 0 ? (
               <EmptyState title="Fila limpa" subtitle="Nenhum comprovativo à espera." />
@@ -367,12 +528,18 @@ export default function AdminCommandCenter({ onBack }) {
                     {tx.fullName} · {tx.email}
                   </Text>
                   <Text style={{ color: colors.textSecondary, marginTop: 4 }}>
-                    {tx.type === 'subscription' ? 'Premium' : tx.videoTitle || 'Aluguer'} ·{' '}
-                    {tx.amountKz?.toLocaleString('pt-AO')} Kz · {(tx.paymentMethod || '').toUpperCase()}
+                    {tx.type === 'subscription'
+                      ? 'Premium'
+                      : tx.type === 'pack'
+                        ? `Pack · ${tx.packSlug || tx.videoTitle || 'TVOD'}`
+                        : tx.videoTitle || 'Aluguer'}{' '}
+                    · {tx.amountKz?.toLocaleString('pt-AO')} Kz · {(tx.paymentMethod || '').toUpperCase()}
                   </Text>
-                  <Text style={{ color: colors.muted, fontSize: 12, marginTop: 6 }}>
-                    {new Date(tx.createdAt).toLocaleString('pt-AO')}
-                  </Text>
+                  {tx.riskScore != null ? (
+                    <Text style={{ color: tx.riskScore >= 70 ? colors.gold : colors.muted, marginTop: 4 }}>
+                      Risco {tx.riskScore}
+                    </Text>
+                  ) : null}
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
                     {tx.proofUrl ? (
                       <PrimaryButton
@@ -383,9 +550,7 @@ export default function AdminCommandCenter({ onBack }) {
                     ) : null}
                     <PrimaryButton
                       label={busy === tx.id ? '…' : 'Aprovar'}
-                      onPress={() =>
-                        run(tx.id, () => reviewPayment(tx.id, { status: 'pago' }))
-                      }
+                      onPress={() => run(tx.id, () => reviewPayment(tx.id, { status: 'pago' }))}
                       disabled={busy === tx.id}
                     />
                     <PrimaryButton
@@ -400,6 +565,150 @@ export default function AdminCommandCenter({ onBack }) {
                 </View>
               ))
             )}
+
+            <SectionTitle>Fila de risco</SectionTitle>
+            {risk.length === 0 ? (
+              <EmptyState title="Sem alertas de risco" />
+            ) : (
+              risk.slice(0, 12).map((tx) => (
+                <View key={`risk-${tx.id}`} style={cardStyle}>
+                  <Text style={{ color: colors.text, fontWeight: '700' }}>
+                    {tx.email || tx.fullName || tx.id}
+                  </Text>
+                  <Text style={{ color: colors.gold }}>Score {tx.riskScore ?? tx.risk_score ?? '—'}</Text>
+                </View>
+              ))
+            )}
+          </View>
+        ) : null}
+
+        {tab === 'support' ? (
+          <View>
+            <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800', marginBottom: 8 }}>
+              Atendimento
+            </Text>
+            <Text style={{ color: colors.muted, marginBottom: 20 }}>
+              Tickets de suporte e artigos do Centro de Ajuda.
+            </Text>
+
+            <SectionTitle>Tickets abertos</SectionTitle>
+            {tickets.length === 0 ? (
+              <EmptyState title="Sem tickets em aberto" />
+            ) : (
+              tickets.map((t) => (
+                <View key={t.id} style={cardStyle}>
+                  <Text style={{ color: colors.text, fontWeight: '700' }}>{t.subject}</Text>
+                  <Text style={{ color: colors.textSecondary, marginTop: 4 }}>
+                    {t.fullName} · {t.email} · {t.category} · {t.priority}
+                  </Text>
+                  <Text style={{ color: colors.muted, marginTop: 8 }}>{t.body}</Text>
+                  <TextInput
+                    value={ticketNotes[t.id] || ''}
+                    onChangeText={(v) => setTicketNotes((m) => ({ ...m, [t.id]: v }))}
+                    placeholder="Notas internas"
+                    placeholderTextColor={colors.muted}
+                    style={inputStyle({ marginTop: 12 })}
+                  />
+                  <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
+                    <PrimaryButton
+                      label="Em progresso"
+                      variant="outline"
+                      onPress={() =>
+                        run(`tk-${t.id}`, () =>
+                          reviewTicket(t.id, {
+                            status: 'in_progress',
+                            adminNotes: ticketNotes[t.id] || undefined,
+                          })
+                        )
+                      }
+                    />
+                    <PrimaryButton
+                      label="Resolver"
+                      onPress={() =>
+                        run(`tk-r-${t.id}`, () =>
+                          reviewTicket(t.id, {
+                            status: 'resolved',
+                            adminNotes: ticketNotes[t.id] || 'Resolvido',
+                          })
+                        )
+                      }
+                    />
+                    <PrimaryButton
+                      label="Fechar"
+                      variant="outline"
+                      onPress={() =>
+                        run(`tk-c-${t.id}`, () =>
+                          reviewTicket(t.id, {
+                            status: 'closed',
+                            adminNotes: ticketNotes[t.id] || undefined,
+                          })
+                        )
+                      }
+                    />
+                  </View>
+                </View>
+              ))
+            )}
+
+            <SectionTitle>FAQ / Artigos</SectionTitle>
+            <View style={cardStyle}>
+              <TextInput
+                value={articleForm.slug}
+                onChangeText={(slug) => setArticleForm((f) => ({ ...f, slug }))}
+                placeholder="slug"
+                placeholderTextColor={colors.muted}
+                autoCapitalize="none"
+                style={inputStyle()}
+              />
+              <TextInput
+                value={articleForm.title}
+                onChangeText={(title) => setArticleForm((f) => ({ ...f, title }))}
+                placeholder="Título"
+                placeholderTextColor={colors.muted}
+                style={inputStyle()}
+              />
+              <TextInput
+                value={articleForm.category}
+                onChangeText={(category) => setArticleForm((f) => ({ ...f, category }))}
+                placeholder="Categoria"
+                placeholderTextColor={colors.muted}
+                style={inputStyle()}
+              />
+              <TextInput
+                value={articleForm.bodyMd}
+                onChangeText={(bodyMd) => setArticleForm((f) => ({ ...f, bodyMd }))}
+                placeholder="Corpo (markdown)"
+                placeholderTextColor={colors.muted}
+                multiline
+                style={inputStyle({ minHeight: 100, textAlignVertical: 'top' })}
+              />
+              <PrimaryButton
+                label={busy === 'article-create' ? '…' : 'Publicar artigo'}
+                onPress={() =>
+                  run('article-create', async () => {
+                    await upsertHelpArticle(articleForm);
+                    setArticleForm({ slug: '', title: '', category: 'geral', bodyMd: '' });
+                  })
+                }
+              />
+            </View>
+            {articles.map((a) => (
+              <View key={a.id} style={cardStyle}>
+                <Text style={{ color: colors.text, fontWeight: '700' }}>{a.title}</Text>
+                <Text style={{ color: colors.muted }}>
+                  {a.slug} · {a.category} · {a.isPublished ? 'publicado' : 'rascunho'}
+                </Text>
+                <View style={{ marginTop: 10 }}>
+                  <PrimaryButton
+                    label={a.isPublished ? 'Despublicar' : 'Publicar'}
+                    variant="outline"
+                    onPress={() =>
+                      run(`art-${a.id}`, () => publishHelpArticle(a.id, !a.isPublished))
+                    }
+                  />
+                </View>
+              </View>
+            ))}
           </View>
         ) : null}
 
@@ -412,7 +721,9 @@ export default function AdminCommandCenter({ onBack }) {
               creators.map((c) => (
                 <View key={c.id} style={cardStyle}>
                   <Text style={{ color: colors.text, fontWeight: '700' }}>{c.displayName}</Text>
-                  <Text style={{ color: colors.muted }}>{c.email} · {c.type}</Text>
+                  <Text style={{ color: colors.muted }}>
+                    {c.email} · {c.type}
+                  </Text>
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
                     <PrimaryButton
                       label="Activar"
@@ -511,13 +822,332 @@ export default function AdminCommandCenter({ onBack }) {
           </View>
         ) : null}
 
+        {tab === 'editorial' ? (
+          <View>
+            <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800', marginBottom: 8 }}>
+              Colecções editoriais
+            </Text>
+            <Text style={{ color: colors.muted, marginBottom: 16 }}>
+              Controlam filas da Home (estilo Netflix rows).
+            </Text>
+            <View style={cardStyle}>
+              <TextInput
+                value={editorialForm.slug}
+                onChangeText={(slug) => setEditorialForm((f) => ({ ...f, slug }))}
+                placeholder="slug"
+                placeholderTextColor={colors.muted}
+                autoCapitalize="none"
+                style={inputStyle()}
+              />
+              <TextInput
+                value={editorialForm.title}
+                onChangeText={(title) => setEditorialForm((f) => ({ ...f, title }))}
+                placeholder="Título da fila"
+                placeholderTextColor={colors.muted}
+                style={inputStyle()}
+              />
+              <TextInput
+                value={editorialForm.subtitle}
+                onChangeText={(subtitle) => setEditorialForm((f) => ({ ...f, subtitle }))}
+                placeholder="Subtítulo"
+                placeholderTextColor={colors.muted}
+                style={inputStyle()}
+              />
+              <PrimaryButton
+                label="Criar colecção"
+                onPress={() =>
+                  run('ed-create', async () => {
+                    await createEditorial(editorialForm);
+                    setEditorialForm({ slug: '', title: '', subtitle: '' });
+                  })
+                }
+              />
+            </View>
+            {collections.length === 0 ? (
+              <EmptyState title="Sem colecções" />
+            ) : (
+              collections.map((c) => (
+                <View key={c.id} style={cardStyle}>
+                  <Text style={{ color: colors.text, fontWeight: '700' }}>{c.title}</Text>
+                  <Text style={{ color: colors.muted }}>
+                    {c.slug} · {c.placement || 'home'} ·{' '}
+                    {c.isPublished !== false ? 'publicada' : 'rascunho'}
+                  </Text>
+                  <View style={{ marginTop: 10 }}>
+                    <PrimaryButton
+                      label={c.isPublished === false ? 'Publicar' : 'Despublicar'}
+                      variant="outline"
+                      onPress={() =>
+                        run(`ed-${c.id}`, () =>
+                          updateEditorial(c.id, { isPublished: c.isPublished === false })
+                        )
+                      }
+                    />
+                  </View>
+                </View>
+              ))
+            )}
+          </View>
+        ) : null}
+
+        {tab === 'flags' ? (
+          <View>
+            <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800', marginBottom: 8 }}>
+              Feature flags
+            </Text>
+            <Text style={{ color: colors.muted, marginBottom: 16 }}>
+              Ligar/desligar capacidades da app sem deploy.
+            </Text>
+            {flags.length === 0 ? (
+              <EmptyState title="Sem flags" />
+            ) : (
+              flags.map((f) => (
+                <View
+                  key={f.key}
+                  style={{
+                    ...cardStyle,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: colors.text, fontWeight: '700' }}>{f.key}</Text>
+                    <Text style={{ color: colors.muted, marginTop: 4 }}>
+                      {f.description || '—'}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={Boolean(f.enabled)}
+                    onValueChange={(enabled) =>
+                      run(`flag-${f.key}`, () => setFeatureFlag(f.key, enabled))
+                    }
+                    trackColor={{ false: colors.border, true: colors.red }}
+                    thumbColor={colors.text}
+                  />
+                </View>
+              ))
+            )}
+
+            <SectionTitle>Experiências A/B</SectionTitle>
+            {experiments.length === 0 ? (
+              <EmptyState title="Sem experiências activas" />
+            ) : (
+              experiments.map((e, idx) => (
+                <View key={e.key || e.id || idx} style={cardStyle}>
+                  <Text style={{ color: colors.text, fontWeight: '700' }}>
+                    {e.key || e.name || e.id}
+                  </Text>
+                  <Text style={{ color: colors.muted }}>
+                    {typeof e === 'object' ? JSON.stringify(e).slice(0, 120) : String(e)}
+                  </Text>
+                </View>
+              ))
+            )}
+          </View>
+        ) : null}
+
+        {tab === 'config' ? (
+          <View>
+            <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800', marginBottom: 8 }}>
+              Configuração & Onboarding
+            </Text>
+            <Text style={{ color: colors.muted, marginBottom: 16 }}>
+              Onboarding, contactos de suporte e mensagens de marca. Exposto em GET /api/app/config.
+            </Text>
+            {settings.length === 0 ? (
+              <EmptyState title="Sem settings" subtitle="Corra a migração 025." />
+            ) : (
+              settings.map((s) => (
+                <View key={s.key} style={cardStyle}>
+                  <Text style={{ color: colors.gold, fontWeight: '800', letterSpacing: 1 }}>
+                    {s.key.toUpperCase()}
+                  </Text>
+                  {s.description ? (
+                    <Text style={{ color: colors.muted, marginTop: 4, marginBottom: 8 }}>
+                      {s.description}
+                    </Text>
+                  ) : null}
+                  <TextInput
+                    value={configDrafts[s.key] ?? ''}
+                    onChangeText={(v) => setConfigDrafts((d) => ({ ...d, [s.key]: v }))}
+                    multiline
+                    autoCapitalize="none"
+                    style={inputStyle({
+                      minHeight: 140,
+                      fontFamily: 'monospace',
+                      textAlignVertical: 'top',
+                    })}
+                  />
+                  <PrimaryButton
+                    label={busy === `cfg-${s.key}` ? '…' : 'Guardar'}
+                    onPress={() =>
+                      run(`cfg-${s.key}`, async () => {
+                        let parsed;
+                        try {
+                          parsed = JSON.parse(configDrafts[s.key] || '{}');
+                        } catch {
+                          throw new Error(`JSON inválido em ${s.key}`);
+                        }
+                        await upsertAppConfig(s.key, parsed, s.description);
+                      })
+                    }
+                  />
+                </View>
+              ))
+            )}
+          </View>
+        ) : null}
+
+        {tab === 'media' ? (
+          <View>
+            <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800', marginBottom: 8 }}>
+              CDN / Encoding
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+              <PrimaryButton
+                label={busy === 'cdn-probe' ? 'A testar…' : 'Probe CDN'}
+                onPress={() =>
+                  run('cdn-probe', async () => {
+                    const r = await probeCdn();
+                    setCdn(r);
+                  })
+                }
+              />
+            </View>
+            <View style={cardStyle}>
+              <Text style={{ color: colors.text, fontWeight: '700' }}>Estado Bunny / CDN</Text>
+              <Text style={{ color: colors.muted, marginTop: 8 }}>
+                {cdn
+                  ? JSON.stringify(cdn, null, 2).slice(0, 800)
+                  : 'Sem dados — execute Probe CDN.'}
+              </Text>
+            </View>
+            <SectionTitle>Fila de encoding</SectionTitle>
+            {encoding.length === 0 ? (
+              <EmptyState title="Fila vazia ou encoding desactivado" />
+            ) : (
+              encoding.slice(0, 30).map((item) => (
+                <View key={item.id || item.contentId} style={cardStyle}>
+                  <Text style={{ color: colors.text, fontWeight: '700' }}>
+                    {item.title || item.contentId || item.id}
+                  </Text>
+                  <Text style={{ color: colors.muted }}>
+                    {item.status || item.encodingStatus || '—'}
+                  </Text>
+                </View>
+              ))
+            )}
+          </View>
+        ) : null}
+
+        {tab === 'catalog' ? (
+          <View>
+            <SectionTitle>Packs TVOD</SectionTitle>
+            {packs.length === 0 ? (
+              <EmptyState title="Sem packs" />
+            ) : (
+              packs.map((p) => (
+                <View key={p.id || p.slug} style={cardStyle}>
+                  <Text style={{ color: colors.text, fontWeight: '700' }}>
+                    {p.title || p.name || p.slug}
+                  </Text>
+                  <Text style={{ color: colors.muted }}>
+                    {p.slug} · {p.priceKz?.toLocaleString?.('pt-AO') || p.price_kz || '—'} Kz ·{' '}
+                    {p.isActive !== false ? 'activo' : 'inactivo'}
+                  </Text>
+                </View>
+              ))
+            )}
+
+            <SectionTitle>NPS / Surveys</SectionTitle>
+            <View style={cardStyle}>
+              <Text style={{ color: colors.muted }}>
+                {surveys ? JSON.stringify(surveys, null, 2).slice(0, 600) : 'Sem resumo NPS.'}
+              </Text>
+            </View>
+
+            <SectionTitle>Estreias</SectionTitle>
+            {premieres.length === 0 ? (
+              <EmptyState title="Sem estreias" />
+            ) : (
+              premieres.map((e) => (
+                <View key={e.id} style={cardStyle}>
+                  <Text style={{ color: colors.text, fontWeight: '700' }}>{e.title}</Text>
+                  <Text style={{ color: colors.muted }}>
+                    {e.slug} · {e.streamStatus || e.phase || '—'} ·{' '}
+                    {e.isPublished !== false ? 'publicada' : 'rascunho'}
+                  </Text>
+                </View>
+              ))
+            )}
+
+            <SectionTitle>Presentes Premium</SectionTitle>
+            <View style={cardStyle}>
+              <TextInput
+                value={giftForm.email}
+                onChangeText={(email) => setGiftForm((f) => ({ ...f, email }))}
+                placeholder="email destinatário"
+                placeholderTextColor={colors.muted}
+                autoCapitalize="none"
+                style={inputStyle()}
+              />
+              <TextInput
+                value={giftForm.days}
+                onChangeText={(days) => setGiftForm((f) => ({ ...f, days }))}
+                placeholder="Dias"
+                placeholderTextColor={colors.muted}
+                keyboardType="number-pad"
+                style={inputStyle()}
+              />
+              <TextInput
+                value={giftForm.note}
+                onChangeText={(note) => setGiftForm((f) => ({ ...f, note }))}
+                placeholder="Nota"
+                placeholderTextColor={colors.muted}
+                style={inputStyle()}
+              />
+              <PrimaryButton
+                label="Oferecer Premium"
+                onPress={() =>
+                  run('gift-create', async () => {
+                    await createGift({
+                      recipientEmail: giftForm.email,
+                      days: Number(giftForm.days) || 30,
+                      message: giftForm.note,
+                    });
+                    setGiftForm({ email: '', days: '30', note: '' });
+                  })
+                }
+              />
+            </View>
+            {gifts.map((g) => (
+              <View key={g.id} style={cardStyle}>
+                <Text style={{ color: colors.text, fontWeight: '700' }}>
+                  {g.recipientEmail || g.redeemedEmail || g.code || g.id}
+                </Text>
+                <Text style={{ color: colors.muted }}>
+                  {g.days || g.premiumDays || '—'} dias · {g.status || '—'}
+                </Text>
+                {g.status !== 'revoked' ? (
+                  <View style={{ marginTop: 10 }}>
+                    <PrimaryButton
+                      label="Revogar"
+                      variant="outline"
+                      onPress={() => run(`gift-${g.id}`, () => revokeGift(g.id))}
+                    />
+                  </View>
+                ) : null}
+              </View>
+            ))}
+          </View>
+        ) : null}
+
         {tab === 'promos' ? (
           <View>
             <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800', marginBottom: 8 }}>
               Códigos promocionais
-            </Text>
-            <Text style={{ color: colors.muted, marginBottom: 16 }}>
-              Resgate concede dias Premium. Seed: ANGOLA7.
             </Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
               <TextInput
@@ -526,14 +1156,7 @@ export default function AdminCommandCenter({ onBack }) {
                 placeholder="CÓDIGO"
                 placeholderTextColor={colors.muted}
                 autoCapitalize="characters"
-                style={{
-                  minWidth: 140,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  color: colors.text,
-                  padding: 10,
-                  borderRadius: 4,
-                }}
+                style={inputStyle({ minWidth: 140, marginBottom: 0 })}
               />
               <TextInput
                 value={promoForm.days}
@@ -541,14 +1164,7 @@ export default function AdminCommandCenter({ onBack }) {
                 placeholder="Dias"
                 placeholderTextColor={colors.muted}
                 keyboardType="number-pad"
-                style={{
-                  width: 80,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  color: colors.text,
-                  padding: 10,
-                  borderRadius: 4,
-                }}
+                style={inputStyle({ width: 80, marginBottom: 0 })}
               />
               <TextInput
                 value={promoForm.max}
@@ -556,14 +1172,7 @@ export default function AdminCommandCenter({ onBack }) {
                 placeholder="Máx."
                 placeholderTextColor={colors.muted}
                 keyboardType="number-pad"
-                style={{
-                  width: 90,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  color: colors.text,
-                  padding: 10,
-                  borderRadius: 4,
-                }}
+                style={inputStyle({ width: 90, marginBottom: 0 })}
               />
               <PrimaryButton
                 label={busy === 'promo-create' ? '…' : 'Criar'}
@@ -582,7 +1191,7 @@ export default function AdminCommandCenter({ onBack }) {
               />
             </View>
             {promos.length === 0 ? (
-              <EmptyState title="Sem códigos" subtitle="Crie o primeiro código de campanha." />
+              <EmptyState title="Sem códigos" />
             ) : (
               promos.map((p) => (
                 <View key={p.id} style={cardStyle}>
@@ -594,11 +1203,6 @@ export default function AdminCommandCenter({ onBack }) {
                     {p.maxRedemptions != null ? ` / ${p.maxRedemptions}` : ''} resgates ·{' '}
                     {p.isActive ? 'activo' : 'inactivo'}
                   </Text>
-                  {p.description ? (
-                    <Text style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
-                      {p.description}
-                    </Text>
-                  ) : null}
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
                     <PrimaryButton
                       label={p.isActive ? 'Desactivar' : 'Activar'}
@@ -619,9 +1223,6 @@ export default function AdminCommandCenter({ onBack }) {
             <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800', marginBottom: 8 }}>
               Streams activos
             </Text>
-            <Text style={{ color: colors.muted, marginBottom: 20 }}>
-              Heartbeat &lt; 90s · limites Free/Premium aplicados no play gate.
-            </Text>
             {streams.length === 0 ? (
               <EmptyState title="Ninguém a assistir agora" />
             ) : (
@@ -630,9 +1231,6 @@ export default function AdminCommandCenter({ onBack }) {
                   <Text style={{ color: colors.text, fontWeight: '700' }}>{s.contentTitle}</Text>
                   <Text style={{ color: colors.textSecondary, marginTop: 4 }}>
                     {s.email} · {s.deviceName || 'Dispositivo'} ({s.platform || '—'})
-                  </Text>
-                  <Text style={{ color: colors.muted, fontSize: 12, marginTop: 6 }}>
-                    Heartbeat {new Date(s.lastHeartbeatAt).toLocaleTimeString('pt-AO')}
                   </Text>
                 </View>
               ))
@@ -644,9 +1242,6 @@ export default function AdminCommandCenter({ onBack }) {
           <View>
             <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800', marginBottom: 8 }}>
               Trilha de auditoria
-            </Text>
-            <Text style={{ color: colors.muted, marginBottom: 20 }}>
-              Acções privilegiadas com actor, IP e timestamp.
             </Text>
             {audit.length === 0 ? (
               <EmptyState title="Sem registos" />
@@ -686,15 +1281,7 @@ export default function AdminCommandCenter({ onBack }) {
               onChangeText={setRejectReason}
               placeholder="Ex.: comprovativo ilegível"
               placeholderTextColor={colors.muted}
-              style={{
-                borderWidth: 1,
-                borderColor: colors.border,
-                color: colors.text,
-                padding: 12,
-                marginBottom: 16,
-                minHeight: 80,
-                textAlignVertical: 'top',
-              }}
+              style={inputStyle({ minHeight: 80, textAlignVertical: 'top' })}
               multiline
             />
             <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -721,50 +1308,3 @@ export default function AdminCommandCenter({ onBack }) {
     </View>
   );
 }
-
-function SectionTitle({ children }) {
-  return (
-    <Text
-      style={{
-        color: colors.gold,
-        fontWeight: '700',
-        letterSpacing: 1,
-        marginTop: 8,
-        marginBottom: 12,
-      }}
-    >
-      {children}
-    </Text>
-  );
-}
-
-function AuditRow({ item }) {
-  return (
-    <View
-      style={{
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-      }}
-    >
-      <Text style={{ color: colors.text, fontWeight: '700' }}>{item.action}</Text>
-      <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 2 }}>
-        {item.entity}
-        {item.actor?.email ? ` · ${item.actor.email}` : ''}
-        {item.ip ? ` · ${item.ip}` : ''}
-      </Text>
-      <Text style={{ color: colors.muted, fontSize: 11, marginTop: 4 }}>
-        {new Date(item.createdAt).toLocaleString('pt-AO')}
-      </Text>
-    </View>
-  );
-}
-
-const cardStyle = {
-  backgroundColor: '#111',
-  borderWidth: 1,
-  borderColor: colors.border,
-  borderRadius: 6,
-  padding: 16,
-  marginBottom: 12,
-};

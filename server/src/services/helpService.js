@@ -148,6 +148,68 @@ async function adminReviewTicket(adminId, ticketId, body, meta = {}) {
   };
 }
 
+async function adminListArticles(limit) {
+  const rows = await helpRepository.adminListArticles(limit);
+  return {
+    articles: rows.map((r) => ({
+      id: r.id,
+      slug: r.slug,
+      category: r.category,
+      title: r.title,
+      bodyMd: r.body_md,
+      locale: r.locale,
+      sortOrder: r.sort_order,
+      isPublished: r.is_published,
+      updatedAt: r.updated_at,
+    })),
+  };
+}
+
+async function adminUpsertArticle(adminId, body, meta = {}) {
+  if (!body?.slug || !body?.title) {
+    throw createError(400, 'slug e title obrigatórios', 'VALIDATION');
+  }
+  const slug = String(body.slug)
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/^-|-$/g, '');
+  const row = await helpRepository.adminUpsertArticle({ ...body, slug });
+  await auditRepository.write({
+    actorId: adminId,
+    action: 'support.article_upserted',
+    entity: 'help_article',
+    entityId: row.id,
+    metadata: { slug: row.slug },
+    ip: meta.ip,
+  });
+  return {
+    id: row.id,
+    slug: row.slug,
+    category: row.category,
+    title: row.title,
+    bodyMd: row.body_md,
+    locale: row.locale,
+    sortOrder: row.sort_order,
+    isPublished: row.is_published,
+    updatedAt: row.updated_at,
+  };
+}
+
+async function adminSetArticlePublished(adminId, articleId, isPublished, meta = {}) {
+  const row = await helpRepository.adminSetArticlePublished(articleId, isPublished);
+  if (!row) throw createError(404, 'Artigo não encontrado', 'NOT_FOUND');
+  await auditRepository.write({
+    actorId: adminId,
+    action: 'support.article_publish',
+    entity: 'help_article',
+    entityId: articleId,
+    metadata: { isPublished: row.is_published },
+    ip: meta.ip,
+  });
+  return { id: row.id, slug: row.slug, isPublished: row.is_published };
+}
+
 module.exports = {
   listAvatars,
   listHelp,
@@ -156,4 +218,7 @@ module.exports = {
   myTickets,
   adminListTickets,
   adminReviewTicket,
+  adminListArticles,
+  adminUpsertArticle,
+  adminSetArticlePublished,
 };

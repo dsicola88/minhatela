@@ -117,6 +117,54 @@ async function reviewTicket({ ticketId, status, adminNotes, assignedTo }) {
   return result.rows[0] || null;
 }
 
+async function adminListArticles(limit = 100) {
+  const result = await query(
+    `SELECT id, slug, category, title, body_md, locale, sort_order, is_published, updated_at
+     FROM help_articles
+     ORDER BY sort_order ASC, title ASC
+     LIMIT $1`,
+    [Math.min(200, Number(limit) || 100)]
+  );
+  return result.rows;
+}
+
+async function adminUpsertArticle(body) {
+  const result = await query(
+    `INSERT INTO help_articles (slug, category, title, body_md, locale, sort_order, is_published)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)
+     ON CONFLICT (slug) DO UPDATE SET
+       category = EXCLUDED.category,
+       title = EXCLUDED.title,
+       body_md = EXCLUDED.body_md,
+       locale = EXCLUDED.locale,
+       sort_order = EXCLUDED.sort_order,
+       is_published = EXCLUDED.is_published,
+       updated_at = NOW()
+     RETURNING id, slug, category, title, body_md, locale, sort_order, is_published, updated_at`,
+    [
+      body.slug,
+      body.category || 'geral',
+      body.title,
+      body.bodyMd || body.body_md || '',
+      body.locale || 'pt-AO',
+      Number(body.sortOrder) || 100,
+      body.isPublished !== false,
+    ]
+  );
+  return result.rows[0];
+}
+
+async function adminSetArticlePublished(id, isPublished) {
+  const result = await query(
+    `UPDATE help_articles
+     SET is_published = $2, updated_at = NOW()
+     WHERE id = $1
+     RETURNING id, slug, is_published, updated_at`,
+    [id, Boolean(isPublished)]
+  );
+  return result.rows[0] || null;
+}
+
 module.exports = {
   listAvatars,
   listArticles,
@@ -125,4 +173,7 @@ module.exports = {
   listTicketsByUser,
   listOpenTickets,
   reviewTicket,
+  adminListArticles,
+  adminUpsertArticle,
+  adminSetArticlePublished,
 };

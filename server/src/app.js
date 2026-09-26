@@ -205,6 +205,13 @@ function createApp() {
   );
   app.use('/api/admin', adminRoutes);
 
+  app.get(
+    '/api/app/config',
+    require('./utils/asyncHandler').asyncHandler(async (_req, res) => {
+      res.json(await require('./services/appConfigService').publicBootstrap());
+    })
+  );
+
   // Deep link SEO / Open Graph (crawlers WhatsApp/Facebook)
   app.get(
     '/share/:id',
