@@ -418,6 +418,150 @@ async function listAllCampaigns({ status, limit = 50 } = {}) {
   };
 }
 
+/* ─── Catalog CMS ───────────────────────────────────────── */
+
+async function listCatalog({ q, limit = 40, offset = 0 } = {}) {
+  const needle = q ? `%${String(q).trim().toLowerCase()}%` : null;
+  const result = await query(
+    `SELECT id, title, slug, kind, monetization, rental_price_kz, is_published,
+            is_featured, workflow_status, bunny_video_id, poster_url, updated_at
+     FROM videos
+     WHERE kind IN ('movie', 'series', 'episode')
+       AND ($1::text IS NULL OR LOWER(title) LIKE $1 OR LOWER(slug) LIKE $1)
+     ORDER BY updated_at DESC
+     LIMIT $2 OFFSET $3`,
+    [needle, Math.min(100, Number(limit) || 40), Math.max(0, Number(offset) || 0)]
+  );
+  return {
+    titles: result.rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      slug: r.slug,
+      kind: r.kind,
+      monetization: r.monetization,
+      rentalPriceKz: r.rental_price_kz,
+      isPublished: r.is_published,
+      isFeatured: r.is_featured,
+      workflowStatus: r.workflow_status,
+      bunnyVideoId: r.bunny_video_id,
+      posterUrl: r.poster_url,
+      updatedAt: r.updated_at,
+    })),
+  };
+}
+
+async function patchCatalogTitle(actorId, contentId, body, meta = {}) {
+  const result = await query(
+    `UPDATE videos SET
+       is_published = COALESCE($2, is_published),
+       is_featured = COALESCE($3, is_featured),
+       monetization = COALESCE($4::monetization_model, monetization),
+       rental_price_kz = CASE WHEN $5::boolean THEN $6 ELSE rental_price_kz END,
+       workflow_status = COALESCE($7::content_workflow, workflow_status),
+       updated_at = NOW()
+     WHERE id = $1
+     RETURNING id, title, is_published, is_featured, monetization, rental_price_kz, workflow_status`,
+    [
+      contentId,
+      body.isPublished === undefined ? null : Boolean(body.isPublished),
+      body.isFeatured === undefined ? null : Boolean(body.isFeatured),
+      body.monetization || null,
+      body.rentalPriceKz !== undefined,
+      body.rentalPriceKz === null || body.rentalPriceKz === ''
+        ? null
+        : Number(body.rentalPriceKz),
+      body.workflowStatus || null,
+    ]
+  );
+  const row = result.rows[0];
+  if (!row) throw createError(404, 'Título não encontrado', 'NOT_FOUND');
+  await auditRepository.write({
+    actorId,
+    action: 'catalog.patched',
+    entity: 'video',
+    entityId: contentId,
+    metadata: {
+      isPublished: row.is_published,
+      isFeatured: row.is_featured,
+      monetization: row.monetization,
+    },
+    ip: meta.ip,
+  });
+  return {
+    id: row.id,
+    title: row.title,
+    isPublished: row.is_published,
+    isFeatured: row.is_featured,
+    monetization: row.monetization,
+    rentalPriceKz: row.rental_price_kz,
+    workflowStatus: row.workflow_status,
+  };
+}
+
+/* ─── Packs admin ───────────────────────────────────────── */
+
+async function upsertPack(actorId, body, meta = {}) {
+  if (!body?.slug || !body?.title || !body?.priceKz) {
+    throw createError(400, 'slug, title e priceKz obrigatórios', 'VALIDATION');
+  }
+  const slug = String(body.slug)
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/^-|-$/g, '');
+  const result = await query(
+    `INSERT INTO tvod_packs (slug, title, description, poster_url, price_kz, rental_hours, is_active, sort_order)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+     ON CONFLICT (slug) DO UPDATE SET
+       title = EXCLUDED.title,
+       description = EXCLUDED.description,
+       poster_url = EXCLUDED.poster_url,
+       price_kz = EXCLUDED.price_kz,
+       rental_hours = EXCLUDED.rental_hours,
+       is_active = EXCLUDED.is_active,
+       sort_order = EXCLUDED.sort_order,
+       updated_at = NOW()
+     RETURNING *`,
+    [
+      slug,
+      body.title.trim(),
+      body.description || null,
+      body.posterUrl || null,
+      Number(body.priceKz),
+      Number(body.rentalHours) || 48,
+      body.isActive !== false,
+      Number(body.sortOrder) || 0,
+    ]
+  );
+  const pack = result.rows[0];
+  if (Array.isArray(body.videoIds)) {
+    await query(`DELETE FROM tvod_pack_items WHERE pack_id = $1`, [pack.id]);
+    for (let i = 0; i < body.videoIds.length; i += 1) {
+      await query(
+        `INSERT INTO tvod_pack_items (pack_id, video_id, sort_order) VALUES ($1,$2,$3)
+         ON CONFLICT DO NOTHING`,
+        [pack.id, body.videoIds[i], i]
+      );
+    }
+  }
+  await auditRepository.write({
+    actorId,
+    action: 'pack.upserted',
+    entity: 'tvod_pack',
+    entityId: pack.id,
+    metadata: { slug: pack.slug, priceKz: pack.price_kz },
+    ip: meta.ip,
+  });
+  return {
+    id: pack.id,
+    slug: pack.slug,
+    title: pack.title,
+    priceKz: pack.price_kz,
+    rentalHours: pack.rental_hours,
+    isActive: pack.is_active,
+  };
+}
+
 module.exports = {
   listUsers,
   updateUser,
@@ -431,5 +575,8 @@ module.exports = {
   registerUpload,
   listProofUploads,
   listAllCampaigns,
+  listCatalog,
+  patchCatalogTitle,
+  upsertPack,
   mapPlan,
 };

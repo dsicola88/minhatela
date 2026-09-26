@@ -2,7 +2,7 @@
 
 const express = require('express');
 const { asyncHandler } = require('../utils/asyncHandler');
-const { requireAuth, requireRoles } = require('../middleware/auth');
+const { requireAuth, requireRoles, requireExactRoles } = require('../middleware/auth');
 const paymentController = require('../controllers/paymentController');
 const adminOpsController = require('../controllers/adminOpsController');
 const creatorStudioService = require('../services/creatorStudioService');
@@ -13,14 +13,19 @@ const router = express.Router();
 
 router.use(requireAuth, requireRoles('admin', 'super_admin', 'moderator'));
 
+/** Ops elevados: admin empresa (não moderator) */
+const elevated = requireRoles('admin', 'super_admin');
+/** Só superadmin: identidade e config crítica */
+const superOnly = requireExactRoles('super_admin');
+
 router.get('/command-center', asyncHandler(adminOpsController.commandCenter));
 router.get('/dashboard', asyncHandler(adminOpsController.commandCenter));
 router.get('/audit', asyncHandler(adminOpsController.audit));
 router.get('/streams/live', asyncHandler(adminOpsController.liveStreams));
 router.get('/campaigns/pending', asyncHandler(adminOpsController.campaigns));
 
-router.get('/transactions/pending', asyncHandler(paymentController.pending));
-router.patch('/transactions/:id/status', asyncHandler(paymentController.review));
+router.get('/transactions/pending', elevated, asyncHandler(paymentController.pending));
+router.patch('/transactions/:id/status', elevated, asyncHandler(paymentController.review));
 
 router.get(
   '/creators/pending',
@@ -107,6 +112,7 @@ router.patch(
 
 router.get(
   '/feature-flags',
+  elevated,
   asyncHandler(async (_req, res) => {
     const flags = await require('../services/featureFlagService').listAll();
     res.json({ flags });
@@ -115,6 +121,7 @@ router.get(
 
 router.patch(
   '/feature-flags/:key',
+  superOnly,
   asyncHandler(async (req, res) => {
     const flag = await require('../services/featureFlagService').setFlag(
       req.params.key,
@@ -300,18 +307,21 @@ router.get('/cdn/health', asyncHandler(require('../controllers/phase26Controller
 
 router.get(
   '/config',
+  elevated,
   asyncHandler(async (_req, res) => {
     res.json(await require('../services/appConfigService').adminList());
   })
 );
 router.get(
   '/config/:key',
+  elevated,
   asyncHandler(async (req, res) => {
     res.json(await require('../services/appConfigService').adminGet(req.params.key));
   })
 );
 router.put(
   '/config/:key',
+  elevated,
   asyncHandler(async (req, res) => {
     const result = await require('../services/appConfigService').adminUpsert(
       req.user.id,
@@ -357,12 +367,14 @@ const enterprise = require('../services/enterpriseConsoleService');
 
 router.get(
   '/users',
+  elevated,
   asyncHandler(async (req, res) => {
     res.json(await enterprise.listUsers(req.query));
   })
 );
 router.patch(
   '/users/:id',
+  elevated,
   asyncHandler(async (req, res) => {
     res.json(await enterprise.updateUser(req.user.id, req.params.id, req.body, { ip: req.ip }));
   })
@@ -370,12 +382,14 @@ router.patch(
 
 router.get(
   '/plans',
+  elevated,
   asyncHandler(async (_req, res) => {
     res.json(await enterprise.listPlansAdmin());
   })
 );
 router.put(
   '/plans/:id',
+  elevated,
   asyncHandler(async (req, res) => {
     res.json(
       await enterprise.upsertPlan(req.user.id, req.params.id, req.body, { ip: req.ip })
@@ -385,12 +399,14 @@ router.put(
 
 router.get(
   '/leads',
+  elevated,
   asyncHandler(async (req, res) => {
     res.json(await enterprise.listLeads(req.query));
   })
 );
 router.patch(
   '/leads/:id',
+  elevated,
   asyncHandler(async (req, res) => {
     res.json(await enterprise.updateLead(req.user.id, req.params.id, req.body, { ip: req.ip }));
   })
@@ -398,18 +414,21 @@ router.patch(
 
 router.get(
   '/uploads',
+  elevated,
   asyncHandler(async (req, res) => {
     res.json(await enterprise.listUploads(req.query));
   })
 );
 router.get(
   '/uploads/proofs',
+  elevated,
   asyncHandler(async (req, res) => {
     res.json(await enterprise.listProofUploads(req.query.limit));
   })
 );
 router.post(
   '/uploads',
+  elevated,
   enterprise.mediaUpload.single('file'),
   asyncHandler(async (req, res) => {
     res.status(201).json(await enterprise.registerUpload(req.user.id, req.file, req.body));
@@ -418,8 +437,39 @@ router.post(
 
 router.get(
   '/ads/campaigns',
+  elevated,
   asyncHandler(async (req, res) => {
     res.json(await enterprise.listAllCampaigns(req.query));
+  })
+);
+
+router.get(
+  '/catalog',
+  asyncHandler(async (req, res) => {
+    res.json(await enterprise.listCatalog(req.query));
+  })
+);
+router.patch(
+  '/catalog/:id',
+  elevated,
+  asyncHandler(async (req, res) => {
+    res.json(
+      await enterprise.patchCatalogTitle(req.user.id, req.params.id, req.body, { ip: req.ip })
+    );
+  })
+);
+
+router.put(
+  '/packs/:slug',
+  elevated,
+  asyncHandler(async (req, res) => {
+    res.json(
+      await enterprise.upsertPack(
+        req.user.id,
+        { ...req.body, slug: req.params.slug },
+        { ip: req.ip }
+      )
+    );
   })
 );
 

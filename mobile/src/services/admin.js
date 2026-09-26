@@ -251,6 +251,30 @@ export async function fetchAllAdCampaigns(params = {}) {
   return api.get(`/api/admin/ads/campaigns${qs ? `?${qs}` : ''}`);
 }
 
+export async function fetchCatalog(params = {}) {
+  const q = new URLSearchParams();
+  if (params.q) q.set('q', params.q);
+  if (params.limit) q.set('limit', String(params.limit));
+  const qs = q.toString();
+  return api.get(`/api/admin/catalog${qs ? `?${qs}` : ''}`);
+}
+
+export async function patchCatalog(contentId, body) {
+  return api.patch(`/api/admin/catalog/${contentId}`, body);
+}
+
+export async function upsertPack(slug, body) {
+  return api.put(`/api/admin/packs/${encodeURIComponent(slug)}`, body);
+}
+
+export async function fetchReports(limit = 50) {
+  return api.get(`/api/admin/reports?limit=${limit}`);
+}
+
+export async function reviewReport(reportId, body) {
+  return api.patch(`/api/admin/reports/${reportId}`, body);
+}
+
 export function resolveProofUrl(path) {
   if (!path) return null;
   if (path.startsWith('http')) return path;
@@ -311,5 +335,10 @@ export default {
   fetchProofUploads,
   uploadAdminMedia,
   fetchAllAdCampaigns,
+  fetchCatalog,
+  patchCatalog,
+  upsertPack,
+  fetchReports,
+  reviewReport,
   resolveProofUrl,
 };

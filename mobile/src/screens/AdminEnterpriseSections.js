@@ -10,6 +10,8 @@ import {
   upsertAppConfig,
   reviewCampaign,
   resolveProofUrl,
+  patchCatalog,
+  reviewReport,
 } from '../services/admin';
 
 const cardStyle = {
@@ -398,6 +400,137 @@ export function AdsTab({ campaigns, run }) {
                 label="Rejeitar"
                 variant="outline"
                 onPress={() => run(`ad-r-${c.id}`, () => reviewCampaign(c.id, 'rejected'))}
+              />
+            </View>
+          </View>
+        ))
+      )}
+    </View>
+  );
+}
+
+export function CatalogCmsTab({ titles, catalogQuery, setCatalogQuery, onSearch, run }) {
+  return (
+    <View>
+      <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800', marginBottom: 8 }}>
+        CMS Catálogo
+      </Text>
+      <Text style={{ color: colors.muted, marginBottom: 16 }}>
+        Publicar, destacar e definir monetização AVOD/SVOD/TVOD — estilo Netflix Studio (ops AO).
+      </Text>
+      <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+        <TextInput
+          value={catalogQuery}
+          onChangeText={setCatalogQuery}
+          placeholder="Pesquisar título"
+          placeholderTextColor={colors.muted}
+          style={inputStyle({ flex: 1, minWidth: 200, marginBottom: 0 })}
+        />
+        <PrimaryButton label="Pesquisar" onPress={onSearch} />
+      </View>
+      {titles.length === 0 ? (
+        <EmptyState title="Sem títulos" />
+      ) : (
+        titles.map((t) => (
+          <View key={t.id} style={cardStyle}>
+            <Text style={{ color: colors.text, fontWeight: '700' }}>{t.title}</Text>
+            <Text style={{ color: colors.muted }}>
+              {t.kind} · {t.monetization}
+              {t.rentalPriceKz != null ? ` · ${t.rentalPriceKz} Kz` : ''} ·{' '}
+              {t.isPublished ? 'publicado' : 'oculto'}
+              {t.isFeatured ? ' · FEATURED' : ''} · {t.workflowStatus}
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+              <PrimaryButton
+                label={t.isPublished ? 'Despublicar' : 'Publicar'}
+                onPress={() =>
+                  run(`cat-p-${t.id}`, () =>
+                    patchCatalog(t.id, {
+                      isPublished: !t.isPublished,
+                      workflowStatus: !t.isPublished ? 'published' : 'archived',
+                    })
+                  )
+                }
+              />
+              <PrimaryButton
+                label={t.isFeatured ? 'Remover destaque' : 'Destacar'}
+                variant="outline"
+                onPress={() =>
+                  run(`cat-f-${t.id}`, () => patchCatalog(t.id, { isFeatured: !t.isFeatured }))
+                }
+              />
+              <PrimaryButton
+                label="AVOD"
+                variant="outline"
+                onPress={() =>
+                  run(`cat-a-${t.id}`, () =>
+                    patchCatalog(t.id, { monetization: 'avod', rentalPriceKz: null })
+                  )
+                }
+              />
+              <PrimaryButton
+                label="SVOD"
+                variant="outline"
+                onPress={() =>
+                  run(`cat-s-${t.id}`, () =>
+                    patchCatalog(t.id, { monetization: 'svod', rentalPriceKz: null })
+                  )
+                }
+              />
+              <PrimaryButton
+                label="TVOD 1500"
+                variant="outline"
+                onPress={() =>
+                  run(`cat-t-${t.id}`, () =>
+                    patchCatalog(t.id, { monetization: 'tvod', rentalPriceKz: 1500 })
+                  )
+                }
+              />
+            </View>
+          </View>
+        ))
+      )}
+    </View>
+  );
+}
+
+export function ReportsTab({ reports, run }) {
+  return (
+    <View>
+      <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800', marginBottom: 8 }}>
+        Denúncias / Trust & Safety
+      </Text>
+      <Text style={{ color: colors.muted, marginBottom: 16 }}>
+        Fila de reports de conteúdo — equivalente Netflix Trust & Safety (ops).
+      </Text>
+      {reports.length === 0 ? (
+        <EmptyState title="Fila limpa" />
+      ) : (
+        reports.map((r) => (
+          <View key={r.id} style={cardStyle}>
+            <Text style={{ color: colors.text, fontWeight: '700' }}>
+              {r.reason || r.category || 'Denúncia'} · {r.contentTitle || r.contentId}
+            </Text>
+            <Text style={{ color: colors.muted }}>
+              {r.status} · {r.email || r.reporterEmail || '—'}
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+              <PrimaryButton
+                label="Resolver"
+                onPress={() =>
+                  run(`rep-${r.id}`, () =>
+                    reviewReport(r.id, { status: 'resolved', notes: 'Revisado' })
+                  )
+                }
+              />
+              <PrimaryButton
+                label="Descartar"
+                variant="outline"
+                onPress={() =>
+                  run(`rep-d-${r.id}`, () =>
+                    reviewReport(r.id, { status: 'dismissed', notes: 'Sem acção' })
+                  )
+                }
               />
             </View>
           </View>

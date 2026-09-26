@@ -53,10 +53,22 @@ function requireRoles(...roles) {
   };
 }
 
+/** Exige role exacta (isAdmin sozinho não basta) — ops críticas Netflix-class */
+function requireExactRoles(...roles) {
+  return (req, _res, next) => {
+    const userRoles = req.user?.roles || [];
+    const allowed = roles.some((role) => userRoles.includes(role));
+    if (!allowed) {
+      return next(createError(403, 'Permissão insuficiente', 'FORBIDDEN'));
+    }
+    return next();
+  };
+}
+
 function optionalProfile(req, _res, next) {
   const profileId = req.headers['x-profile-id'] || req.body?.profileId || null;
   req.profileId = profileId || null;
   next();
 }
 
-module.exports = { requireAuth, requireRoles, optionalProfile };
+module.exports = { requireAuth, requireRoles, requireExactRoles, optionalProfile };

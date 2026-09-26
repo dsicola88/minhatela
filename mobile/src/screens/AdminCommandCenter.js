@@ -62,6 +62,8 @@ import {
   fetchProofUploads,
   uploadAdminMedia,
   fetchAllAdCampaigns,
+  fetchCatalog,
+  fetchReports,
 } from '../services/admin';
 import { fetchPendingPayouts, reviewPayout } from '../services/payouts';
 import Focusable from '../tv/Focusable';
@@ -72,6 +74,8 @@ import {
   LeadsTab,
   UploadsTab,
   AdsTab,
+  CatalogCmsTab,
+  ReportsTab,
 } from './AdminEnterpriseSections';
 
 const TABS = [
@@ -85,6 +89,8 @@ const TABS = [
   { id: 'moderation', label: 'Moderação', icon: 'shield-checkmark-outline' },
   { id: 'ads', label: 'Anúncios', icon: 'megaphone-outline' },
   { id: 'uploads', label: 'Uploads', icon: 'cloud-upload-outline' },
+  { id: 'cms', label: 'CMS Catálogo', icon: 'film-outline' },
+  { id: 'reports', label: 'Denúncias', icon: 'warning-outline' },
   { id: 'editorial', label: 'Editorial', icon: 'albums-outline' },
   { id: 'flags', label: 'Flags', icon: 'toggle-outline' },
   { id: 'config', label: 'Config / Onboard', icon: 'settings-outline' },
@@ -248,6 +254,9 @@ export default function AdminCommandCenter({ onBack }) {
   const [uploads, setUploads] = useState([]);
   const [proofs, setProofs] = useState([]);
   const [allAds, setAllAds] = useState([]);
+  const [catalogTitles, setCatalogTitles] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [catalogQuery, setCatalogQuery] = useState('');
   const [userQuery, setUserQuery] = useState('');
   const [promoForm, setPromoForm] = useState({ code: '', days: '7', max: '1000' });
   const [articleForm, setArticleForm] = useState({
@@ -296,6 +305,8 @@ export default function AdminCommandCenter({ onBack }) {
         up,
         pf,
         adsAll,
+        cat,
+        reps,
       ] = await Promise.all([
         fetchCommandCenter(),
         fetchPendingPayments(),
@@ -325,6 +336,8 @@ export default function AdminCommandCenter({ onBack }) {
         fetchUploads({ limit: 40 }).catch(() => ({ uploads: [] })),
         fetchProofUploads(40).catch(() => ({ proofs: [] })),
         fetchAllAdCampaigns({}).catch(() => ({ campaigns: [] })),
+        fetchCatalog({ limit: 40 }).catch(() => ({ titles: [] })),
+        fetchReports(40).catch(() => ({ reports: [] })),
       ]);
       setCenter(cc);
       setPayments(pay.transactions || []);
@@ -354,6 +367,8 @@ export default function AdminCommandCenter({ onBack }) {
       setUploads(up.uploads || []);
       setProofs(pf.proofs || []);
       setAllAds(adsAll.campaigns || []);
+      setCatalogTitles(cat.titles || []);
+      setReports(reps.reports || reps.items || []);
       const drafts = {};
       (cfg.settings || []).forEach((s) => {
         drafts[s.key] = JSON.stringify(s.value || {}, null, 2);
@@ -618,6 +633,23 @@ export default function AdminCommandCenter({ onBack }) {
             }
           />
         ) : null}
+
+        {tab === 'cms' ? (
+          <CatalogCmsTab
+            titles={catalogTitles}
+            catalogQuery={catalogQuery}
+            setCatalogQuery={setCatalogQuery}
+            onSearch={() =>
+              run('cms-search', async () => {
+                const r = await fetchCatalog({ q: catalogQuery, limit: 40 });
+                setCatalogTitles(r.titles || []);
+              })
+            }
+            run={run}
+          />
+        ) : null}
+
+        {tab === 'reports' ? <ReportsTab reports={reports} run={run} /> : null}
 
         {tab === 'payments' ? (
           <View>
