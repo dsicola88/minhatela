@@ -15,7 +15,8 @@ router.post(
 );
 router.post(
   '/login',
-  rateLimit({ windowMs: 60_000, max: 20 }),
+  // Por IP: diagnóstico/curl no mesmo IP não deve bloquear o browser tão rápido
+  rateLimit({ windowMs: 60_000, max: 40, keyFn: (req) => `login:${req.ip}` }),
   asyncHandler(authController.login)
 );
 router.post(
