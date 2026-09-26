@@ -36,13 +36,18 @@ async function saveProgress({
 
   const completed = duration > 0 && cappedPosition / duration >= 0.92;
 
+  const uuidRe =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const safeDeviceId =
+    deviceId && uuidRe.test(String(deviceId)) ? String(deviceId) : null;
+
   const row = await watchProgressRepository.upsertProgress({
     profileId,
     contentId,
     positionSeconds: cappedPosition,
     durationSeconds: duration,
     completed,
-    deviceId,
+    deviceId: safeDeviceId,
   });
 
   return {

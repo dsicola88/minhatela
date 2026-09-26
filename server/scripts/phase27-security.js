@@ -153,12 +153,12 @@ async function run() {
     const id = content.id;
     await req('PUT', `/api/watch/${id}/progress`, {
       token: a.token,
-      headers: { 'x-profile-id': a.profileId, 'x-device-id': 'dev-b' },
+      headers: { 'x-profile-id': a.profileId },
       body: { profileId: a.profileId, positionSeconds: 600, durationSeconds: 3600 },
     });
     const back = await req('PUT', `/api/watch/${id}/progress`, {
       token: a.token,
-      headers: { 'x-profile-id': a.profileId, 'x-device-id': 'dev-a' },
+      headers: { 'x-profile-id': a.profileId },
       body: { profileId: a.profileId, positionSeconds: 120, durationSeconds: 3600 },
     });
     assert(back.status === 200, `status ${back.status}`);
