@@ -101,7 +101,7 @@ async function listCampaigns(advertiserId) {
 
 async function moderateCampaign(id, status) {
   const result = await query(
-    `UPDATE campaigns SET status = $2, updated_at = NOW() WHERE id = $1 RETURNING *`,
+    `UPDATE campaigns SET status = $2::campaign_status, updated_at = NOW() WHERE id = $1 RETURNING *`,
     [id, status]
   );
   return result.rows[0] || null;

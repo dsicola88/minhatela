@@ -206,6 +206,10 @@ async function adminReviewCreator(adminId, creatorId, status) {
   const row = await creatorRepository.updateStatus(creatorId, status);
   if (!row) throw createError(404, 'Criador não encontrado', 'NOT_FOUND');
 
+  if (status === 'active' && row.user_id) {
+    await userRepository.assignRole(row.user_id, 'creator');
+  }
+
   await auditRepository.write({
     actorId: adminId,
     action: status === 'active' ? 'CREATOR_APPROVED' : 'CREATOR_REJECTED',

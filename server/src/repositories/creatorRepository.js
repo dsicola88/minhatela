@@ -42,8 +42,11 @@ async function create({
 async function updateStatus(id, status) {
   const result = await query(
     `UPDATE creators
-     SET status = $1,
-         verified_at = CASE WHEN $1 = 'active' THEN NOW() ELSE verified_at END,
+     SET status = $1::creator_status,
+         verified_at = CASE
+           WHEN $1::text = 'active' THEN NOW()
+           ELSE verified_at
+         END,
          updated_at = NOW()
      WHERE id = $2
      RETURNING *`,
