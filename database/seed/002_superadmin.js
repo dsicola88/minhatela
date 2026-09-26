@@ -2,7 +2,11 @@
 
 /**
  * Seed · Super Admin MinhaTela
- * Acesso total: todos os papéis, Premium vitalício, perfil e Creator Studio activo.
+ *
+ * Estas credenciais SÃO as de login (acesso total à app + /admin).
+ * Depois de `npm run seed`, entra com o email/password abaixo.
+ *
+ * Acesso: is_admin=true · roles incl. super_admin · Premium vitalício · perfil · Creator activo.
  * Idempotente: actualiza password / papéis / premium se o email já existir.
  *
  * Overrides via env (recomendado em produção):
@@ -32,7 +36,9 @@ function loadBcrypt() {
 const bcrypt = loadBcrypt();
 
 const SUPERADMIN = {
-  email: process.env.SUPERADMIN_EMAIL || 'minhatela2026@gmail.com',
+  email: String(process.env.SUPERADMIN_EMAIL || 'minhatela2026@gmail.com')
+    .trim()
+    .toLowerCase(),
   password: process.env.SUPERADMIN_PASSWORD || 'Dpa211088@',
   fullName: process.env.SUPERADMIN_NAME || 'Super Admin MinhaTela',
 };
@@ -48,14 +54,22 @@ const ALL_ROLES = [
 ];
 
 async function run({ query }) {
+  if (!SUPERADMIN.email || !SUPERADMIN.email.includes('@')) {
+    throw new Error('SUPERADMIN_EMAIL inválido');
+  }
+  if (!SUPERADMIN.password || String(SUPERADMIN.password).length < 8) {
+    throw new Error('SUPERADMIN_PASSWORD deve ter pelo menos 8 caracteres');
+  }
+
   const passwordHash = await bcrypt.hash(SUPERADMIN.password, 12);
 
+  // Credenciais de LOGIN — password_hash actualizado sempre (idempotente)
   const upsert = await query(
     `INSERT INTO users (
        email, password_hash, full_name, is_admin,
-       subscription_status, premium_expires_at, email_verified_at
+       subscription_status, premium_expires_at, email_verified_at, deleted_at
      )
-     VALUES ($1, $2, $3, TRUE, 'premium_active', NULL, NOW())
+     VALUES ($1, $2, $3, TRUE, 'premium_active', NULL, NOW(), NULL)
      ON CONFLICT (email) DO UPDATE SET
        password_hash = EXCLUDED.password_hash,
        full_name = EXCLUDED.full_name,
@@ -63,13 +77,20 @@ async function run({ query }) {
        subscription_status = 'premium_active',
        premium_expires_at = NULL,
        email_verified_at = COALESCE(users.email_verified_at, NOW()),
+       deleted_at = NULL,
+       deletion_requested_at = NULL,
+       deletion_scheduled_at = NULL,
        updated_at = NOW()
-     RETURNING id, email, is_admin, subscription_status`,
+     RETURNING id, email, is_admin, subscription_status, password_hash`,
     [SUPERADMIN.email, passwordHash, SUPERADMIN.fullName]
   );
 
   const user = upsert.rows[0];
+  if (!user?.id) {
+    throw new Error('Falha ao criar/actualizar superadmin');
+  }
 
+  // Garantir papéis (incl. super_admin) — necessário para /admin e flags críticas
   await query(
     `INSERT INTO user_roles (user_id, role_id)
      SELECT $1, r.id
@@ -99,6 +120,12 @@ async function run({ query }) {
     [user.id, SUPERADMIN.fullName]
   );
 
+  // Verificação: a password do seed deve autenticar (mesmo algoritmo do login)
+  const ok = await bcrypt.compare(SUPERADMIN.password, user.password_hash);
+  if (!ok) {
+    throw new Error('Seed superadmin: hash de password não confere com a password de login');
+  }
+
   const roles = await query(
     `SELECT r.code
      FROM user_roles ur
@@ -108,11 +135,22 @@ async function run({ query }) {
     [user.id]
   );
 
+  const roleCodes = roles.rows.map((r) => r.code);
+  if (!roleCodes.includes('super_admin') || !roleCodes.includes('admin')) {
+    throw new Error(
+      `Seed superadmin: papéis em falta (tem: ${roleCodes.join(', ') || 'nenhum'}). Corra as migrations.`
+    );
+  }
+
   return {
     email: user.email,
+    loginEmail: SUPERADMIN.email,
+    /** password só no log de seed local — nunca em APIs */
+    loginPasswordSet: true,
     isAdmin: user.is_admin,
     subscription: user.subscription_status,
-    roles: roles.rows.map((r) => r.code),
+    roles: roleCodes,
+    access: 'full · /admin · Console Empresa',
   };
 }
 
