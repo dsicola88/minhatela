@@ -1,11 +1,26 @@
 import Constants from 'expo-constants';
 import { getDeviceIdentity } from '../platform/deviceIdentity';
 
-// EXPO_PUBLIC_* (Vercel/build) tem prioridade sobre app.json hardcoded
-const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL ||
-  Constants.expoConfig?.extra?.apiBaseUrl ||
-  'http://localhost:4000';
+// EXPO_PUBLIC_* (Vercel/build) tem prioridade sobre app.json hardcoded.
+// Em web produção/preview, nunca usar localhost (causa NetworkError no browser).
+function resolveApiBaseUrl() {
+  const fromEnv = process.env.EXPO_PUBLIC_API_BASE_URL;
+  const fromExtra = Constants.expoConfig?.extra?.apiBaseUrl;
+  const candidates = [fromEnv, fromExtra].filter(Boolean);
+  const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
+  const isLocalHost = (u) =>
+    /localhost|127\.0\.0\.1/.test(String(u || '')) ||
+    String(u || '').includes('api.minhatela.net');
+
+  for (const c of candidates) {
+    if (isBrowser && isLocalHost(c)) continue;
+    if (c) return c.replace(/\/$/, '');
+  }
+  if (isBrowser) return 'https://minhatela-production.up.railway.app';
+  return 'http://localhost:4000';
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 let authToken = null;
 let activeProfileId = null;

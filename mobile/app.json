@@ -52,7 +52,7 @@
       "typedRoutes": false
     },
     "extra": {
-      "apiBaseUrl": "http://localhost:4000",
+      "apiBaseUrl": "https://minhatela-production.up.railway.app",
       "platforms": ["ios", "android", "web", "androidTv"],
       "tv": {
         "leanback": true,

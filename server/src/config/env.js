@@ -27,13 +27,23 @@ for (const key of required) {
 function parseCorsOrigin(value) {
   if (value == null || value === '' || value === 'true') return true;
   if (value === 'false') return false;
-  if (String(value).includes(',')) {
-    return String(value)
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-  }
-  return value;
+
+  const listed = String(value)
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (listed.length === 0) return true;
+
+  // Lista fixa + previews Vercel (*.vercel.app) — evita NetworkError em deploys preview
+  return function corsOriginCheck(origin, callback) {
+    if (!origin) return callback(null, true);
+    const allowed =
+      listed.includes(origin) ||
+      /\.vercel\.app$/i.test(origin) ||
+      /\.vercel\.sh$/i.test(origin);
+    return callback(null, allowed ? origin : false);
+  };
 }
 
 const env = Object.freeze({

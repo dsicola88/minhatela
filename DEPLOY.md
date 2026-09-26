@@ -84,7 +84,7 @@ railway run --service api npm --prefix server run seed
 
 | Variável | Valor |
 |----------|--------|
-| `EXPO_PUBLIC_API_BASE_URL` | `https://api.minhatela.net` |
+| `EXPO_PUBLIC_API_BASE_URL` | `https://minhatela-production.up.railway.app` (até DNS `api.minhatela.net`) |
 | `EXPO_PUBLIC_APP_PUBLIC_URL` | `https://minhatela.net` |
 
 3. **Domains:** `minhatela.net`, `www.minhatela.net`, `minhatela.ao`, `www.minhatela.ao`
