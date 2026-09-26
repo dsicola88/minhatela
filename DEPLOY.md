@@ -71,9 +71,10 @@ railway run --service api npm --prefix server run seed
 
 **DNS (no registo do domínio):**
 
-- Apex `minhatela.net` / `minhatela.ao` → Vercel `A` `76.76.21.21` (confirmar no painel)
+- Apex `minhatela.net` / `minhatela.ao` → Vercel `A` `216.198.79.1` (confirmar no painel Domains)
 - `www` → CNAME Vercel (ver Domains no projecto)
-- `api.minhatela.net` → CNAME → o host Railway indicado em `railway domain status`
+- `api.minhatela.net` → CNAME `d27h9ra1.up.railway.app`
+- Verificação Railway (TXT): `_railway-verify.api` → `railway-verify=…` (ver `railway domain status`)
 - Emails: cria `noreply@` / `support@` / `contato@` e preenche `SMTP_*` no Railway
 
 ## 4. Vercel (Web)
