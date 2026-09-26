@@ -180,6 +180,77 @@ export async function fetchExperiments() {
   return api.get('/api/admin/experiments');
 }
 
+export async function fetchUsers(params = {}) {
+  const q = new URLSearchParams();
+  if (params.q) q.set('q', params.q);
+  if (params.limit) q.set('limit', String(params.limit));
+  if (params.offset) q.set('offset', String(params.offset));
+  const qs = q.toString();
+  return api.get(`/api/admin/users${qs ? `?${qs}` : ''}`);
+}
+
+export async function updateUser(userId, body) {
+  return api.patch(`/api/admin/users/${userId}`, body);
+}
+
+export async function fetchAdminPlans() {
+  return api.get('/api/admin/plans');
+}
+
+export async function upsertPlan(planId, body) {
+  return api.put(`/api/admin/plans/${encodeURIComponent(planId)}`, body);
+}
+
+export async function fetchLeads(params = {}) {
+  const q = new URLSearchParams();
+  if (params.status) q.set('status', params.status);
+  if (params.limit) q.set('limit', String(params.limit));
+  const qs = q.toString();
+  return api.get(`/api/admin/leads${qs ? `?${qs}` : ''}`);
+}
+
+export async function updateLead(leadId, body) {
+  return api.patch(`/api/admin/leads/${leadId}`, body);
+}
+
+export async function createLead(body) {
+  return api.post('/api/leads', body);
+}
+
+export async function fetchUploads(params = {}) {
+  const q = new URLSearchParams();
+  if (params.kind) q.set('kind', params.kind);
+  if (params.limit) q.set('limit', String(params.limit));
+  const qs = q.toString();
+  return api.get(`/api/admin/uploads${qs ? `?${qs}` : ''}`);
+}
+
+export async function fetchProofUploads(limit = 40) {
+  return api.get(`/api/admin/uploads/proofs?limit=${limit}`);
+}
+
+export async function uploadAdminMedia(file, kind = 'asset') {
+  const form = new FormData();
+  form.append('kind', kind);
+  if (typeof File !== 'undefined' && file instanceof File) {
+    form.append('file', file);
+  } else {
+    form.append('file', {
+      uri: file.uri,
+      name: file.name || 'upload.bin',
+      type: file.type || 'application/octet-stream',
+    });
+  }
+  return api.post('/api/admin/uploads', form);
+}
+
+export async function fetchAllAdCampaigns(params = {}) {
+  const q = new URLSearchParams();
+  if (params.status) q.set('status', params.status);
+  const qs = q.toString();
+  return api.get(`/api/admin/ads/campaigns${qs ? `?${qs}` : ''}`);
+}
+
 export function resolveProofUrl(path) {
   if (!path) return null;
   if (path.startsWith('http')) return path;
@@ -229,5 +300,16 @@ export default {
   updateEncoding,
   fetchPaymentRisk,
   fetchExperiments,
+  fetchUsers,
+  updateUser,
+  fetchAdminPlans,
+  upsertPlan,
+  fetchLeads,
+  updateLead,
+  createLead,
+  fetchUploads,
+  fetchProofUploads,
+  uploadAdminMedia,
+  fetchAllAdCampaigns,
   resolveProofUrl,
 };

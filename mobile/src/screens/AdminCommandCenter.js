@@ -55,15 +55,36 @@ import {
   fetchEncoding,
   fetchPaymentRisk,
   fetchExperiments,
+  fetchUsers,
+  fetchAdminPlans,
+  fetchLeads,
+  fetchUploads,
+  fetchProofUploads,
+  uploadAdminMedia,
+  fetchAllAdCampaigns,
 } from '../services/admin';
 import { fetchPendingPayouts, reviewPayout } from '../services/payouts';
 import Focusable from '../tv/Focusable';
+import {
+  LandingPaymentsTab,
+  UsersTab,
+  PlansTab,
+  LeadsTab,
+  UploadsTab,
+  AdsTab,
+} from './AdminEnterpriseSections';
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: 'grid-outline' },
+  { id: 'landing', label: 'Landing / Pay', icon: 'color-palette-outline' },
   { id: 'payments', label: 'Pagamentos', icon: 'card-outline' },
+  { id: 'users', label: 'Utilizadores', icon: 'people-outline' },
+  { id: 'plans', label: 'Planos', icon: 'pricetags-outline' },
+  { id: 'leads', label: 'Leads', icon: 'mail-outline' },
   { id: 'support', label: 'Atendimento', icon: 'headset-outline' },
   { id: 'moderation', label: 'Moderação', icon: 'shield-checkmark-outline' },
+  { id: 'ads', label: 'Anúncios', icon: 'megaphone-outline' },
+  { id: 'uploads', label: 'Uploads', icon: 'cloud-upload-outline' },
   { id: 'editorial', label: 'Editorial', icon: 'albums-outline' },
   { id: 'flags', label: 'Flags', icon: 'toggle-outline' },
   { id: 'config', label: 'Config / Onboard', icon: 'settings-outline' },
@@ -221,6 +242,13 @@ export default function AdminCommandCenter({ onBack }) {
   const [encoding, setEncoding] = useState([]);
   const [risk, setRisk] = useState([]);
   const [experiments, setExperiments] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [adminPlans, setAdminPlans] = useState([]);
+  const [leads, setLeads] = useState([]);
+  const [uploads, setUploads] = useState([]);
+  const [proofs, setProofs] = useState([]);
+  const [allAds, setAllAds] = useState([]);
+  const [userQuery, setUserQuery] = useState('');
   const [promoForm, setPromoForm] = useState({ code: '', days: '7', max: '1000' });
   const [articleForm, setArticleForm] = useState({
     slug: '',
@@ -262,6 +290,12 @@ export default function AdminCommandCenter({ onBack }) {
         enc,
         rk,
         ex,
+        us,
+        pl,
+        ld,
+        up,
+        pf,
+        adsAll,
       ] = await Promise.all([
         fetchCommandCenter(),
         fetchPendingPayments(),
@@ -285,6 +319,12 @@ export default function AdminCommandCenter({ onBack }) {
         fetchEncoding().catch(() => ({ items: [] })),
         fetchPaymentRisk(0).catch(() => ({ transactions: [] })),
         fetchExperiments().catch(() => ({ experiments: [] })),
+        fetchUsers({ limit: 40 }).catch(() => ({ users: [] })),
+        fetchAdminPlans().catch(() => ({ plans: [] })),
+        fetchLeads({ limit: 50 }).catch(() => ({ leads: [] })),
+        fetchUploads({ limit: 40 }).catch(() => ({ uploads: [] })),
+        fetchProofUploads(40).catch(() => ({ proofs: [] })),
+        fetchAllAdCampaigns({}).catch(() => ({ campaigns: [] })),
       ]);
       setCenter(cc);
       setPayments(pay.transactions || []);
@@ -308,6 +348,12 @@ export default function AdminCommandCenter({ onBack }) {
       setEncoding(enc.items || enc.queue || []);
       setRisk(rk.transactions || rk.items || []);
       setExperiments(ex.experiments || ex.items || []);
+      setUsers(us.users || []);
+      setAdminPlans(pl.plans || []);
+      setLeads(ld.leads || []);
+      setUploads(up.uploads || []);
+      setProofs(pf.proofs || []);
+      setAllAds(adsAll.campaigns || []);
       const drafts = {};
       (cfg.settings || []).forEach((s) => {
         drafts[s.key] = JSON.stringify(s.value || {}, null, 2);
@@ -509,6 +555,68 @@ export default function AdminCommandCenter({ onBack }) {
               center.recentAudit.map((item) => <AuditRow key={item.id} item={item} />)
             )}
           </View>
+        ) : null}
+
+        {tab === 'landing' ? (
+          <LandingPaymentsTab
+            settings={settings}
+            configDrafts={configDrafts}
+            setConfigDrafts={setConfigDrafts}
+            run={run}
+            busy={busy}
+          />
+        ) : null}
+
+        {tab === 'users' ? (
+          <UsersTab
+            users={users}
+            userQuery={userQuery}
+            setUserQuery={setUserQuery}
+            onSearch={() =>
+              run('users-search', async () => {
+                const r = await fetchUsers({ q: userQuery, limit: 40 });
+                setUsers(r.users || []);
+              })
+            }
+            run={run}
+          />
+        ) : null}
+
+        {tab === 'plans' ? <PlansTab plans={adminPlans} run={run} busy={busy} /> : null}
+
+        {tab === 'leads' ? <LeadsTab leads={leads} run={run} /> : null}
+
+        {tab === 'ads' ? <AdsTab campaigns={allAds} run={run} /> : null}
+
+        {tab === 'uploads' ? (
+          <UploadsTab
+            uploads={uploads}
+            proofs={proofs}
+            busy={busy}
+            onPickUpload={() =>
+              run('upload', async () => {
+                if (typeof document === 'undefined') {
+                  throw new Error('Upload de ficheiro disponível na versão Web do Console.');
+                }
+                await new Promise((resolve, reject) => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = 'image/*,video/*,application/pdf';
+                  input.onchange = async () => {
+                    try {
+                      const file = input.files?.[0];
+                      if (!file) return resolve();
+                      await uploadAdminMedia(file, 'landing');
+                      resolve();
+                    } catch (err) {
+                      reject(err);
+                    }
+                  };
+                  input.click();
+                });
+              })
+            }
+          />
         ) : null}
 
         {tab === 'payments' ? (

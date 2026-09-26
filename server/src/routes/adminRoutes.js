@@ -353,4 +353,74 @@ router.patch(
   })
 );
 
+const enterprise = require('../services/enterpriseConsoleService');
+
+router.get(
+  '/users',
+  asyncHandler(async (req, res) => {
+    res.json(await enterprise.listUsers(req.query));
+  })
+);
+router.patch(
+  '/users/:id',
+  asyncHandler(async (req, res) => {
+    res.json(await enterprise.updateUser(req.user.id, req.params.id, req.body, { ip: req.ip }));
+  })
+);
+
+router.get(
+  '/plans',
+  asyncHandler(async (_req, res) => {
+    res.json(await enterprise.listPlansAdmin());
+  })
+);
+router.put(
+  '/plans/:id',
+  asyncHandler(async (req, res) => {
+    res.json(
+      await enterprise.upsertPlan(req.user.id, req.params.id, req.body, { ip: req.ip })
+    );
+  })
+);
+
+router.get(
+  '/leads',
+  asyncHandler(async (req, res) => {
+    res.json(await enterprise.listLeads(req.query));
+  })
+);
+router.patch(
+  '/leads/:id',
+  asyncHandler(async (req, res) => {
+    res.json(await enterprise.updateLead(req.user.id, req.params.id, req.body, { ip: req.ip }));
+  })
+);
+
+router.get(
+  '/uploads',
+  asyncHandler(async (req, res) => {
+    res.json(await enterprise.listUploads(req.query));
+  })
+);
+router.get(
+  '/uploads/proofs',
+  asyncHandler(async (req, res) => {
+    res.json(await enterprise.listProofUploads(req.query.limit));
+  })
+);
+router.post(
+  '/uploads',
+  enterprise.mediaUpload.single('file'),
+  asyncHandler(async (req, res) => {
+    res.status(201).json(await enterprise.registerUpload(req.user.id, req.file, req.body));
+  })
+);
+
+router.get(
+  '/ads/campaigns',
+  asyncHandler(async (req, res) => {
+    res.json(await enterprise.listAllCampaigns(req.query));
+  })
+);
+
 module.exports = router;

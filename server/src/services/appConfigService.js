@@ -4,7 +4,7 @@ const appConfigRepository = require('../repositories/appConfigRepository');
 const auditRepository = require('../repositories/auditRepository');
 const { createError } = require('../utils/errors');
 
-const PUBLIC_KEYS = new Set(['onboarding', 'branding', 'support']);
+const PUBLIC_KEYS = new Set(['onboarding', 'branding', 'support', 'landing', 'payments']);
 
 function mapRow(row) {
   if (!row) return null;

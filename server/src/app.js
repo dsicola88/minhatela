@@ -212,6 +212,15 @@ function createApp() {
     })
   );
 
+  app.post(
+    '/api/leads',
+    require('./middleware/rateLimit').rateLimit({ windowMs: 60_000, max: 10 }),
+    require('./utils/asyncHandler').asyncHandler(async (req, res) => {
+      const lead = await require('./services/enterpriseConsoleService').createLead(req.body);
+      res.status(201).json(lead);
+    })
+  );
+
   // Deep link SEO / Open Graph (crawlers WhatsApp/Facebook)
   app.get(
     '/share/:id',

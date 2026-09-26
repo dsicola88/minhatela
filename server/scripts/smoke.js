@@ -197,6 +197,16 @@ async function run() {
     assert(r.status === 200 && r.json?.config, `got ${r.status}`);
   });
 
+  await step('POST /api/leads email inválido → 400', async () => {
+    const r = await req('POST', '/api/leads', { body: { email: 'x' } });
+    assert([400, 429].includes(r.status), `got ${r.status}`);
+  });
+
+  await step('GET /api/admin/users sem auth → 401', async () => {
+    const r = await req('GET', '/api/admin/users');
+    assert(r.status === 401, `got ${r.status}`);
+  });
+
   await step('GET /api/admin/config sem auth → 401', async () => {
     const r = await req('GET', '/api/admin/config');
     assert(r.status === 401, `got ${r.status}`);

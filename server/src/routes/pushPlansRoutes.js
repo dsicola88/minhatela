@@ -32,8 +32,8 @@ pushRouter.delete(
 );
 
 const plansRouter = express.Router();
-plansRouter.get('/', (_req, res) => {
-  res.json(plansService.listPlans());
-});
+plansRouter.get('/', asyncHandler(async (_req, res) => {
+  res.json(await plansService.listPlans());
+}));
 
 module.exports = { pushRouter, plansRouter };

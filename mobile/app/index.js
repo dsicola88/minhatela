@@ -22,7 +22,7 @@ export default function Index() {
   }
 
   if (!isAuthenticated) {
-    return <Redirect href="/login" />;
+    return <Redirect href="/welcome" />;
   }
 
   if (!hasProfile) {

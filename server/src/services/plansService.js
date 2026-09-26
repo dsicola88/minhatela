@@ -1,8 +1,66 @@
 'use strict';
 
 const { env } = require('../config/env');
+const { query } = require('../config/database');
+const enterpriseConsoleService = require('./enterpriseConsoleService');
 
-function listPlans() {
+async function listPlansFromDb() {
+  try {
+    const result = await query(
+      `SELECT * FROM subscription_plans
+       WHERE is_active = TRUE AND market = 'AO'
+       ORDER BY sort_order ASC`
+    );
+    if (!result.rowCount) return null;
+    return result.rows.map(enterpriseConsoleService.mapPlan);
+  } catch {
+    return null;
+  }
+}
+
+async function listPlans() {
+  const dbPlans = await listPlansFromDb();
+  let payments = {
+    ibanEnabled: true,
+    multicaixaEnabled: true,
+    manualReviewRequired: true,
+  };
+  try {
+    const pay = await query(`SELECT value FROM app_settings WHERE key = 'payments'`);
+    if (pay.rows[0]?.value) payments = { ...payments, ...pay.rows[0].value };
+  } catch {
+    /* defaults */
+  }
+
+  const methods = [];
+  if (payments.ibanEnabled !== false) methods.push('iban');
+  if (payments.multicaixaEnabled !== false) methods.push('multicaixa');
+
+  if (dbPlans?.length) {
+    return {
+      currency: payments.currency || 'AOA',
+      market: 'AO',
+      plans: dbPlans.map((p) => ({
+        ...p,
+        currentDefault: p.isDefault || p.id === 'free',
+        cta:
+          p.cta ||
+          (p.priceKz > 0
+            ? {
+                type: 'subscription',
+                label: `Assinar · ${Number(p.priceKz).toLocaleString('pt-AO')} Kz/mês`,
+              }
+            : null),
+      })),
+      paymentMethods: methods,
+      payments,
+      note:
+        payments.ibanInstructions ||
+        'Pagamento por transferência IBAN ou Multicaixa. Acesso após confirmação admin (padrão Angola).',
+    };
+  }
+
+  // Fallback estático se migração ainda não aplicada
   return {
     currency: 'AOA',
     market: 'AO',
@@ -47,7 +105,8 @@ function listPlans() {
         badge: 'Recomendado',
       },
     ],
-    paymentMethods: ['iban', 'multicaixa'],
+    paymentMethods: methods,
+    payments,
     note: 'Pagamento por transferência IBAN ou Multicaixa. Acesso após confirmação admin (padrão Angola).',
   };
 }
