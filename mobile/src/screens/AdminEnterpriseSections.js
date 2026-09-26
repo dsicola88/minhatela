@@ -14,14 +14,16 @@ import {
   reviewReport,
 } from '../services/admin';
 
-const cardStyle = {
-  backgroundColor: '#111',
-  borderWidth: 1,
-  borderColor: colors.border,
-  borderRadius: 6,
-  padding: 16,
-  marginBottom: 12,
-};
+function getCardStyle() {
+  return {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 6,
+    padding: 16,
+    marginBottom: 12,
+  };
+}
 
 function SectionTitle({ children }) {
   return (
@@ -71,7 +73,7 @@ export function LandingPaymentsTab({
       </Text>
 
       {[landing, payments].filter(Boolean).map((s) => (
-        <View key={s.key} style={cardStyle}>
+        <View key={s.key} style={getCardStyle()}>
           <Text style={{ color: colors.gold, fontWeight: '800', letterSpacing: 1 }}>
             {s.key.toUpperCase()}
           </Text>
@@ -130,7 +132,7 @@ export function UsersTab({ users, userQuery, setUserQuery, onSearch, run }) {
         <EmptyState title="Sem utilizadores" />
       ) : (
         users.map((u) => (
-          <View key={u.id} style={cardStyle}>
+          <View key={u.id} style={getCardStyle()}>
             <Text style={{ color: colors.text, fontWeight: '700' }}>
               {u.fullName} · {u.email}
             </Text>
@@ -201,7 +203,7 @@ export function PlansTab({ plans, run, busy }) {
       <Text style={{ color: colors.muted, marginBottom: 16 }}>
         Preços e benefícios editáveis — mercado Angola / AOA.
       </Text>
-      <View style={cardStyle}>
+      <View style={getCardStyle()}>
         <TextInput
           value={form.id}
           onChangeText={(id) => setForm((f) => ({ ...f, id }))}
@@ -256,7 +258,7 @@ export function PlansTab({ plans, run, busy }) {
         />
       </View>
       {plans.map((p) => (
-        <View key={p.id} style={cardStyle}>
+        <View key={p.id} style={getCardStyle()}>
           <Text style={{ color: colors.text, fontWeight: '700' }}>
             {p.name} · {Number(p.priceKz || 0).toLocaleString('pt-AO')} Kz
           </Text>
@@ -283,7 +285,7 @@ export function LeadsTab({ leads, run }) {
         <EmptyState title="Sem leads" subtitle="O formulário público POST /api/leads alimenta esta fila." />
       ) : (
         leads.map((l) => (
-          <View key={l.id} style={cardStyle}>
+          <View key={l.id} style={getCardStyle()}>
             <Text style={{ color: colors.text, fontWeight: '700' }}>
               {l.fullName || '—'} · {l.email}
             </Text>
@@ -325,7 +327,7 @@ export function UploadsTab({ uploads, proofs, onPickUpload, busy }) {
         <EmptyState title="Sem uploads" />
       ) : (
         uploads.map((u) => (
-          <View key={u.id} style={cardStyle}>
+          <View key={u.id} style={getCardStyle()}>
             <Text style={{ color: colors.text, fontWeight: '700' }}>
               {u.originalName || u.url}
             </Text>
@@ -345,7 +347,7 @@ export function UploadsTab({ uploads, proofs, onPickUpload, busy }) {
         <EmptyState title="Sem comprovativos" />
       ) : (
         proofs.map((p) => (
-          <View key={p.transactionId} style={cardStyle}>
+          <View key={p.transactionId} style={getCardStyle()}>
             <Text style={{ color: colors.text, fontWeight: '700' }}>
               {p.fullName} · {p.email}
             </Text>
@@ -379,7 +381,7 @@ export function AdsTab({ campaigns, run }) {
         <EmptyState title="Sem campanhas" />
       ) : (
         campaigns.map((c) => (
-          <View key={c.id} style={cardStyle}>
+          <View key={c.id} style={getCardStyle()}>
             <Text style={{ color: colors.text, fontWeight: '700' }}>{c.name}</Text>
             <Text style={{ color: colors.muted }}>
               {c.companyName} · {c.placement} · orçamento{' '}
@@ -432,7 +434,7 @@ export function CatalogCmsTab({ titles, catalogQuery, setCatalogQuery, onSearch,
         <EmptyState title="Sem títulos" />
       ) : (
         titles.map((t) => (
-          <View key={t.id} style={cardStyle}>
+          <View key={t.id} style={getCardStyle()}>
             <Text style={{ color: colors.text, fontWeight: '700' }}>{t.title}</Text>
             <Text style={{ color: colors.muted }}>
               {t.kind} · {t.monetization}
@@ -507,7 +509,7 @@ export function ReportsTab({ reports, run }) {
         <EmptyState title="Fila limpa" />
       ) : (
         reports.map((r) => (
-          <View key={r.id} style={cardStyle}>
+          <View key={r.id} style={getCardStyle()}>
             <Text style={{ color: colors.text, fontWeight: '700' }}>
               {r.reason || r.category || 'Denúncia'} · {r.contentTitle || r.contentId}
             </Text>

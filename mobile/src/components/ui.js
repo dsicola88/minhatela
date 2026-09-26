@@ -9,26 +9,27 @@ export function PrimaryButton({
   disabled = false,
   style,
 }) {
+  const isLightTheme = colors.id === 'light';
   const variants = {
     primary: {
       backgroundColor: colors.red,
       borderColor: colors.red,
-      textColor: colors.text,
+      textColor: '#FFFFFF',
     },
     secondary: {
-      backgroundColor: 'rgba(109,109,110,0.7)',
+      backgroundColor: isLightTheme ? 'rgba(24,24,27,0.08)' : 'rgba(109,109,110,0.7)',
       borderColor: 'transparent',
       textColor: colors.text,
     },
     light: {
-      backgroundColor: colors.text,
-      borderColor: colors.text,
-      textColor: colors.black,
+      backgroundColor: isLightTheme ? '#18181B' : '#FFFFFF',
+      borderColor: isLightTheme ? '#18181B' : '#FFFFFF',
+      textColor: isLightTheme ? '#FFFFFF' : '#000000',
     },
     gold: {
       backgroundColor: colors.gold,
       borderColor: colors.gold,
-      textColor: colors.black,
+      textColor: '#000000',
     },
     outline: {
       backgroundColor: 'transparent',

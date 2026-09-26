@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DATA_SAVER_KEY = 'minhatela.prefs.dataSaver';
+const THEME_KEY = 'minhatela.prefs.theme';
 
 export async function getDataSaver() {
   const raw = await AsyncStorage.getItem(DATA_SAVER_KEY);
@@ -14,6 +15,18 @@ export async function setDataSaver(enabled) {
   return enabled;
 }
 
+export async function getThemePreference() {
+  const raw = await AsyncStorage.getItem(THEME_KEY);
+  if (raw === 'light' || raw === 'dark') return raw;
+  return 'dark';
+}
+
+export async function setThemePreference(themeId) {
+  const id = themeId === 'light' ? 'light' : 'dark';
+  await AsyncStorage.setItem(THEME_KEY, id);
+  return id;
+}
+
 /**
  * Ajusta URL embed Bunny para qualidade económica.
  */
@@ -22,7 +35,6 @@ export function applyDataSaverToEmbedUrl(embedUrl, dataSaver) {
   try {
     const url = new URL(embedUrl);
     url.searchParams.set('preload', 'false');
-    // Bunny player: força arranque em resolução baixa quando suportado
     url.searchParams.set('startQuality', '480p');
     return url.toString();
   } catch {

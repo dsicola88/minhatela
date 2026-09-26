@@ -40,6 +40,7 @@ import {
   leaveHousehold,
 } from '../services/gifts';
 import { getDataSaver, setDataSaver } from '../platform/preferences';
+import { useTheme } from '../theme/ThemeContext';
 import Focusable from '../tv/Focusable';
 
 function Row({ label, value, danger, onPress, icon, badge }) {
@@ -116,6 +117,7 @@ export default function Account({
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { t } = useI18n();
+  const { themeId, setTheme, available: themeOptions } = useTheme();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [account, setAccount] = useState(null);
@@ -445,6 +447,47 @@ export default function Account({
           {pwdMsg ? (
             <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 8 }}>{pwdMsg}</Text>
           ) : null}
+
+          <Text
+            style={{
+              color: colors.gold,
+              fontSize: 12,
+              fontWeight: '700',
+              letterSpacing: 1.2,
+              marginTop: 32,
+            }}
+          >
+            APARÊNCIA
+          </Text>
+          <Text style={{ color: colors.muted, fontSize: 12, marginTop: 8, marginBottom: 12 }}>
+            Tema original (cinema) ou tema claro para leitura diurna.
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 8 }}>
+            {themeOptions.map((opt) => {
+              const active = themeId === opt.id;
+              return (
+                <Focusable
+                  key={opt.id}
+                  id={`theme-${opt.id}`}
+                  onPress={() => setTheme(opt.id)}
+                  style={{
+                    minWidth: 140,
+                    flexGrow: 1,
+                    padding: 14,
+                    borderRadius: 6,
+                    borderWidth: 2,
+                    borderColor: active ? colors.red : colors.border,
+                    backgroundColor: active ? 'rgba(206,17,38,0.08)' : colors.surface,
+                  }}
+                >
+                  <Text style={{ color: colors.text, fontWeight: '800' }}>{opt.label}</Text>
+                  <Text style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
+                    {opt.description}
+                  </Text>
+                </Focusable>
+              );
+            })}
+          </View>
 
           <Text
             style={{

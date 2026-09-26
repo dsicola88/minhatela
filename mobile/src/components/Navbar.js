@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, brand, layout } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import { useI18n } from '../i18n';
 import Focusable from '../tv/Focusable';
 import { useDeviceProfile } from '../platform/device';
@@ -35,10 +36,17 @@ export default function Navbar({
   const isCompact = width < 768;
   const { t, locale, setLocale } = useI18n();
   const { isTV } = useDeviceProfile();
+  const { isLight } = useTheme();
 
   useEffect(() => {
     setSolid(scrollY > 40);
   }, [scrollY]);
+
+  const gradientColors = solid
+    ? [colors.black, colors.black]
+    : isLight
+      ? ['rgba(244,244,245,0.95)', 'rgba(244,244,245,0.55)', 'transparent']
+      : ['rgba(0,0,0,0.85)', 'rgba(0,0,0,0.35)', 'transparent'];
 
   return (
     <View
@@ -53,11 +61,7 @@ export default function Navbar({
       }}
     >
       <LinearGradient
-        colors={
-          solid
-            ? [colors.black, colors.black]
-            : ['rgba(0,0,0,0.85)', 'rgba(0,0,0,0.35)', 'transparent']
-        }
+        colors={gradientColors}
         style={{
           minHeight: layout.navbarHeight + insets.top,
           paddingHorizontal: isCompact ? 16 : 40,

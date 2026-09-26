@@ -101,14 +101,16 @@ const TABS = [
   { id: 'audit', label: 'Auditoria', icon: 'document-text-outline' },
 ];
 
-const cardStyle = {
-  backgroundColor: '#111',
-  borderWidth: 1,
-  borderColor: colors.border,
-  borderRadius: 6,
-  padding: 16,
-  marginBottom: 12,
-};
+function getCardStyle() {
+  return {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 6,
+    padding: 16,
+    marginBottom: 12,
+  };
+}
 
 function Kpi({ label, value, hint, alert }) {
   return (
@@ -663,7 +665,7 @@ export default function AdminCommandCenter({ onBack }) {
               <EmptyState title="Fila limpa" subtitle="Nenhum comprovativo à espera." />
             ) : (
               payments.map((tx) => (
-                <View key={tx.id} style={cardStyle}>
+                <View key={tx.id} style={getCardStyle()}>
                   <Text style={{ color: colors.text, fontWeight: '700' }}>
                     {tx.fullName} · {tx.email}
                   </Text>
@@ -711,7 +713,7 @@ export default function AdminCommandCenter({ onBack }) {
               <EmptyState title="Sem alertas de risco" />
             ) : (
               risk.slice(0, 12).map((tx) => (
-                <View key={`risk-${tx.id}`} style={cardStyle}>
+                <View key={`risk-${tx.id}`} style={getCardStyle()}>
                   <Text style={{ color: colors.text, fontWeight: '700' }}>
                     {tx.email || tx.fullName || tx.id}
                   </Text>
@@ -736,7 +738,7 @@ export default function AdminCommandCenter({ onBack }) {
               <EmptyState title="Sem tickets em aberto" />
             ) : (
               tickets.map((t) => (
-                <View key={t.id} style={cardStyle}>
+                <View key={t.id} style={getCardStyle()}>
                   <Text style={{ color: colors.text, fontWeight: '700' }}>{t.subject}</Text>
                   <Text style={{ color: colors.textSecondary, marginTop: 4 }}>
                     {t.fullName} · {t.email} · {t.category} · {t.priority}
@@ -791,7 +793,7 @@ export default function AdminCommandCenter({ onBack }) {
             )}
 
             <SectionTitle>FAQ / Artigos</SectionTitle>
-            <View style={cardStyle}>
+            <View style={getCardStyle()}>
               <TextInput
                 value={articleForm.slug}
                 onChangeText={(slug) => setArticleForm((f) => ({ ...f, slug }))}
@@ -833,7 +835,7 @@ export default function AdminCommandCenter({ onBack }) {
               />
             </View>
             {articles.map((a) => (
-              <View key={a.id} style={cardStyle}>
+              <View key={a.id} style={getCardStyle()}>
                 <Text style={{ color: colors.text, fontWeight: '700' }}>{a.title}</Text>
                 <Text style={{ color: colors.muted }}>
                   {a.slug} · {a.category} · {a.isPublished ? 'publicado' : 'rascunho'}
@@ -859,7 +861,7 @@ export default function AdminCommandCenter({ onBack }) {
               <EmptyState title="Sem criadores pendentes" />
             ) : (
               creators.map((c) => (
-                <View key={c.id} style={cardStyle}>
+                <View key={c.id} style={getCardStyle()}>
                   <Text style={{ color: colors.text, fontWeight: '700' }}>{c.displayName}</Text>
                   <Text style={{ color: colors.muted }}>
                     {c.email} · {c.type}
@@ -884,7 +886,7 @@ export default function AdminCommandCenter({ onBack }) {
               <EmptyState title="Sem conteúdos em revisão" />
             ) : (
               contents.map((item) => (
-                <View key={item.id} style={cardStyle}>
+                <View key={item.id} style={getCardStyle()}>
                   <Text style={{ color: colors.text, fontWeight: '700' }}>{item.title}</Text>
                   <Text style={{ color: colors.muted }}>{item.workflowStatus || item.status}</Text>
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
@@ -916,7 +918,7 @@ export default function AdminCommandCenter({ onBack }) {
               <EmptyState title="Sem payouts pendentes" />
             ) : (
               payouts.map((p) => (
-                <View key={p.id} style={cardStyle}>
+                <View key={p.id} style={getCardStyle()}>
                   <Text style={{ color: colors.text, fontWeight: '700' }}>
                     {p.displayName || p.creatorName} · {p.amountKz?.toLocaleString('pt-AO')} Kz
                   </Text>
@@ -940,7 +942,7 @@ export default function AdminCommandCenter({ onBack }) {
               <EmptyState title="Sem campanhas em review" />
             ) : (
               campaigns.map((c) => (
-                <View key={c.id} style={cardStyle}>
+                <View key={c.id} style={getCardStyle()}>
                   <Text style={{ color: colors.text, fontWeight: '700' }}>{c.name}</Text>
                   <Text style={{ color: colors.muted }}>
                     {c.companyName} · {c.placement} · {c.budgetKz?.toLocaleString('pt-AO')} Kz
@@ -970,7 +972,7 @@ export default function AdminCommandCenter({ onBack }) {
             <Text style={{ color: colors.muted, marginBottom: 16 }}>
               Controlam filas da Home (estilo Netflix rows).
             </Text>
-            <View style={cardStyle}>
+            <View style={getCardStyle()}>
               <TextInput
                 value={editorialForm.slug}
                 onChangeText={(slug) => setEditorialForm((f) => ({ ...f, slug }))}
@@ -1007,7 +1009,7 @@ export default function AdminCommandCenter({ onBack }) {
               <EmptyState title="Sem colecções" />
             ) : (
               collections.map((c) => (
-                <View key={c.id} style={cardStyle}>
+                <View key={c.id} style={getCardStyle()}>
                   <Text style={{ color: colors.text, fontWeight: '700' }}>{c.title}</Text>
                   <Text style={{ color: colors.muted }}>
                     {c.slug} · {c.placement || 'home'} ·{' '}
@@ -1045,7 +1047,7 @@ export default function AdminCommandCenter({ onBack }) {
                 <View
                   key={f.key}
                   style={{
-                    ...cardStyle,
+                    ...getCardStyle(),
                     flexDirection: 'row',
                     alignItems: 'center',
                     justifyContent: 'space-between',
@@ -1075,7 +1077,7 @@ export default function AdminCommandCenter({ onBack }) {
               <EmptyState title="Sem experiências activas" />
             ) : (
               experiments.map((e, idx) => (
-                <View key={e.key || e.id || idx} style={cardStyle}>
+                <View key={e.key || e.id || idx} style={getCardStyle()}>
                   <Text style={{ color: colors.text, fontWeight: '700' }}>
                     {e.key || e.name || e.id}
                   </Text>
@@ -1100,7 +1102,7 @@ export default function AdminCommandCenter({ onBack }) {
               <EmptyState title="Sem settings" subtitle="Corra a migração 025." />
             ) : (
               settings.map((s) => (
-                <View key={s.key} style={cardStyle}>
+                <View key={s.key} style={getCardStyle()}>
                   <Text style={{ color: colors.gold, fontWeight: '800', letterSpacing: 1 }}>
                     {s.key.toUpperCase()}
                   </Text>
@@ -1156,7 +1158,7 @@ export default function AdminCommandCenter({ onBack }) {
                 }
               />
             </View>
-            <View style={cardStyle}>
+            <View style={getCardStyle()}>
               <Text style={{ color: colors.text, fontWeight: '700' }}>Estado Bunny / CDN</Text>
               <Text style={{ color: colors.muted, marginTop: 8 }}>
                 {cdn
@@ -1169,7 +1171,7 @@ export default function AdminCommandCenter({ onBack }) {
               <EmptyState title="Fila vazia ou encoding desactivado" />
             ) : (
               encoding.slice(0, 30).map((item) => (
-                <View key={item.id || item.contentId} style={cardStyle}>
+                <View key={item.id || item.contentId} style={getCardStyle()}>
                   <Text style={{ color: colors.text, fontWeight: '700' }}>
                     {item.title || item.contentId || item.id}
                   </Text>
@@ -1189,7 +1191,7 @@ export default function AdminCommandCenter({ onBack }) {
               <EmptyState title="Sem packs" />
             ) : (
               packs.map((p) => (
-                <View key={p.id || p.slug} style={cardStyle}>
+                <View key={p.id || p.slug} style={getCardStyle()}>
                   <Text style={{ color: colors.text, fontWeight: '700' }}>
                     {p.title || p.name || p.slug}
                   </Text>
@@ -1202,7 +1204,7 @@ export default function AdminCommandCenter({ onBack }) {
             )}
 
             <SectionTitle>NPS / Surveys</SectionTitle>
-            <View style={cardStyle}>
+            <View style={getCardStyle()}>
               <Text style={{ color: colors.muted }}>
                 {surveys ? JSON.stringify(surveys, null, 2).slice(0, 600) : 'Sem resumo NPS.'}
               </Text>
@@ -1213,7 +1215,7 @@ export default function AdminCommandCenter({ onBack }) {
               <EmptyState title="Sem estreias" />
             ) : (
               premieres.map((e) => (
-                <View key={e.id} style={cardStyle}>
+                <View key={e.id} style={getCardStyle()}>
                   <Text style={{ color: colors.text, fontWeight: '700' }}>{e.title}</Text>
                   <Text style={{ color: colors.muted }}>
                     {e.slug} · {e.streamStatus || e.phase || '—'} ·{' '}
@@ -1224,7 +1226,7 @@ export default function AdminCommandCenter({ onBack }) {
             )}
 
             <SectionTitle>Presentes Premium</SectionTitle>
-            <View style={cardStyle}>
+            <View style={getCardStyle()}>
               <TextInput
                 value={giftForm.email}
                 onChangeText={(email) => setGiftForm((f) => ({ ...f, email }))}
@@ -1263,7 +1265,7 @@ export default function AdminCommandCenter({ onBack }) {
               />
             </View>
             {gifts.map((g) => (
-              <View key={g.id} style={cardStyle}>
+              <View key={g.id} style={getCardStyle()}>
                 <Text style={{ color: colors.text, fontWeight: '700' }}>
                   {g.recipientEmail || g.redeemedEmail || g.code || g.id}
                 </Text>
@@ -1334,7 +1336,7 @@ export default function AdminCommandCenter({ onBack }) {
               <EmptyState title="Sem códigos" />
             ) : (
               promos.map((p) => (
-                <View key={p.id} style={cardStyle}>
+                <View key={p.id} style={getCardStyle()}>
                   <Text style={{ color: colors.text, fontWeight: '800', letterSpacing: 1 }}>
                     {p.code}
                   </Text>
@@ -1367,7 +1369,7 @@ export default function AdminCommandCenter({ onBack }) {
               <EmptyState title="Ninguém a assistir agora" />
             ) : (
               streams.map((s) => (
-                <View key={s.sessionId} style={cardStyle}>
+                <View key={s.sessionId} style={getCardStyle()}>
                   <Text style={{ color: colors.text, fontWeight: '700' }}>{s.contentTitle}</Text>
                   <Text style={{ color: colors.textSecondary, marginTop: 4 }}>
                     {s.email} · {s.deviceName || 'Dispositivo'} ({s.platform || '—'})

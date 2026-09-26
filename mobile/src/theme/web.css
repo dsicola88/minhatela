@@ -1,5 +1,6 @@
 /* CSS custom properties — bandeira de Angola */
-:root {
+:root,
+[data-theme='dark'] {
   --ao-black: #000000;
   --ao-red: #ce1126;
   --ao-gold: #f7d417;
@@ -8,6 +9,17 @@
   --ao-border: #2a2a2a;
   --ao-text: #ffffff;
   --ao-muted: #8c8c8c;
+}
+
+[data-theme='light'] {
+  --ao-black: #f4f4f5;
+  --ao-red: #ce1126;
+  --ao-gold: #c9a00a;
+  --ao-surface: #ffffff;
+  --ao-elevated: #ffffff;
+  --ao-border: #d4d4d8;
+  --ao-text: #18181b;
+  --ao-muted: #71717a;
 }
 
 html,
@@ -25,6 +37,6 @@ body,
 @media (hover: hover) {
   ::selection {
     background: rgba(206, 17, 38, 0.35);
-    color: #fff;
+    color: var(--ao-text);
   }
 }

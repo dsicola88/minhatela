@@ -7,16 +7,18 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../src/context/AuthContext';
 import { LanguageProvider } from '../src/i18n';
 import { FocusProvider } from '../src/tv/FocusContext';
+import { ThemeProvider, useTheme } from '../src/theme/ThemeContext';
 import { useDeviceProfile } from '../src/platform/device';
-import { colors } from '../src/theme/tokens';
 
 function AppShell() {
   const { remoteFriendly } = useDeviceProfile();
+  const { themeId, colors, statusBarStyle } = useTheme();
 
   return (
     <FocusProvider enabled={remoteFriendly}>
-      <StatusBar style="light" />
+      <StatusBar style={statusBarStyle} />
       <Stack
+        key={themeId}
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: colors.black },
@@ -27,7 +29,8 @@ function AppShell() {
   );
 }
 
-export default function RootLayout() {
+function ThemedRoot() {
+  const { colors } = useTheme();
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.black }}>
       <SafeAreaProvider>
@@ -38,5 +41,13 @@ export default function RootLayout() {
         </LanguageProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ThemeProvider defaultTheme="dark">
+      <ThemedRoot />
+    </ThemeProvider>
   );
 }

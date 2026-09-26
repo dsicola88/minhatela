@@ -1,4 +1,9 @@
-export const colors = Object.freeze({
+/** Tema original (cinema / Netflix AO) */
+export const darkTheme = Object.freeze({
+  id: 'dark',
+  label: 'Original',
+  labelEn: 'Original',
+  statusBar: 'light',
   black: '#000000',
   red: '#CE1126',
   redDark: '#9B0C1C',
@@ -16,7 +21,60 @@ export const colors = Object.freeze({
   success: '#22C55E',
   warning: '#F7D417',
   danger: '#CE1126',
+  /** aliases semânticos */
+  background: '#000000',
+  card: '#111111',
+  navbar: 'rgba(0,0,0,0.92)',
 });
+
+/**
+ * Tema claro — mesma identidade Angola (vermelho/amarelo),
+ * base branca/cinza para leitura diurna e dados móveis.
+ */
+export const lightTheme = Object.freeze({
+  id: 'light',
+  label: 'Claro',
+  labelEn: 'Light',
+  statusBar: 'dark',
+  black: '#F4F4F5',
+  red: '#CE1126',
+  redDark: '#9B0C1C',
+  redBright: '#E50914',
+  gold: '#C9A00A',
+  goldMuted: '#A6860A',
+  surface: '#FFFFFF',
+  surfaceSecondary: '#F0F0F2',
+  elevated: '#FFFFFF',
+  border: '#D4D4D8',
+  muted: '#71717A',
+  text: '#18181B',
+  textSecondary: '#3F3F46',
+  overlay: 'rgba(244,244,245,0.82)',
+  success: '#16A34A',
+  warning: '#CA8A04',
+  danger: '#CE1126',
+  background: '#F4F4F5',
+  card: '#FFFFFF',
+  navbar: 'rgba(255,255,255,0.94)',
+});
+
+export const themes = Object.freeze({
+  dark: darkTheme,
+  light: lightTheme,
+});
+
+/** Objecto mutável lido em runtime — ThemeProvider faz Object.assign */
+export const colors = { ...darkTheme };
+
+export function applyTheme(themeId) {
+  const next = themes[themeId] || darkTheme;
+  Object.assign(colors, next);
+  return next;
+}
+
+export function getThemeId() {
+  return colors.id || 'dark';
+}
 
 export const spacing = Object.freeze({
   xs: 4,
