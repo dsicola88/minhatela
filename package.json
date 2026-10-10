@@ -9,6 +9,7 @@
     "dev:mobile": "npm --prefix mobile start",
     "migrate": "npm --prefix server run migrate",
     "seed": "npm --prefix server run seed",
+    "reset:local": "node server/scripts/reset-local.js && npm --prefix server run migrate && npm --prefix server run seed",
     "smoke": "node server/scripts/smoke.js",
     "e2e": "node server/scripts/e2e.js",
     "phase27": "node server/scripts/phase27-security.js",

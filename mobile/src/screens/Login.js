@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -12,9 +12,9 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { PrimaryButton, FieldLabel } from '../components/ui';
+import { PrimaryButton, FieldLabel, GoogleSignInButton } from '../components/ui';
 import TotpQr from '../components/TotpQr';
-import { colors, layout } from '../theme/tokens';
+import { darkTheme as cinema, layout } from '../theme/tokens';
 import { useBrandCopy } from '../context/AppConfigContext';
 import {
   login,
@@ -24,7 +24,7 @@ import {
   mfaSetupConfirm,
   mfaVerifyLogin,
 } from '../services/auth';
-import { oauthLogin, requestGoogleAccessToken } from '../services/phase25';
+import { oauthLogin, preloadGoogleIdentity, requestGoogleAccessToken } from '../services/phase25';
 import Constants from 'expo-constants';
 import { getDeviceIdentity } from '../platform/deviceIdentity';
 
@@ -32,6 +32,12 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
   const { width, height } = useWindowDimensions();
   const isCompact = width < 768;
   const branding = useBrandCopy();
+  const googleClientId = Constants.expoConfig?.extra?.googleClientId;
+
+  useEffect(() => {
+    preloadGoogleIdentity();
+  }, []);
+
   const [mode, setMode] = useState('login');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -63,8 +69,10 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
     }
     setLoading(true);
     try {
-      const clientId = Constants.expoConfig?.extra?.googleClientId;
-      const accessToken = await requestGoogleAccessToken(clientId);
+      if (!googleClientId) {
+        throw new Error('Login Google ainda não está configurado neste ambiente.');
+      }
+      const accessToken = await requestGoogleAccessToken(googleClientId);
       const device = await getDeviceIdentity();
       const data = await oauthLogin('google', {
         accessToken,
@@ -140,7 +148,7 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.black }}>
+    <View style={{ flex: 1, backgroundColor: cinema.black }}>
       <StatusBar style="light" />
       <ImageBackground
         source={require('../../assets/angola-flag.jpg')}
@@ -148,7 +156,7 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
         imageStyle={{ opacity: 0.18, resizeMode: 'cover' }}
       >
         <LinearGradient
-          colors={['rgba(0,0,0,0.55)', 'rgba(0,0,0,0.92)', colors.black]}
+          colors={['rgba(0,0,0,0.55)', 'rgba(0,0,0,0.92)', cinema.black]}
           style={{ flex: 1 }}
         >
           <KeyboardAvoidingView
@@ -167,12 +175,12 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
                     width: 14,
                     height: 14,
                     borderRadius: 2,
-                    backgroundColor: colors.gold,
+                    backgroundColor: cinema.gold,
                   }}
                 />
                 <Text
                   style={{
-                    color: colors.red,
+                    color: cinema.red,
                     fontSize: 32,
                     fontWeight: '800',
                     letterSpacing: 2,
@@ -187,15 +195,15 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
                   backgroundColor: 'rgba(10,10,10,0.92)',
                   borderRadius: 8,
                   borderWidth: 1,
-                  borderColor: colors.border,
+                  borderColor: cinema.border,
                   borderTopWidth: 3,
-                  borderTopColor: colors.red,
+                  borderTopColor: cinema.red,
                   padding: isCompact ? 22 : 32,
                 }}
               >
                 <Text
                   style={{
-                    color: colors.text,
+                    color: cinema.text,
                     fontSize: 28,
                     fontWeight: '700',
                     marginBottom: 8,
@@ -203,45 +211,45 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
                 >
                   {mode === 'login' ? 'Entrar' : 'Criar conta'}
                 </Text>
-                <Text style={{ color: colors.textSecondary, marginBottom: 24 }}>
+                <Text style={{ color: cinema.textSecondary, marginBottom: 24 }}>
                   {branding.tagline}
                 </Text>
 
                 {mode === 'register' ? (
                   <View style={{ marginBottom: 16 }}>
-                    <FieldLabel>Nome completo</FieldLabel>
+                    <FieldLabel palette={cinema}>Nome completo</FieldLabel>
                     <TextInput
                       value={fullName}
                       onChangeText={setFullName}
                       placeholder="O seu nome"
-                      placeholderTextColor={colors.muted}
+                      placeholderTextColor={cinema.muted}
                       style={inputStyle}
                     />
                   </View>
                 ) : null}
 
                 <View style={{ marginBottom: 16 }}>
-                  <FieldLabel>Email</FieldLabel>
+                    <FieldLabel palette={cinema}>Email</FieldLabel>
                   <TextInput
                     value={email}
                     onChangeText={setEmail}
                     autoCapitalize="none"
                     keyboardType="email-address"
                     placeholder="nome@email.com"
-                    placeholderTextColor={colors.muted}
+                    placeholderTextColor={cinema.muted}
                     style={inputStyle}
                   />
                 </View>
 
                 <View style={{ marginBottom: 8 }}>
-                  <FieldLabel>Palavra-passe</FieldLabel>
+                    <FieldLabel palette={cinema}>Palavra-passe</FieldLabel>
                   <View style={{ position: 'relative' }}>
                     <TextInput
                       value={password}
                       onChangeText={setPassword}
                       secureTextEntry={secure}
                       placeholder="••••••••"
-                      placeholderTextColor={colors.muted}
+                      placeholderTextColor={cinema.muted}
                       style={[inputStyle, { paddingRight: 48 }]}
                     />
                     <Pressable
@@ -251,7 +259,7 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
                       <Ionicons
                         name={secure ? 'eye-outline' : 'eye-off-outline'}
                         size={20}
-                        color={colors.muted}
+                        color={cinema.muted}
                       />
                     </Pressable>
                   </View>
@@ -263,9 +271,9 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
 
                 {mfaStep ? (
                   <View style={{ marginBottom: 8, marginTop: 12 }}>
-                    <FieldLabel>Código de 6 dígitos</FieldLabel>
+                    <FieldLabel palette={cinema}>Código de 6 dígitos</FieldLabel>
                     {mfaStep === 'code' ? (
-                      <Text style={{ color: colors.textSecondary, fontSize: 13, marginBottom: 8 }}>
+                      <Text style={{ color: cinema.textSecondary, fontSize: 13, marginBottom: 8 }}>
                         Abra o Google Authenticator e escreva o número que lá aparece.
                       </Text>
                     ) : null}
@@ -274,7 +282,7 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
                       onChangeText={(value) => setMfaCode(value.replace(/\D/g, '').slice(0, 6))}
                       keyboardType="number-pad"
                       placeholder="000000"
-                      placeholderTextColor={colors.muted}
+                      placeholderTextColor={cinema.muted}
                       style={inputStyle}
                       maxLength={6}
                     />
@@ -282,14 +290,14 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
                 ) : null}
 
                 {error ? (
-                  <Text style={{ color: colors.red, marginTop: 12, marginBottom: 4 }}>
+                  <Text style={{ color: cinema.red, marginTop: 12, marginBottom: 4 }}>
                     {error}
                   </Text>
                 ) : null}
 
                 {mode === 'login' ? (
                   <Pressable onPress={onForgotPassword} style={{ alignSelf: 'flex-end', marginTop: 10 }}>
-                    <Text style={{ color: colors.gold, fontWeight: '600' }}>
+                    <Text style={{ color: cinema.gold, fontWeight: '600' }}>
                       Esqueceu a palavra-passe?
                     </Text>
                   </Pressable>
@@ -309,28 +317,28 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
                         height: 22,
                         borderRadius: 4,
                         borderWidth: 1,
-                        borderColor: acceptTerms ? colors.gold : colors.border,
-                        backgroundColor: acceptTerms ? colors.gold : 'transparent',
+                        borderColor: acceptTerms ? cinema.gold : cinema.border,
+                        backgroundColor: acceptTerms ? cinema.gold : 'transparent',
                         alignItems: 'center',
                         justifyContent: 'center',
                         marginTop: 2,
                       }}
                     >
                       {acceptTerms ? (
-                        <Ionicons name="checkmark" size={16} color={colors.black} />
+                        <Ionicons name="checkmark" size={16} color={cinema.black} />
                       ) : null}
                     </View>
-                    <Text style={{ color: colors.textSecondary, flex: 1, fontSize: 13, lineHeight: 20 }}>
+                    <Text style={{ color: cinema.textSecondary, flex: 1, fontSize: 13, lineHeight: 20 }}>
                       Li e aceito os{' '}
                       <Text
-                        style={{ color: colors.gold, fontWeight: '700' }}
+                        style={{ color: cinema.gold, fontWeight: '700' }}
                         onPress={() => onOpenLegal?.('terms')}
                       >
                         Termos de Utilização
                       </Text>{' '}
                       e a{' '}
                       <Text
-                        style={{ color: colors.gold, fontWeight: '700' }}
+                        style={{ color: cinema.gold, fontWeight: '700' }}
                         onPress={() => onOpenLegal?.('privacy')}
                       >
                         Política de Privacidade
@@ -352,28 +360,28 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
                   }
                   onPress={handleSubmit}
                   loading={loading}
+                  palette={cinema}
                   style={{ marginTop: 20 }}
                 />
 
-                <View style={{ marginTop: 22, gap: 12 }}>
-                  <Text
-                    style={{
-                      color: colors.muted,
-                      textAlign: 'center',
-                      fontSize: 12,
-                      letterSpacing: 1,
-                    }}
-                  >
-                    OU CONTINUAR COM
-                  </Text>
-                  <PrimaryButton
-                    label="Continuar com Google"
-                    variant="outline"
-                    onPress={() => handleOAuth('google')}
-                    disabled={loading}
-                    style={{ alignSelf: 'stretch' }}
-                  />
-                </View>
+                {googleClientId ? (
+                  <View style={{ marginTop: 22, gap: 12 }}>
+                    <Text
+                      style={{
+                        color: cinema.muted,
+                        textAlign: 'center',
+                        fontSize: 12,
+                        letterSpacing: 1,
+                      }}
+                    >
+                      OU CONTINUAR COM
+                    </Text>
+                    <GoogleSignInButton
+                      onPress={() => handleOAuth('google')}
+                      loading={loading}
+                    />
+                  </View>
+                ) : null}
 
                 <Pressable
                   onPress={() => {
@@ -382,11 +390,11 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
                   }}
                   style={{ marginTop: 24 }}
                 >
-                  <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>
+                  <Text style={{ color: cinema.textSecondary, textAlign: 'center' }}>
                     {mode === 'login'
                       ? 'Novo na MinhaTela? '
                       : 'Já tem conta? '}
-                    <Text style={{ color: colors.gold, fontWeight: '700' }}>
+                    <Text style={{ color: cinema.gold, fontWeight: '700' }}>
                       {mode === 'login' ? 'Registe-se agora' : 'Entrar'}
                     </Text>
                   </Text>
@@ -401,11 +409,11 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
 }
 
 const inputStyle = {
-  backgroundColor: colors.elevated,
+  backgroundColor: cinema.elevated,
   borderWidth: 1,
-  borderColor: colors.border,
+  borderColor: cinema.border,
   borderRadius: 4,
-  color: colors.text,
+  color: cinema.text,
   paddingHorizontal: 14,
   paddingVertical: 13,
   fontSize: 15,

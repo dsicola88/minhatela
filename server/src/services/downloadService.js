@@ -15,8 +15,7 @@ const { logger } = require('../utils/logger');
 
 function isPremium(user) {
   return (
-    user?.subscription_status === 'premium_active' &&
-    (!user.premium_expires_at || new Date(user.premium_expires_at) > new Date())
+    require('./subscriptionService').isPremiumActive(user)
   );
 }
 

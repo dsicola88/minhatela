@@ -349,7 +349,7 @@ router.get(
 );
 router.put(
   '/config/:key',
-  elevated,
+  superOnly,
   requirePermission('platform.settings.manage'),
   asyncHandler(async (req, res) => {
     const result = await require('../services/appConfigService').adminUpsert(

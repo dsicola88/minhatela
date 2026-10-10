@@ -1,4 +1,5 @@
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/tokens';
 
 export function PrimaryButton({
@@ -9,18 +10,20 @@ export function PrimaryButton({
   disabled = false,
   compact = false,
   style,
+  palette,
 }) {
-  const isLightTheme = colors.id === 'light';
+  const p = palette || colors;
+  const isLightTheme = p.id === 'light';
   const variants = {
     primary: {
-      backgroundColor: colors.red,
-      borderColor: colors.red,
+      backgroundColor: p.red,
+      borderColor: p.red,
       textColor: '#FFFFFF',
     },
     secondary: {
       backgroundColor: isLightTheme ? 'rgba(24,24,27,0.08)' : 'rgba(109,109,110,0.7)',
       borderColor: 'transparent',
-      textColor: colors.text,
+      textColor: p.text,
     },
     light: {
       backgroundColor: isLightTheme ? '#18181B' : '#FFFFFF',
@@ -28,14 +31,14 @@ export function PrimaryButton({
       textColor: isLightTheme ? '#FFFFFF' : '#000000',
     },
     gold: {
-      backgroundColor: colors.gold,
-      borderColor: colors.gold,
+      backgroundColor: p.gold,
+      borderColor: p.gold,
       textColor: '#000000',
     },
     outline: {
       backgroundColor: 'transparent',
-      borderColor: colors.border,
-      textColor: colors.text,
+      borderColor: p.border,
+      textColor: p.text,
     },
   };
 
@@ -49,7 +52,7 @@ export function PrimaryButton({
         {
           backgroundColor: theme.backgroundColor,
           borderWidth: 1,
-          borderColor: hovered ? colors.gold : theme.borderColor,
+          borderColor: hovered ? p.gold : theme.borderColor,
           paddingVertical: compact ? 8 : 14,
           paddingHorizontal: compact ? 12 : 18,
           borderRadius: compact ? 6 : 4,
@@ -80,11 +83,47 @@ export function ScreenShell({ children, style }) {
   );
 }
 
-export function FieldLabel({ children }) {
+export function GoogleSignInButton({ onPress, disabled = false, loading = false }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled || loading}
+      accessibilityRole="button"
+      accessibilityLabel="Continuar com Google"
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#DADCE0',
+        borderRadius: 4,
+        minHeight: 48,
+        paddingHorizontal: 18,
+        opacity: disabled ? 0.45 : pressed ? 0.88 : 1,
+      })}
+    >
+      {loading ? (
+        <ActivityIndicator color="#1F1F1F" />
+      ) : (
+        <>
+          <Ionicons name="logo-google" size={18} color="#4285F4" />
+          <Text style={{ color: '#1F1F1F', fontWeight: '700', fontSize: 15 }}>
+            Continuar com Google
+          </Text>
+        </>
+      )}
+    </Pressable>
+  );
+}
+
+export function FieldLabel({ children, palette }) {
+  const p = palette || colors;
   return (
     <Text
       style={{
-        color: colors.textSecondary,
+        color: p.textSecondary,
         fontSize: 13,
         fontWeight: '600',
         marginBottom: 8,

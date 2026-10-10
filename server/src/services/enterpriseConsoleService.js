@@ -64,9 +64,16 @@ async function updateUser(actorId, userId, body, meta = {}) {
   );
   if (!visible.rowCount) throw createError(404, 'Utilizador não encontrado', 'NOT_FOUND');
 
+  const actorRoles = await require('../repositories/userRepository').getRoles(actorId);
+  const actorIsSuper = actorRoles.includes('super_admin');
+  if (body.isAdmin !== undefined && !actorIsSuper) {
+    throw createError(403, 'Apenas SuperAdmin pode promover ou remover operadores', 'FORBIDDEN');
+  }
+  if (body.roleCode && ['admin', 'super_admin'].includes(body.roleCode) && !actorIsSuper) {
+    throw createError(403, 'Apenas SuperAdmin pode atribuir papéis de operador', 'FORBIDDEN');
+  }
   if (body.roleCode === 'super_admin') {
-    const actorRoles = await require('../repositories/userRepository').getRoles(actorId);
-    if (!actorRoles.includes('super_admin')) {
+    if (!actorIsSuper) {
       throw createError(403, 'Apenas SuperAdmin pode promover SuperAdmin', 'FORBIDDEN');
     }
     const gate = await require('./fourEyesService').request({
@@ -105,12 +112,36 @@ async function updateUser(actorId, userId, body, meta = {}) {
   const row = result.rows[0];
   if (!row) throw createError(404, 'Utilizador não encontrado', 'NOT_FOUND');
 
-  if (body.roleCode) {
+  if (body.roleCode && body.roleCode !== 'super_admin') {
     await query(
       `INSERT INTO user_roles (user_id, role_id)
        SELECT $1, r.id FROM roles r WHERE r.code = $2
        ON CONFLICT DO NOTHING`,
       [userId, body.roleCode]
+    );
+  }
+
+  if (body.isAdmin === true) {
+    await query(
+      `INSERT INTO user_roles (user_id, role_id)
+       SELECT $1, r.id FROM roles r WHERE r.code = 'admin'
+       ON CONFLICT DO NOTHING`,
+      [userId]
+    );
+    await query(
+      `INSERT INTO tenant_memberships (user_id, tenant_id, role_code, status)
+       SELECT $1, t.id, 'admin', 'active'
+       FROM tenants t WHERE t.slug = 'minhatela'
+       ON CONFLICT DO NOTHING`,
+      [userId]
+    );
+  }
+  if (body.isAdmin === false) {
+    await query(
+      `DELETE FROM user_roles ur
+       USING roles r
+       WHERE ur.user_id = $1 AND ur.role_id = r.id AND r.code = 'admin'`,
+      [userId]
     );
   }
 
@@ -454,7 +485,12 @@ async function listCatalog({ q, limit = 40, offset = 0, superAdmin = false } = {
   const result = await query(
     `SELECT v.id, v.title, v.slug, v.kind, v.monetization, v.rental_price_kz, v.is_published,
             v.is_featured, v.workflow_status, v.bunny_video_id, v.poster_url, v.updated_at,
-            v.synopsis_short
+            v.synopsis_short,
+            (SELECT COUNT(*)::int FROM analytics_events ae
+              WHERE ae.content_id = v.id AND ae.event_name IN ('video_started', 'video_played')) AS views,
+            (SELECT COUNT(*)::int FROM content_ratings cr WHERE cr.content_id = v.id) AS ratings,
+            (SELECT ROUND(AVG(cr.rating)::numeric, 1) FROM content_ratings cr WHERE cr.content_id = v.id) AS rating_avg,
+            (SELECT COUNT(*)::int FROM favorites f WHERE f.content_id = v.id) AS favorites
      FROM videos v
      WHERE v.kind IN ('movie', 'series', 'episode')
        AND ${tenantSql}
@@ -478,6 +514,10 @@ async function listCatalog({ q, limit = 40, offset = 0, superAdmin = false } = {
       posterUrl: r.poster_url,
       updatedAt: r.updated_at,
       synopsisShort: r.synopsis_short,
+      views: r.views || 0,
+      ratings: r.ratings || 0,
+      ratingAvg: r.rating_avg != null ? Number(r.rating_avg) : null,
+      favorites: r.favorites || 0,
     })),
   };
 }

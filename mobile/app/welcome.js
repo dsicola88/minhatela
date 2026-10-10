@@ -10,7 +10,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PrimaryButton } from '../src/components/ui';
-import { colors, layout } from '../src/theme/tokens';
+import { darkTheme as cinema, layout } from '../src/theme/tokens';
 import { createLead } from '../src/services/admin';
 import { useAppConfig } from '../src/context/AppConfigContext';
 import Focusable from '../src/tv/Focusable';
@@ -69,7 +69,7 @@ export default function WelcomeLanding() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.black }}>
+    <View style={{ flex: 1, backgroundColor: cinema.black }}>
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
         <View
@@ -85,11 +85,11 @@ export default function WelcomeLanding() {
             justifyContent: 'space-between',
           }}
         >
-          <Text style={{ color: colors.red, fontWeight: '800', letterSpacing: 1.4, fontSize: 18 }}>
+          <Text style={{ color: cinema.red, fontWeight: '800', letterSpacing: 1.4, fontSize: 18 }}>
             {(branding.appName || 'MinhaTela').toUpperCase()}
           </Text>
           <Focusable id="welcome-login-top" onPress={() => router.push('/login')}>
-            <Text style={{ color: colors.text, fontWeight: '700' }}>Entrar</Text>
+            <Text style={{ color: cinema.text, fontWeight: '700' }}>Entrar</Text>
           </Focusable>
         </View>
         <View
@@ -107,7 +107,7 @@ export default function WelcomeLanding() {
           <View style={{ flex: 1.15, justifyContent: 'center', paddingVertical: isCompact ? 8 : 36 }}>
             <Text
               style={{
-                color: colors.text,
+                color: cinema.text,
                 fontSize: isCompact ? 34 : 52,
                 fontWeight: '900',
                 lineHeight: isCompact ? 40 : 58,
@@ -117,7 +117,7 @@ export default function WelcomeLanding() {
             </Text>
             <Text
               style={{
-                color: colors.textSecondary,
+                color: cinema.textSecondary,
                 fontSize: 16,
                 marginTop: 12,
                 lineHeight: 24,
@@ -130,12 +130,14 @@ export default function WelcomeLanding() {
               <PrimaryButton
                 label={landing?.heroCtaPrimary || 'Começar'}
                 onPress={() => router.push('/login')}
+                palette={cinema}
                 style={{ flex: 1 }}
               />
               <PrimaryButton
                 label={landing?.heroCtaSecondary || 'Planos'}
                 variant="outline"
                 onPress={() => router.push('/plans')}
+                palette={cinema}
                 style={{ flex: 1 }}
               />
             </View>
@@ -147,19 +149,19 @@ export default function WelcomeLanding() {
                 key={s.id || s.title}
                 style={{
                   borderWidth: 1,
-                  borderColor: colors.border,
+                  borderColor: cinema.border,
                   borderRadius: 8,
                   padding: 16,
-                  backgroundColor: '#111',
+                  backgroundColor: cinema.surface,
                 }}
               >
-                <Text style={{ color: colors.gold, fontWeight: '700', fontSize: 12 }}>
+                <Text style={{ color: cinema.gold, fontWeight: '700', fontSize: 12 }}>
                   {sectionLabel[s.id] || `0${index + 1}`}
                 </Text>
-                <Text style={{ color: colors.text, fontSize: 18, fontWeight: '800', marginTop: 4 }}>
+                <Text style={{ color: cinema.text, fontSize: 18, fontWeight: '800', marginTop: 4 }}>
                   {s.title}
                 </Text>
-                <Text style={{ color: colors.textSecondary, marginTop: 4, fontSize: 14, lineHeight: 20 }}>
+                <Text style={{ color: cinema.textSecondary, marginTop: 4, fontSize: 14, lineHeight: 20 }}>
                   {s.body}
                 </Text>
               </View>
@@ -181,31 +183,32 @@ export default function WelcomeLanding() {
             <View
               style={{
                 borderWidth: 1,
-                borderColor: colors.border,
+                borderColor: cinema.border,
                 borderRadius: 8,
                 padding: 20,
-                backgroundColor: '#111',
+                backgroundColor: cinema.surface,
                 marginTop: 12,
               }}
             >
-              <Text style={{ color: colors.gold, fontWeight: '800', fontSize: 12, letterSpacing: 1.2 }}>
+              <Text style={{ color: cinema.gold, fontWeight: '800', fontSize: 12, letterSpacing: 1.2 }}>
                 CONTACTO
               </Text>
-              <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800', marginTop: 8 }}>
+              <Text style={{ color: cinema.text, fontSize: 22, fontWeight: '800', marginTop: 8 }}>
                 Fale connosco
               </Text>
-              <Text style={{ color: colors.muted, marginTop: 6, marginBottom: 16 }}>
+              <Text style={{ color: cinema.muted, marginTop: 6, marginBottom: 16 }}>
                 Premium, criadores ou publicidade. Respondemos por email ou WhatsApp.
               </Text>
               <TextInput
                 value={name}
                 onChangeText={setName}
                 placeholder="Nome"
-                placeholderTextColor={colors.muted}
+                placeholderTextColor={cinema.muted}
                 style={{
                   borderWidth: 1,
-                  borderColor: colors.border,
-                  color: colors.text,
+                  borderColor: cinema.border,
+                  color: cinema.text,
+                  backgroundColor: cinema.elevated,
                   padding: 12,
                   borderRadius: 4,
                   marginBottom: 10,
@@ -215,13 +218,14 @@ export default function WelcomeLanding() {
                 value={email}
                 onChangeText={setEmail}
                 placeholder="Email"
-                placeholderTextColor={colors.muted}
+                placeholderTextColor={cinema.muted}
                 autoCapitalize="none"
                 keyboardType="email-address"
                 style={{
                   borderWidth: 1,
-                  borderColor: colors.border,
-                  color: colors.text,
+                  borderColor: cinema.border,
+                  color: cinema.text,
+                  backgroundColor: cinema.elevated,
                   padding: 12,
                   borderRadius: 4,
                   marginBottom: 10,
@@ -231,12 +235,13 @@ export default function WelcomeLanding() {
                 value={phone}
                 onChangeText={setPhone}
                 placeholder="WhatsApp (+244…)"
-                placeholderTextColor={colors.muted}
+                placeholderTextColor={cinema.muted}
                 keyboardType="phone-pad"
                 style={{
                   borderWidth: 1,
-                  borderColor: colors.border,
-                  color: colors.text,
+                  borderColor: cinema.border,
+                  color: cinema.text,
+                  backgroundColor: cinema.elevated,
                   padding: 12,
                   borderRadius: 4,
                   marginBottom: 14,
@@ -246,16 +251,17 @@ export default function WelcomeLanding() {
                 label={busy ? 'A enviar…' : 'Quero ser contactado'}
                 onPress={submitLead}
                 disabled={busy}
+                palette={cinema}
               />
               {msg ? (
-                <Text style={{ color: colors.gold, marginTop: 12 }}>{msg}</Text>
+                <Text style={{ color: cinema.gold, marginTop: 12 }}>{msg}</Text>
               ) : null}
             </View>
           ) : null}
 
           <Focusable id="welcome-login" onPress={() => router.push('/login')} style={{ marginTop: 28 }}>
-            <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>
-              Já tem conta? <Text style={{ color: colors.text, fontWeight: '700' }}>Entrar</Text>
+            <Text style={{ color: cinema.textSecondary, textAlign: 'center' }}>
+              Já tem conta? <Text style={{ color: cinema.text, fontWeight: '700' }}>Entrar</Text>
             </Text>
           </Focusable>
         </View>

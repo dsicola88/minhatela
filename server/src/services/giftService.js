@@ -62,9 +62,7 @@ async function purchase(userId, body, meta = {}) {
   }
 
   const user = await userRepository.findById(userId);
-  const isPremium =
-    user?.subscription_status === 'premium_active' &&
-    (!user.premium_expires_at || new Date(user.premium_expires_at) > new Date());
+  const isPremium = require('./subscriptionService').isPremiumActive(user);
 
   // Em produção: checkout IBAN. Localmente: Premium activo pode gerar presentes.
   if (!isPremium && !user?.is_admin) {

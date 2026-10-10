@@ -425,6 +425,12 @@ function CatalogTitleCard({ item, run }) {
         {item.isPublished ? 'publicado' : 'oculto'}
         {item.isFeatured ? ' · FEATURED' : ''} · {item.workflowStatus}
       </Text>
+      <Text style={{ color: colors.textSecondary, marginBottom: 8, fontSize: 13 }}>
+        {item.views ?? 0} visualizações · {item.favorites ?? 0} na lista
+        {item.ratingAvg != null
+          ? ` · ★ ${item.ratingAvg} (${item.ratings || 0})`
+          : ` · ${item.ratings || 0} avaliações`}
+      </Text>
       <ActionRow>
         <AdminButton
           label="Guardar título e sinopse"
@@ -488,12 +494,16 @@ function CatalogTitleCard({ item, run }) {
   );
 }
 
-export function UsersTab({ users, userQuery, setUserQuery, onSearch, run }) {
+export function UsersTab({ users, userQuery, setUserQuery, onSearch, run, canManageAdmins = false }) {
   return (
     <View>
       <PageHeader
         compact
-        subtitle="Pesquisa, papéis e entitlements. Promoção a SuperAdmin segue four-eyes."
+        subtitle={
+          canManageAdmins
+            ? 'Promova operadores (Admin), Premium e four-eyes para SuperAdmin. Só SuperAdmin altera papéis de operador.'
+            : 'Pesquisa, Premium e estado de assinatura. Promoção de operadores está reservada ao SuperAdmin.'
+        }
       />
       <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
         <TextInput
@@ -532,13 +542,20 @@ export function UsersTab({ users, userQuery, setUserQuery, onSearch, run }) {
               </Text>
             ) : null}
             <ActionRow>
-              <AdminButton
-                label={u.isAdmin ? 'Remover admin' : 'Tornar admin'}
-                variant="outline"
-                onPress={() =>
-                  run(`u-adm-${u.id}`, () => updateUser(u.id, { isAdmin: !u.isAdmin }))
-                }
-              />
+              {canManageAdmins ? (
+                <AdminButton
+                  label={u.isAdmin ? 'Remover operador' : 'Tornar operador'}
+                  variant="outline"
+                  onPress={() =>
+                    run(`u-adm-${u.id}`, () =>
+                      updateUser(u.id, {
+                        isAdmin: !u.isAdmin,
+                        roleCode: u.isAdmin ? undefined : 'admin',
+                      })
+                    )
+                  }
+                />
+              ) : null}
               <AdminButton
                 label="Dar Premium 30d"
                 onPress={() =>
@@ -801,7 +818,10 @@ export function CatalogCmsTab({ titles, catalogQuery, setCatalogQuery, onSearch,
         <AdminButton label="Pesquisar" onPress={onSearch} />
       </View>
       {titles.length === 0 ? (
-        <EmptyState title="Sem títulos" />
+        <EmptyState
+          title="Catálogo vazio"
+          subtitle="Ainda não há títulos publicados. Um criador envia no Estúdio; aqui o operador publica, destaca e define AVOD / SVOD / TVOD."
+        />
       ) : (
         titles.map((item) => <CatalogTitleCard key={item.id} item={item} run={run} />)
       )}

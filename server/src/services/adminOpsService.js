@@ -22,6 +22,8 @@ async function getCommandCenter() {
     ticketsOpen,
     activeStreams,
     watchToday,
+    ratingsToday,
+    favoritesToday,
     recentAudit,
   ] = await Promise.all([
     query(`SELECT COUNT(*)::int AS c FROM users u WHERE ${opsUserSql('u')}`),
@@ -97,6 +99,20 @@ async function getCommandCenter() {
          AND ae.created_at::date = CURRENT_DATE
          AND ${opsVideoSql('v')}`
     ).catch(() => ({ rows: [{ c: 0 }] })),
+    query(
+      `SELECT COUNT(*)::int AS c,
+              ROUND(AVG(cr.rating)::numeric, 1) AS avg
+       FROM content_ratings cr
+       JOIN videos v ON v.id = cr.content_id
+       WHERE cr.updated_at::date = CURRENT_DATE
+         AND ${opsVideoSql('v')}`
+    ).catch(() => ({ rows: [{ c: 0, avg: null }] })),
+    query(
+      `SELECT COUNT(*)::int AS c FROM favorites f
+       JOIN videos v ON v.id = f.content_id
+       WHERE f.created_at::date = CURRENT_DATE
+         AND ${opsVideoSql('v')}`
+    ).catch(() => ({ rows: [{ c: 0 }] })),
     auditRepository.listRecent({ limit: 12 }),
   ]);
 
@@ -131,6 +147,9 @@ async function getCommandCenter() {
       seriesCount: series.rows[0].c,
       activeStreams: activeStreams.rows[0].c,
       playsToday: watchToday.rows[0]?.c || 0,
+      ratingsToday: ratingsToday.rows[0]?.c || 0,
+      ratingAvgToday: ratingsToday.rows[0]?.avg || null,
+      favoritesToday: favoritesToday.rows[0]?.c || 0,
       attentionRequired: attention,
     },
     queues,

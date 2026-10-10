@@ -27,9 +27,7 @@ async function resolveAccess(userId, content) {
   }
 
   if (monetization === 'svod') {
-    let premiumActive =
-      user?.subscription_status === 'premium_active' &&
-      (!user.premium_expires_at || new Date(user.premium_expires_at) > new Date());
+    let premiumActive = require('./subscriptionService').isPremiumActive(user);
     let premiumSource = 'self';
 
     if (!premiumActive) {

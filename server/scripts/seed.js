@@ -10,9 +10,20 @@ const { logger } = require('../src/utils/logger');
 const seedDir = path.resolve(__dirname, '../../database/seed');
 
 async function seed() {
+  const dbUrl = process.env.DATABASE_URL || '';
+  if (
+    /railway|onrender|amazonaws\.com|supabase\.co/i.test(dbUrl) &&
+    process.env.ALLOW_REMOTE_SEED !== '1'
+  ) {
+    logger.error('seed.blocked_remote_host');
+    throw new Error('BLOCKED: seed recusa host remoto sem ALLOW_REMOTE_SEED=1');
+  }
+
+  const includeDemo = process.env.SEED_DEMO === '1';
   const files = fs
     .readdirSync(seedDir)
     .filter((f) => f.endsWith('.sql') || f.endsWith('.js'))
+    .filter((f) => includeDemo || !f.startsWith('001_demo'))
     .sort();
 
   for (const file of files) {

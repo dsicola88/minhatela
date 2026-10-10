@@ -7,7 +7,7 @@ const { env } = require('../config/env');
 const { createError } = require('../utils/errors');
 
 function maxStreamsForUser(user) {
-  if (user?.subscription_status === 'premium_active') {
+  if (require('./subscriptionService').isPremiumActive(user)) {
     return env.maxConcurrentStreamsPremium;
   }
   return env.maxConcurrentStreamsFree;

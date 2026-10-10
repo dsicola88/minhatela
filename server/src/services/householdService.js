@@ -23,9 +23,7 @@ function mapMember(row) {
 
 async function assertPremiumOwner(userId) {
   const user = await userRepository.findById(userId);
-  const ok =
-    user?.subscription_status === 'premium_active' &&
-    (!user.premium_expires_at || new Date(user.premium_expires_at) > new Date());
+  const ok = require('./subscriptionService').isPremiumActive(user);
   if (!ok && !user?.is_admin) {
     throw createError(
       403,
@@ -274,12 +272,10 @@ async function leaveHousehold(userId, meta = {}) {
  * Benefício enterprise: membro activo herda Premium do titular se o titular estiver activo.
  */
 async function resolveEffectiveSubscription(userId) {
+  const sub = require('./subscriptionService');
   const user = await userRepository.findById(userId);
-  const selfPremium =
-    user?.subscription_status === 'premium_active' &&
-    (!user.premium_expires_at || new Date(user.premium_expires_at) > new Date());
 
-  if (selfPremium) {
+  if (sub.isPremiumActive(user)) {
     return {
       status: 'premium_active',
       expiresAt: user.premium_expires_at,
@@ -290,24 +286,24 @@ async function resolveEffectiveSubscription(userId) {
   try {
     await featureFlagService.assertEnabled('household_enabled');
   } catch {
-    return { status: user?.subscription_status || 'free', expiresAt: null, source: 'self' };
+    return {
+      status: sub.publicStatus(user),
+      expiresAt: user?.premium_expires_at || null,
+      source: 'self',
+    };
   }
 
   const membership = await householdRepository.getMembership(userId);
   if (!membership || membership.role === 'owner') {
     return {
-      status: user?.subscription_status || 'free',
+      status: sub.publicStatus(user),
       expiresAt: user?.premium_expires_at || null,
       source: 'self',
     };
   }
 
   const owner = await userRepository.findById(membership.owner_user_id);
-  const ownerPremium =
-    owner?.subscription_status === 'premium_active' &&
-    (!owner.premium_expires_at || new Date(owner.premium_expires_at) > new Date());
-
-  if (ownerPremium) {
+  if (sub.isPremiumActive(owner)) {
     return {
       status: 'premium_active',
       expiresAt: owner.premium_expires_at,
@@ -317,7 +313,7 @@ async function resolveEffectiveSubscription(userId) {
   }
 
   return {
-    status: user?.subscription_status || 'free',
+    status: sub.publicStatus(user),
     expiresAt: user?.premium_expires_at || null,
     source: 'self',
   };

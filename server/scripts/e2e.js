@@ -15,6 +15,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 const { SUPERADMIN } = require('../../database/seed/002_superadmin');
 
 const BASE = process.env.API_BASE_URL || process.env.E2E_BASE_URL || 'http://localhost:4000';
@@ -382,18 +383,28 @@ async function run() {
       });
     }
     if (r.json?.mfaRequired) {
-      assert(secret, 'mfa secret after enroll');
+      let code = secret ? totp.generate(secret) : null;
+      if (!code) {
+        const jwt = require('jsonwebtoken');
+        const sub = jwt.decode(r.json.mfaTicket)?.sub;
+        code = sub ? await require('../src/services/mfaService').totpNow(sub) : null;
+      }
+      assert(code, 'mfa code after enroll or stored secret');
       r = await req('POST', '/api/auth/mfa/verify', {
         body: {
           mfaTicket: r.json.mfaTicket,
-          code: totp.generate(secret),
+          code,
           deviceName: 'E2E Admin Console',
           platform: 'web',
         },
       });
+      assert(
+        r.status === 200,
+        `mfa verify ${r.status} ${r.json?.code || r.json?.message || ''}`
+      );
     }
     adminToken = r.json.token || r.json.accessToken;
-    assert(adminToken, 'admin token');
+    assert(adminToken, `admin token · ${r.json?.code || r.status}`);
     const me = await req('GET', '/api/auth/me', { token: adminToken });
     assert(me.json?.isAdmin || me.json?.roles?.includes('super_admin') || me.json?.roles?.includes('admin'), 'admin role');
     return SUPERADMIN.email;

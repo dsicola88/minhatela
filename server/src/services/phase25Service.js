@@ -255,10 +255,12 @@ async function verifyGoogleToken(body, expectedAud) {
   if (aud !== String(expectedAud) && azp !== String(expectedAud)) {
     throw createError(401, 'Token Google inválido (audience)', 'OAUTH_AUD_MISMATCH');
   }
-  const emailVerified =
-    payload.email_verified === true || String(payload.email_verified) === 'true';
-  if (!emailVerified) {
-    throw createError(401, 'Email Google não verificado', 'OAUTH_EMAIL_UNVERIFIED');
+  if (payload.email_verified !== undefined) {
+    const emailVerified =
+      payload.email_verified === true || String(payload.email_verified) === 'true';
+    if (!emailVerified) {
+      throw createError(401, 'Email Google não verificado', 'OAUTH_EMAIL_UNVERIFIED');
+    }
   }
   if (payload.exp && Number(payload.exp) * 1000 < Date.now()) {
     throw createError(401, 'Token Google expirado', 'OAUTH_EXPIRED');

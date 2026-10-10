@@ -25,6 +25,9 @@ export default function WatchRoute() {
         });
       }}
       onOpenTitle={(titleId) => router.push(`/title/${titleId}`)}
+      onSubscribe={() =>
+        router.push({ pathname: '/checkout', params: { type: 'subscription' } })
+      }
     />
   );
 }

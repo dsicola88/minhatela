@@ -62,7 +62,7 @@ router.post(
 );
 router.post(
   '/mfa/setup',
-  rateLimit({ windowMs: 60_000, max: 10 }),
+  rateLimit({ windowMs: 60_000, max: 30, keyFn: (req) => `mfa-setup:${req.ip}` }),
   asyncHandler(authController.mfaSetup)
 );
 router.post(

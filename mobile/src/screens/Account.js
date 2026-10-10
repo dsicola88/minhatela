@@ -253,12 +253,22 @@ export default function Account({
   }
 
   const effective = account?.user?.effectiveSubscription;
-  const subLabel =
-    effective?.status === 'premium_active' ||
-    account?.user?.subscriptionStatus === 'premium_active'
-      ? effective?.source === 'household'
-        ? 'Premium via agregado familiar'
-        : 'Premium activo'
+  const premiumOn =
+    effective?.status === 'premium_active' || account?.user?.premiumActive === true;
+  const expired =
+    !premiumOn &&
+    (account?.user?.subscriptionStatus === 'premium_expired' ||
+      effective?.status === 'premium_expired');
+  const expiresAt =
+    effective?.expiresAt || account?.user?.premiumExpiresAt || null;
+  const subLabel = premiumOn
+    ? effective?.source === 'household'
+      ? 'Premium via agregado familiar'
+      : expiresAt
+        ? `Premium até ${new Date(expiresAt).toLocaleDateString('pt-AO')}`
+        : 'Premium vitalício'
+    : expired
+      ? 'Premium expirado — AVOD'
       : 'Plano gratuito (AVOD)';
 
   const primaryProfile = account?.profiles?.[0];
@@ -337,6 +347,12 @@ export default function Account({
             icon="diamond-outline"
             onPress={onPlans}
           />
+          {expired ? (
+            <Text style={{ color: colors.gold, fontSize: 13, marginTop: 8, lineHeight: 20 }}>
+              O período acabou. Continua a ver o catálogo gratuito (com anúncios). Conteúdo Premium
+              pede nova assinatura — a app não bloqueia a conta.
+            </Text>
+          ) : null}
           {!account?.user?.emailVerified ? (
             <Pressable
               onPress={async () => {

@@ -120,6 +120,16 @@ async function run({ query }) {
     [user.id, SUPERADMIN.fullName]
   );
 
+  await query(
+    `INSERT INTO tenant_memberships (user_id, tenant_id, role_code, status)
+     SELECT $1, t.id, r.code, 'active'
+     FROM tenants t
+     CROSS JOIN roles r
+     WHERE t.slug = 'minhatela' AND r.code = ANY($2::text[])
+     ON CONFLICT DO NOTHING`,
+    [user.id, ALL_ROLES]
+  );
+
   // Verificação: a password do seed deve autenticar (mesmo algoritmo do login)
   const ok = await bcrypt.compare(SUPERADMIN.password, user.password_hash);
   if (!ok) {

@@ -44,6 +44,7 @@ export default function Plans({ onBack, onSubscribe, onPacks, currentStatus }) {
   }, [load]);
 
   const isPremium = currentStatus === 'premium_active';
+  const expired = currentStatus === 'premium_expired';
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.black, paddingTop: insets.top }}>
@@ -87,7 +88,9 @@ export default function Plans({ onBack, onSubscribe, onPacks, currentStatus }) {
             Escolha o seu plano
           </Text>
           <Text style={{ color: colors.muted, marginBottom: 28, lineHeight: 22 }}>
-            Feito para Angola — IBAN e Multicaixa, sem cartão internacional.
+            {expired
+              ? 'A sua assinatura expirou. O catálogo gratuito continua disponível; o Premium SVOD volta após novo pagamento.'
+              : 'Feito para Angola — IBAN e Multicaixa, sem cartão internacional. No fim do período o Premium cai para AVOD — a conta não é fechada.'}
           </Text>
 
           {error ? <ErrorState message={error} onRetry={load} /> : null}

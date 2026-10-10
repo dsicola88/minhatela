@@ -21,6 +21,10 @@ export async function fetchScrub(contentId) {
   return api.get(`/api/catalog/content/${contentId}/scrub`);
 }
 
+export function preloadGoogleIdentity() {
+  return loadGoogleIdentity().catch(() => null);
+}
+
 function loadGoogleIdentity() {
   return new Promise((resolve, reject) => {
     if (typeof window === 'undefined') {
@@ -59,6 +63,7 @@ export function requestGoogleAccessToken(clientId) {
         const client = google.accounts.oauth2.initTokenClient({
           client_id: clientId,
           scope: 'openid email profile',
+          prompt: 'select_account',
           callback: (response) => {
             if (response?.access_token) resolve(response.access_token);
             else reject(new Error(response?.error || 'Login Google cancelado'));
@@ -89,6 +94,7 @@ export function buildDemoOAuthToken({ provider, email, fullName, sub }) {
 
 export default {
   oauthLogin,
+  preloadGoogleIdentity,
   fetchPaymentRisk,
   fetchEncodingQueue,
   updateEncoding,

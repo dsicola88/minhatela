@@ -18,11 +18,12 @@ const GENERIC_RESET_MESSAGE =
 function signAccessToken(user, roles, sessionId, tenantId = null, mfaVerified = false) {
   const rbac = require('./rbacService');
   const staff = rbac.isStaff(roles);
+  const sub = require('./subscriptionService');
   return jwt.sign(
     {
       sub: user.id,
       email: user.email,
-      subscriptionStatus: user.subscription_status,
+      subscriptionStatus: sub.publicStatus(user),
       roles,
       isAdmin: Boolean(user.is_admin) || roles.includes('admin') || roles.includes('super_admin'),
       tenantId,
@@ -37,13 +38,15 @@ function signAccessToken(user, roles, sessionId, tenantId = null, mfaVerified = 
 
 function toPublicUser(user, roles = [], extras = {}) {
   const rbac = require('./rbacService');
+  const sub = require('./subscriptionService');
   const isAdmin = Boolean(user.is_admin) || roles.includes('admin') || roles.includes('super_admin');
 
   return {
     id: user.id,
     email: user.email,
     fullName: user.full_name,
-    subscriptionStatus: user.subscription_status,
+    subscriptionStatus: sub.publicStatus(user),
+    premiumActive: sub.isPremiumActive(user),
     premiumExpiresAt: user.premium_expires_at || null,
     emailVerified: Boolean(user.email_verified_at),
     emailVerifiedAt: user.email_verified_at || null,
@@ -69,6 +72,7 @@ function mapSession(row, currentSessionId) {
 }
 
 async function issueSession(user, roles, meta = {}) {
+  user = await require('./subscriptionService').syncExpired(user);
   if (user.is_admin && !roles.includes('admin') && !roles.includes('super_admin')) {
     await userRepository.assignRole(user.id, 'admin');
     roles = [...roles, 'admin'];
@@ -312,10 +316,11 @@ async function revokeOtherSessions(userId, currentSessionId) {
 }
 
 async function me(userId) {
-  const user = await userRepository.findById(userId);
+  let user = await userRepository.findById(userId);
   if (!user) {
     throw createError(404, 'Utilizador não encontrado', 'USER_NOT_FOUND');
   }
+  user = await require('./subscriptionService').syncExpired(user);
   const roles = await userRepository.getRoles(userId);
   const tenantId = await require('./rbacService').tenantIdForUser(userId);
   return toPublicUser(user, roles, { tenantId });

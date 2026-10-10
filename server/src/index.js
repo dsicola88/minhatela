@@ -6,6 +6,7 @@ const { logger } = require('./utils/logger');
 const { startScheduler } = require('./jobs/comingSoonReleaseJob');
 const { startScheduler: startPurgeScheduler } = require('./jobs/accountPurgeJob');
 const { startScheduler: startEpisodeScheduler } = require('./jobs/newEpisodeAlertJob');
+const { startScheduler: startSubscriptionExpiry } = require('./jobs/subscriptionExpiryJob');
 
 const app = createApp();
 
@@ -19,5 +20,6 @@ app.listen(env.port, () => {
     startScheduler();
     startPurgeScheduler();
     startEpisodeScheduler();
+    startSubscriptionExpiry();
   }
 });

@@ -80,7 +80,6 @@ export const NAV_GROUPS = [
       { id: 'promos', label: 'Promos', icon: 'pricetag-outline' },
       { id: 'leads', label: 'Leads', icon: 'mail-outline' },
       { id: 'ads', label: 'Anúncios', icon: 'megaphone-outline' },
-      { id: 'landing', label: 'Landing & textos', icon: 'color-palette-outline' },
     ],
   },
   {
@@ -89,26 +88,43 @@ export const NAV_GROUPS = [
     items: [{ id: 'users', label: 'Utilizadores', icon: 'people-outline' }],
   },
   {
-    id: 'platform',
-    label: 'Plataforma',
-    items: [
-      { id: 'flags', label: 'Flags', icon: 'toggle-outline' },
-      { id: 'config', label: 'Textos & marca', icon: 'text-outline' },
-      { id: 'media', label: 'CDN / encode', icon: 'cloud-outline' },
-    ],
+    id: 'mediaops',
+    label: 'Media',
+    items: [{ id: 'media', label: 'CDN / encode', icon: 'cloud-outline' }],
   },
   {
     id: 'gov',
     label: 'Governação',
     items: [
-      { id: 'tenants', label: 'Tenants', icon: 'globe-outline' },
       { id: 'rights', label: 'Direitos', icon: 'ribbon-outline' },
       { id: 'acquisition', label: 'Aquisição', icon: 'briefcase-outline' },
       { id: 'reports', label: 'Denúncias', icon: 'warning-outline' },
       { id: 'audit', label: 'Auditoria', icon: 'document-text-outline' },
     ],
   },
+  {
+    id: 'platform',
+    label: 'Plataforma',
+    superOnly: true,
+    items: [
+      { id: 'landing', label: 'Landing & textos', icon: 'color-palette-outline', superOnly: true },
+      { id: 'config', label: 'Textos & marca', icon: 'text-outline', superOnly: true },
+      { id: 'flags', label: 'Flags', icon: 'toggle-outline', superOnly: true },
+      { id: 'tenants', label: 'Tenants', icon: 'globe-outline', superOnly: true },
+    ],
+  },
 ];
+
+export function navGroupsForUser(user) {
+  const roles = user?.roles || [];
+  const isSuper = roles.includes('super_admin');
+  return NAV_GROUPS.map((group) => {
+    if (group.superOnly && !isSuper) return null;
+    const items = group.items.filter((item) => !item.superOnly || isSuper);
+    if (!items.length) return null;
+    return { ...group, items };
+  }).filter(Boolean);
+}
 
 export const TAB_META = Object.fromEntries(
   NAV_GROUPS.flatMap((g) => g.items.map((item) => [item.id, { ...item, group: g.label }]))
@@ -475,7 +491,7 @@ export function NavItem({ item, active, onPress }) {
   );
 }
 
-export function AdminSidebar({ tab, onChange, attention }) {
+export function AdminSidebar({ tab, onChange, attention, groups = NAV_GROUPS }) {
   return (
     <View
       style={{
@@ -516,7 +532,7 @@ export function AdminSidebar({ tab, onChange, attention }) {
           <Text style={{ color: colors.text, fontSize: 20, fontWeight: '800' }}>{attention}</Text>
         </View>
       ) : null}
-      {NAV_GROUPS.map((group) => (
+      {groups.map((group) => (
         <View key={group.id} style={{ marginBottom: 16 }}>
           <Text
             style={{
@@ -545,7 +561,7 @@ export function AdminSidebar({ tab, onChange, attention }) {
   );
 }
 
-export function AdminMobileNav({ tab, onChange }) {
+export function AdminMobileNav({ tab, onChange, groups = NAV_GROUPS }) {
   return (
     <ScrollView
       horizontal
@@ -553,15 +569,15 @@ export function AdminMobileNav({ tab, onChange }) {
       contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 10, alignItems: 'center' }}
       style={{ borderBottomWidth: 1, borderBottomColor: colors.border, flexGrow: 0 }}
     >
-      {NAV_GROUPS.map((group, gi) => (
+      {groups.map((group, gi) => (
         <View
           key={group.id}
           style={{
             flexDirection: 'row',
             alignItems: 'center',
             marginRight: 10,
-            paddingRight: gi === NAV_GROUPS.length - 1 ? 0 : 10,
-            borderRightWidth: gi === NAV_GROUPS.length - 1 ? 0 : 1,
+            paddingRight: gi === groups.length - 1 ? 0 : 10,
+            borderRightWidth: gi === groups.length - 1 ? 0 : 1,
             borderRightColor: colors.border,
           }}
         >

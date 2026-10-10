@@ -10,7 +10,9 @@ export default function PlansRoute() {
 
   return (
     <PlansScreen
-      currentStatus={user?.subscriptionStatus}
+      currentStatus={
+        user?.premiumActive ? 'premium_active' : user?.subscriptionStatus
+      }
       onBack={() => router.back()}
       onPacks={() => router.push('/packs')}
       onSubscribe={() =>

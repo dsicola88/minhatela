@@ -169,6 +169,12 @@ async function assertStepUp(user, code) {
   return { skipped: false, verified: true };
 }
 
+async function totpNow(userId) {
+  const row = await loadMfa(userId);
+  if (!row?.mfa_secret_enc) return null;
+  return totp.generate(decrypt(row.mfa_secret_enc));
+}
+
 module.exports = {
   enroll,
   confirm,
@@ -180,4 +186,5 @@ module.exports = {
   loadMfa,
   assertStepUp,
   staffMfaRequired,
+  totpNow,
 };

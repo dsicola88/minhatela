@@ -82,7 +82,8 @@ const env = Object.freeze({
   }),
   uploadsDir: path.resolve(__dirname, '../../uploads'),
   oauth: Object.freeze({
-    googleClientId: process.env.GOOGLE_CLIENT_ID || '',
+    googleClientId:
+      process.env.GOOGLE_CLIENT_ID || process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '',
     googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
     appleClientId: process.env.APPLE_CLIENT_ID || '',
   }),

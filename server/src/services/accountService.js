@@ -41,8 +41,9 @@ function mapProfile(row) {
 }
 
 async function getAccount(userId) {
-  const user = await userRepository.findById(userId);
+  let user = await userRepository.findById(userId);
   if (!user) throw createError(404, 'Utilizador não encontrado', 'USER_NOT_FOUND');
+  user = await require('./subscriptionService').syncExpired(user);
   const roles = await userRepository.getRoles(userId);
   const streams = await deviceStreamService.streamStatus(userId);
   const deviceData = await deviceStreamService.listDevices(userId);
@@ -67,7 +68,8 @@ async function getAccount(userId) {
       id: user.id,
       email: user.email,
       fullName: user.full_name,
-      subscriptionStatus: user.subscription_status,
+      subscriptionStatus: require('./subscriptionService').publicStatus(user),
+      premiumActive: require('./subscriptionService').isPremiumActive(user),
       premiumExpiresAt: user.premium_expires_at,
       effectiveSubscription: effectiveSub,
       emailVerified: Boolean(user.email_verified_at),

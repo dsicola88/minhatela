@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import { useAuth } from '../context/AuthContext';
 import { useAppConfig } from '../context/AppConfigContext';
 import {
   TAB_META,
+  navGroupsForUser,
   StatusBadge,
   PageHeader,
   cardStyle,
@@ -115,6 +116,7 @@ export default function AdminCommandCenter({ onBack }) {
   const { themeId, statusBarStyle } = useTheme();
   const { user } = useAuth();
   const { refresh: refreshAppConfig } = useAppConfig();
+  const navGroups = useMemo(() => navGroupsForUser(user), [(user?.roles || []).join(',')]);
   const isCompact = width < 1080;
   const [tab, setTab] = useState('overview');
   const [approvals, setApprovals] = useState([]);
@@ -371,6 +373,11 @@ export default function AdminCommandCenter({ onBack }) {
   }, [loadCore]);
 
   useEffect(() => {
+    const allowed = new Set(navGroups.flatMap((g) => g.items.map((i) => i.id)));
+    if (!allowed.has(tab)) setTab('overview');
+  }, [navGroups, tab]);
+
+  useEffect(() => {
     setError('');
     loadTab(tab).catch((err) => setError(err.message || 'Falha ao carregar secção'));
   }, [tab, loadTab]);
@@ -413,7 +420,12 @@ export default function AdminCommandCenter({ onBack }) {
     <View key={themeId} style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top, flexDirection: isCompact ? 'column' : 'row' }}>
       <StatusBar style={statusBarStyle} />
       {isCompact ? null : (
-        <AdminSidebar tab={tab} onChange={setTab} attention={kpis.attentionRequired || 0} />
+        <AdminSidebar
+          tab={tab}
+          onChange={setTab}
+          attention={kpis.attentionRequired || 0}
+          groups={navGroups}
+        />
       )}
       <View style={{ flex: 1 }}>
       <AdminTopBar
@@ -427,7 +439,7 @@ export default function AdminCommandCenter({ onBack }) {
         compact={isCompact}
       />
 
-      {isCompact ? <AdminMobileNav tab={tab} onChange={setTab} /> : null}
+      {isCompact ? <AdminMobileNav tab={tab} onChange={setTab} groups={navGroups} /> : null}
 
       <ScrollView
         contentContainerStyle={{
@@ -457,7 +469,11 @@ export default function AdminCommandCenter({ onBack }) {
           <View>
             <PageHeader
               compact
-              subtitle="KPIs, filas e governação. Toda a autorização é validada no servidor."
+              subtitle={
+                roleLabel === 'SuperAdmin'
+                  ? 'Plataforma: marca, landing, flags, tenants e promoção de operadores. Sem código.'
+                  : 'Operação do tenant: filas, catálogo, pagamentos e atendimento. Sem acesso a flags, tenants ou textos da plataforma.'
+              }
             />
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 8 }}>
               <KpiCard label="UTILIZADORES" value={kpis.users ?? '—'} hint={`${kpis.premiumUsers || 0} Premium`} />
@@ -468,10 +484,20 @@ export default function AdminCommandCenter({ onBack }) {
               />
               <KpiCard label="7 DIAS" value={center?.labels?.revenue7d || '—'} />
               <KpiCard
-                label="STREAMS LIVE"
-                value={kpis.activeStreams ?? 0}
-                hint={`${kpis.playsToday || 0} plays hoje`}
-                tone={kpis.activeStreams > 0 ? 'success' : 'info'}
+                label="PLAYS HOJE"
+                value={kpis.playsToday ?? 0}
+                hint={`${kpis.activeStreams ?? 0} streams agora`}
+                tone={kpis.playsToday > 0 ? 'success' : 'info'}
+              />
+              <KpiCard
+                label="GOSTOS / ESTRELAS"
+                value={kpis.ratingsToday ?? 0}
+                hint={kpis.ratingAvgToday ? `média ${kpis.ratingAvgToday} · hoje` : 'avaliações hoje'}
+              />
+              <KpiCard
+                label="LISTA HOJE"
+                value={kpis.favoritesToday ?? 0}
+                hint="adicionados à Minha lista"
               />
               <KpiCard label="CATÁLOGO" value={kpis.publishedTitles ?? 0} hint={`${kpis.seriesCount || 0} séries`} />
               <KpiCard
@@ -555,6 +581,7 @@ export default function AdminCommandCenter({ onBack }) {
               })
             }
             run={run}
+            canManageAdmins={(user?.roles || []).includes('super_admin')}
           />
         ) : null}
 

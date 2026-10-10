@@ -41,11 +41,19 @@ function reportQoeSafe(payload) {
   reportWatchQoe(payload).catch(() => {});
 }
 
-export default function Watch({ videoId, onBack, onNextEpisode, onWatchTogether, onOpenTitle }) {
+export default function Watch({
+  videoId,
+  onBack,
+  onNextEpisode,
+  onWatchTogether,
+  onOpenTitle,
+  onSubscribe,
+}) {
   const { width, height } = useWindowDimensions();
   const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [denyCode, setDenyCode] = useState('');
   const [session, setSession] = useState(null);
   const [showControls, setShowControls] = useState(true);
   const [introSkipped, setIntroSkipped] = useState(false);
@@ -79,6 +87,7 @@ export default function Watch({ videoId, onBack, onNextEpisode, onWatchTogether,
     let mounted = true;
     setLoading(true);
     setError('');
+    setDenyCode('');
     setSession(null);
     setIntroSkipped(false);
     setRecapSkipped(false);
@@ -194,7 +203,10 @@ export default function Watch({ videoId, onBack, onNextEpisode, onWatchTogether,
           platform: Platform.OS,
           metadata: { message: err.message },
         });
-        if (mounted) setError(err.message || t('errorGeneric'));
+        if (mounted) {
+          setError(err.message || t('errorGeneric'));
+          setDenyCode(err.code || '');
+        }
       } finally {
         if (mounted) setLoading(false);
       }
@@ -497,8 +509,20 @@ export default function Watch({ videoId, onBack, onNextEpisode, onWatchTogether,
         </View>
       ) : error ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          <Text style={{ color: colors.red, marginBottom: 16, textAlign: 'center' }}>{error}</Text>
-          <Focusable id="watch-error-back" autoFocus onPress={onBack}>
+          <Text style={{ color: colors.red, marginBottom: 12, textAlign: 'center', fontWeight: '700' }}>
+            {error}
+          </Text>
+          {denyCode === 'SUBSCRIPTION_REQUIRED' ? (
+            <Text style={{ color: colors.muted, marginBottom: 20, textAlign: 'center', lineHeight: 20 }}>
+              A assinatura acabou ou não está activa. O catálogo gratuito continua disponível.
+            </Text>
+          ) : null}
+          {denyCode === 'SUBSCRIPTION_REQUIRED' && onSubscribe ? (
+            <Focusable id="watch-error-subscribe" autoFocus onPress={onSubscribe}>
+              <Text style={{ color: colors.gold, fontWeight: '800', padding: 12 }}>Assinar Premium</Text>
+            </Focusable>
+          ) : null}
+          <Focusable id="watch-error-back" autoFocus={!onSubscribe} onPress={onBack}>
             <Text style={{ color: colors.text, fontWeight: '700', padding: 12 }}>{t('back')}</Text>
           </Focusable>
         </View>
