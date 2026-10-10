@@ -5,9 +5,7 @@ import {
   ScrollView,
   TextInput,
   useWindowDimensions,
-  ImageBackground,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -94,28 +92,25 @@ export default function WelcomeLanding() {
             <Text style={{ color: colors.text, fontWeight: '700' }}>Entrar</Text>
           </Focusable>
         </View>
-        <ImageBackground
-          source={landing?.heroImageUrl ? { uri: landing.heroImageUrl } : undefined}
-          style={{ backgroundColor: '#0A0A0A' }}
+        <View
+          style={{
+            paddingHorizontal: isCompact ? 20 : 48,
+            maxWidth: layout.maxContentWidth,
+            width: '100%',
+            alignSelf: 'center',
+            marginTop: 8,
+            flexDirection: isCompact ? 'column' : 'row',
+            gap: isCompact ? 28 : 48,
+            alignItems: 'stretch',
+          }}
         >
-          <LinearGradient
-            colors={['transparent', colors.black]}
-            style={{
-              paddingHorizontal: isCompact ? 20 : 48,
-              paddingTop: 28,
-              paddingBottom: 8,
-              maxWidth: layout.maxContentWidth,
-              width: '100%',
-              alignSelf: 'center',
-            }}
-          >
+          <View style={{ flex: 1.15, justifyContent: 'center', paddingVertical: isCompact ? 8 : 36 }}>
             <Text
               style={{
                 color: colors.text,
                 fontSize: isCompact ? 34 : 52,
                 fontWeight: '900',
                 lineHeight: isCompact ? 40 : 58,
-                maxWidth: 720,
               }}
             >
               {heroTitle}
@@ -125,13 +120,13 @@ export default function WelcomeLanding() {
                 color: colors.textSecondary,
                 fontSize: 16,
                 marginTop: 12,
-                maxWidth: 520,
                 lineHeight: 24,
+                maxWidth: 520,
               }}
             >
               {heroSubtitle}
             </Text>
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: 24 }}>
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, maxWidth: 440 }}>
               <PrimaryButton
                 label={landing?.heroCtaPrimary || 'Começar'}
                 onPress={() => router.push('/login')}
@@ -144,22 +139,9 @@ export default function WelcomeLanding() {
                 style={{ flex: 1 }}
               />
             </View>
-          </LinearGradient>
-        </ImageBackground>
+          </View>
 
-        <View
-          style={{
-            paddingHorizontal: isCompact ? 20 : 48,
-            maxWidth: layout.maxContentWidth,
-            width: '100%',
-            alignSelf: 'center',
-            marginTop: 24,
-          }}
-        >
-          <Text style={{ color: colors.gold, fontWeight: '800', fontSize: 12, letterSpacing: 1.2, marginBottom: 14 }}>
-            COMO VER
-          </Text>
-          <View style={{ gap: 12, marginBottom: 28 }}>
+          <View style={{ flex: 1, gap: 12, justifyContent: 'center' }}>
             {sections.map((s, index) => (
               <View
                 key={s.id || s.title}
@@ -174,15 +156,26 @@ export default function WelcomeLanding() {
                 <Text style={{ color: colors.gold, fontWeight: '700', fontSize: 12 }}>
                   {sectionLabel[s.id] || `0${index + 1}`}
                 </Text>
-                <Text style={{ color: colors.text, fontSize: 20, fontWeight: '800', marginTop: 6 }}>
+                <Text style={{ color: colors.text, fontSize: 18, fontWeight: '800', marginTop: 4 }}>
                   {s.title}
                 </Text>
-                <Text style={{ color: colors.textSecondary, marginTop: 6, fontSize: 15, lineHeight: 22 }}>
+                <Text style={{ color: colors.textSecondary, marginTop: 4, fontSize: 14, lineHeight: 20 }}>
                   {s.body}
                 </Text>
               </View>
             ))}
           </View>
+        </View>
+
+        <View
+          style={{
+            paddingHorizontal: isCompact ? 20 : 48,
+            maxWidth: layout.maxContentWidth,
+            width: '100%',
+            alignSelf: 'center',
+            marginTop: 28,
+          }}
+        >
 
           {landing?.showLeadForm !== false ? (
             <View
