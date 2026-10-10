@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { PrimaryButton, FieldLabel } from '../components/ui';
+import TotpQr from '../components/TotpQr';
 import { colors, layout } from '../theme/tokens';
 import { useBrandCopy } from '../context/AppConfigContext';
 import {
@@ -41,6 +42,7 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [mfaTicket, setMfaTicket] = useState('');
   const [mfaSecret, setMfaSecret] = useState('');
+  const [mfaOtpauth, setMfaOtpauth] = useState('');
   const [mfaCode, setMfaCode] = useState('');
   const [mfaStep, setMfaStep] = useState('');
 
@@ -110,6 +112,7 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
           const setup = await mfaSetup(data.mfaTicket);
           setMfaTicket(data.mfaTicket);
           setMfaSecret(setup.secret || '');
+          setMfaOtpauth(setup.otpauthUrl || '');
           setMfaStep('setup');
           setError('');
           return;
@@ -254,24 +257,21 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
                   </View>
                 </View>
 
-                {mfaStep === 'setup' && mfaSecret ? (
-                  <View style={{ marginTop: 16, marginBottom: 8 }}>
-                    <FieldLabel>Segredo MFA (Google Authenticator)</FieldLabel>
-                    <Text selectable style={{ color: colors.gold, fontFamily: Platform.OS === 'web' ? 'monospace' : undefined }}>
-                      {mfaSecret}
-                    </Text>
-                    <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 8 }}>
-                      Adicione o segredo na app autenticadora e introduza o código de 6 dígitos.
-                    </Text>
-                  </View>
+                {mfaStep === 'setup' && (mfaOtpauth || mfaSecret) ? (
+                  <TotpQr otpauthUrl={mfaOtpauth} secret={mfaSecret} />
                 ) : null}
 
                 {mfaStep ? (
                   <View style={{ marginBottom: 8, marginTop: 12 }}>
-                    <FieldLabel>Código MFA</FieldLabel>
+                    <FieldLabel>Código de 6 dígitos</FieldLabel>
+                    {mfaStep === 'code' ? (
+                      <Text style={{ color: colors.textSecondary, fontSize: 13, marginBottom: 8 }}>
+                        Abra o Google Authenticator e escreva o número que lá aparece.
+                      </Text>
+                    ) : null}
                     <TextInput
                       value={mfaCode}
-                      onChangeText={setMfaCode}
+                      onChangeText={(value) => setMfaCode(value.replace(/\D/g, '').slice(0, 6))}
                       keyboardType="number-pad"
                       placeholder="000000"
                       placeholderTextColor={colors.muted}
