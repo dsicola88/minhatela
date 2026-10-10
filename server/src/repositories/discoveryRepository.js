@@ -2,6 +2,7 @@
 
 const { query } = require('../config/database');
 const { mapContentPublic } = require('../utils/mappers');
+const { videoTenantSql } = require('../utils/tenantScope');
 
 function mapCard(row) {
   return {
@@ -40,6 +41,7 @@ async function search({
 
   // Base browse kinds
   filters.push(`v.kind IN ('movie', 'series')`);
+  filters.push(videoTenantSql('v'));
   filters.push(`(
     (v.is_published = TRUE AND v.workflow_status = 'published')
     OR (v.coming_soon_at IS NOT NULL AND v.coming_soon_at > NOW())
@@ -117,6 +119,7 @@ async function listFavorites(profileId) {
      FROM favorites f
      JOIN videos v ON v.id = f.content_id
      WHERE f.profile_id = $1
+       AND ${videoTenantSql('v')}
        AND v.kind IN ('movie', 'series')
        AND (
          (v.is_published = TRUE AND v.workflow_status = 'published')
@@ -155,8 +158,8 @@ async function isFavorite(profileId, contentId) {
 
 async function related(contentId, limit = 12) {
   const base = await query(
-    `SELECT id, genre, monetization, creator_id FROM videos
-     WHERE id = $1`,
+    `SELECT id, genre, monetization, creator_id FROM videos v
+     WHERE v.id = $1 AND ${videoTenantSql('v')}`,
     [contentId]
   );
   if (!base.rowCount) return [];
@@ -169,6 +172,7 @@ async function related(contentId, limit = 12) {
      WHERE v.is_published = TRUE
        AND v.workflow_status = 'published'
        AND v.kind IN ('movie', 'series')
+       AND ${videoTenantSql('v')}
        AND v.id <> $1
        AND (
          (v.genre IS NOT NULL AND v.genre = $2)

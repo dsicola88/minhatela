@@ -1,6 +1,7 @@
 'use strict';
 
 const { query } = require('../config/database');
+const { videoTenantSql } = require('../utils/tenantScope');
 
 async function saveDiagnostic(row) {
   const result = await query(
@@ -54,7 +55,7 @@ async function listFollows(profileId) {
   const result = await query(
     `SELECT sf.*, v.title, v.poster_url, v.slug, v.kind
      FROM series_follows sf
-     JOIN videos v ON v.id = sf.series_id
+     JOIN videos v ON v.id = sf.series_id AND ${videoTenantSql('v')}
      WHERE sf.profile_id = $1
      ORDER BY sf.created_at DESC`,
     [profileId]
@@ -103,6 +104,7 @@ async function listLanguages() {
      WHERE v.is_published = TRUE
        AND v.workflow_status = 'published'
        AND v.kind IN ('movie', 'series')
+       AND ${videoTenantSql('v')}
      GROUP BY lang
      ORDER BY count DESC, lang ASC`
   );
@@ -118,6 +120,7 @@ async function byLanguage(lang, maturityMax = 18, limit = 40) {
      WHERE v.is_published = TRUE
        AND v.workflow_status = 'published'
        AND v.kind IN ('movie', 'series')
+       AND ${videoTenantSql('v')}
        AND COALESCE(v.maturity_rating, 12) <= $2
        AND $1 = ANY(COALESCE(v.languages, ARRAY['pt']::text[]))
      ORDER BY v.updated_at DESC
@@ -137,6 +140,7 @@ async function listCategoryHub() {
        AND v.is_published = TRUE
        AND v.workflow_status = 'published'
        AND v.kind IN ('movie', 'series')
+       AND ${videoTenantSql('v')}
      GROUP BY c.id, c.slug, c.title
      HAVING COUNT(vc.video_id) > 0
      ORDER BY count DESC, c.title ASC`
@@ -153,6 +157,7 @@ async function byCategorySlug(slug, maturityMax = 18, limit = 40) {
      JOIN video_categories vc ON vc.category_id = c.id
      JOIN videos v ON v.id = vc.video_id
      WHERE c.slug = $1
+       AND ${videoTenantSql('v')}
        AND v.is_published = TRUE
        AND v.workflow_status = 'published'
        AND v.kind IN ('movie', 'series')

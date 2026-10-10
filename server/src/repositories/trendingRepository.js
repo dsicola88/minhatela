@@ -1,6 +1,7 @@
 'use strict';
 
 const { query } = require('../config/database');
+const { videoTenantSql } = require('../utils/tenantScope');
 
 async function listTopAngola(maturityMax = 18, limit = 10, days = 7) {
   const result = await query(
@@ -14,6 +15,7 @@ async function listTopAngola(maturityMax = 18, limit = 10, days = 7) {
        FROM analytics_events ae
        JOIN videos v ON v.id = ae.content_id
        WHERE ae.event_name = 'video_started'
+         AND ${videoTenantSql('v')}
          AND ae.created_at > NOW() - ($3 || ' days')::interval
        GROUP BY 1
      )
@@ -26,6 +28,7 @@ async function listTopAngola(maturityMax = 18, limit = 10, days = 7) {
      WHERE v.is_published = TRUE
        AND v.workflow_status = 'published'
        AND v.kind IN ('movie', 'series')
+       AND ${videoTenantSql('v')}
        AND v.maturity_rating <= $1
      ORDER BY p.play_count DESC
      LIMIT $2`,

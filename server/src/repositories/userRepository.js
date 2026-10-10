@@ -63,6 +63,11 @@ async function assignRole(userId, roleCode) {
      ON CONFLICT DO NOTHING`,
     [userId, roleCode]
   );
+  try {
+    await require('../services/rbacService').ensureMembership(userId, roleCode);
+  } catch {
+    /* membership opcional até migração 029 */
+  }
 }
 
 async function updatePassword(userId, passwordHash) {

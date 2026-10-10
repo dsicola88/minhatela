@@ -15,7 +15,9 @@ const { logger } = require('../utils/logger');
 const GENERIC_RESET_MESSAGE =
   'Se existir uma conta com este email, enviámos instruções de recuperação.';
 
-function signAccessToken(user, roles, sessionId) {
+function signAccessToken(user, roles, sessionId, tenantId = null, mfaVerified = false) {
+  const rbac = require('./rbacService');
+  const staff = rbac.isStaff(roles);
   return jwt.sign(
     {
       sub: user.id,
@@ -23,19 +25,19 @@ function signAccessToken(user, roles, sessionId) {
       subscriptionStatus: user.subscription_status,
       roles,
       isAdmin: Boolean(user.is_admin) || roles.includes('admin') || roles.includes('super_admin'),
+      tenantId,
       sid: sessionId,
+      staff,
+      mfaVerified: Boolean(mfaVerified),
     },
     env.jwtSecret,
     { expiresIn: env.jwtExpiresIn }
   );
 }
 
-function toPublicUser(user, roles = []) {
-  const isAdmin =
-    Boolean(user.is_admin) ||
-    roles.includes('admin') ||
-    roles.includes('super_admin') ||
-    roles.includes('moderator');
+function toPublicUser(user, roles = [], extras = {}) {
+  const rbac = require('./rbacService');
+  const isAdmin = Boolean(user.is_admin) || roles.includes('admin') || roles.includes('super_admin');
 
   return {
     id: user.id,
@@ -47,6 +49,8 @@ function toPublicUser(user, roles = []) {
     emailVerifiedAt: user.email_verified_at || null,
     roles,
     isAdmin,
+    tenantId: extras.tenantId || null,
+    capabilities: rbac.capabilities(roles),
     createdAt: user.created_at,
   };
 }
@@ -65,6 +69,13 @@ function mapSession(row, currentSessionId) {
 }
 
 async function issueSession(user, roles, meta = {}) {
+  if (user.is_admin && !roles.includes('admin') && !roles.includes('super_admin')) {
+    await userRepository.assignRole(user.id, 'admin');
+    roles = [...roles, 'admin'];
+  }
+
+  const tenantId = await require('./rbacService').tenantIdForUser(user.id);
+
   const { session, refreshToken } = await authSessionRepository.create({
     userId: user.id,
     deviceName: meta.deviceName,
@@ -74,13 +85,19 @@ async function issueSession(user, roles, meta = {}) {
     ttlDays: env.refreshTokenDays,
   });
 
-  const accessToken = signAccessToken(user, roles, session.id);
+  const accessToken = signAccessToken(
+    user,
+    roles,
+    session.id,
+    tenantId,
+    Boolean(meta.mfaVerified)
+  );
   return {
     token: accessToken,
     accessToken,
     refreshToken,
     sessionId: session.id,
-    user: toPublicUser(user, roles),
+    user: toPublicUser(user, roles, { tenantId, mfaEnabled: Boolean(meta.mfaVerified) }),
   };
 }
 
@@ -175,6 +192,41 @@ async function login(body, meta = {}) {
     roles.push('customer');
   }
 
+  const rbac = require('./rbacService');
+  const mfaService = require('./mfaService');
+  let mfa = null;
+  try {
+    mfa = await mfaService.loadMfa(user.id);
+  } catch (err) {
+    if (mfaService.staffMfaRequired() && rbac.isStaff(roles)) {
+      throw createError(503, 'Verificação MFA indisponível', 'MFA_UNAVAILABLE');
+    }
+    logger.warn('auth.mfa_check_skipped', { message: err.message });
+  }
+
+  if (mfaService.staffMfaRequired() && rbac.isStaff(roles)) {
+    if (!mfa?.mfa_enabled_at) {
+      return {
+        mfaSetupRequired: true,
+        mfaTicket: mfaService.signMfaTicket(user.id, 'mfa_enroll'),
+        message: 'Staff tem de activar MFA (TOTP) antes de entrar na consola.',
+      };
+    }
+    return {
+      mfaRequired: true,
+      mfaTicket: mfaService.signMfaTicket(user.id, 'mfa'),
+      message: 'Introduza o código MFA.',
+    };
+  }
+
+  if (mfa?.mfa_enabled_at) {
+    return {
+      mfaRequired: true,
+      mfaTicket: mfaService.signMfaTicket(user.id, 'mfa'),
+      message: 'Introduza o código MFA.',
+    };
+  }
+
   const sessionPayload = await issueSession(user, roles, meta);
 
   try {
@@ -210,7 +262,15 @@ async function refresh({ refreshToken, ip, userAgent }) {
     // touch already updated last_seen; device metadata stays
   }
 
-  const accessToken = signAccessToken(user, roles, session.id);
+  const tenantId = await require('./rbacService').tenantIdForUser(user.id);
+  const rbac = require('./rbacService');
+  const mfaService = require('./mfaService');
+  const mfa = await mfaService.loadMfa(user.id);
+  if (mfaService.staffMfaRequired() && rbac.isStaff(roles) && !mfa?.mfa_enabled_at) {
+    throw createError(401, 'Staff tem de activar MFA', 'MFA_SETUP_REQUIRED');
+  }
+  const mfaVerified = Boolean(mfa?.mfa_enabled_at);
+  const accessToken = signAccessToken(user, roles, session.id, tenantId, mfaVerified);
   logger.info('auth.refresh', { userId: user.id, sessionId: session.id });
 
   return {
@@ -218,7 +278,7 @@ async function refresh({ refreshToken, ip, userAgent }) {
     accessToken,
     refreshToken: newRefresh,
     sessionId: session.id,
-    user: toPublicUser(user, roles),
+    user: toPublicUser(user, roles, { tenantId }),
   };
 }
 
@@ -257,7 +317,8 @@ async function me(userId) {
     throw createError(404, 'Utilizador não encontrado', 'USER_NOT_FOUND');
   }
   const roles = await userRepository.getRoles(userId);
-  return toPublicUser(user, roles);
+  const tenantId = await require('./rbacService').tenantIdForUser(userId);
+  return toPublicUser(user, roles, { tenantId });
 }
 
 async function listProfiles(userId) {
@@ -412,7 +473,17 @@ async function resendVerification(userId, meta = {}) {
   };
 }
 
+async function completeMfaLogin(body, meta = {}) {
+  const mfaService = require('./mfaService');
+  const userId = await mfaService.verifyLogin(body.mfaTicket, body.code);
+  const user = await userRepository.findAuthById(userId);
+  if (!user) throw createError(401, 'Utilizador inválido', 'USER_NOT_FOUND');
+  const roles = await userRepository.getRoles(user.id);
+  return issueSession(user, roles, { ...meta, mfaVerified: true });
+}
+
 module.exports = {
+  completeMfaLogin,
   register,
   login,
   refresh,

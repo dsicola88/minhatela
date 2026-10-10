@@ -55,6 +55,25 @@ router.post(
   asyncHandler(require('../controllers/phase25Controller').oauthApple)
 );
 
+router.post(
+  '/mfa/verify',
+  rateLimit({ windowMs: 60_000, max: 20 }),
+  asyncHandler(authController.mfaVerifyLogin)
+);
+router.post(
+  '/mfa/setup',
+  rateLimit({ windowMs: 60_000, max: 10 }),
+  asyncHandler(authController.mfaSetup)
+);
+router.post(
+  '/mfa/setup/confirm',
+  rateLimit({ windowMs: 60_000, max: 20 }),
+  asyncHandler(authController.mfaSetupConfirm)
+);
+router.post('/mfa/enroll', requireAuth, asyncHandler(authController.mfaEnroll));
+router.post('/mfa/confirm', requireAuth, asyncHandler(authController.mfaConfirm));
+router.post('/mfa/disable', requireAuth, asyncHandler(authController.mfaDisable));
+
 router.get('/me', requireAuth, asyncHandler(authController.me));
 router.get('/profiles', requireAuth, asyncHandler(authController.profiles));
 router.post('/logout', requireAuth, asyncHandler(authController.logout));

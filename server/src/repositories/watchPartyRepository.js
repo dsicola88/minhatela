@@ -1,6 +1,7 @@
 'use strict';
 
 const { query } = require('../config/database');
+const { videoTenantSql } = require('../utils/tenantScope');
 const crypto = require('crypto');
 
 function genCode() {
@@ -46,7 +47,7 @@ async function findActiveByCode(code) {
   const result = await query(
     `SELECT r.*, v.title AS content_title, v.poster_url, v.kind
      FROM watch_party_rooms r
-     JOIN videos v ON v.id = r.content_id
+     JOIN videos v ON v.id = r.content_id AND ${videoTenantSql('v')}
      WHERE upper(r.code) = upper($1) AND r.status = 'active'`,
     [code]
   );
@@ -57,7 +58,7 @@ async function findById(roomId) {
   const result = await query(
     `SELECT r.*, v.title AS content_title, v.poster_url, v.kind
      FROM watch_party_rooms r
-     JOIN videos v ON v.id = r.content_id
+     JOIN videos v ON v.id = r.content_id AND ${videoTenantSql('v')}
      WHERE r.id = $1`,
     [roomId]
   );

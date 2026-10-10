@@ -1,6 +1,7 @@
 'use strict';
 
 const { query } = require('../config/database');
+const { videoTenantSql } = require('../utils/tenantScope');
 
 async function listWatchHistory(profileId, limit = 40) {
   const result = await query(
@@ -12,6 +13,7 @@ async function listWatchHistory(profileId, limit = 40) {
      JOIN videos v ON v.id = wp.video_id
      LEFT JOIN videos s ON s.id = v.series_id AND s.kind = 'series'
      WHERE wp.profile_id = $1
+       AND ${videoTenantSql('v')}
        AND wp.position_seconds > 5
      ORDER BY wp.updated_at DESC
      LIMIT $2`,
@@ -81,11 +83,12 @@ async function listComingSoon(maturityMax = 18, limit = 16) {
     `SELECT id, title, slug, synopsis_short, poster_url, backdrop_url,
             monetization, rental_price_kz, release_year, maturity_rating,
             kind, coming_soon_at
-     FROM videos
-     WHERE coming_soon_at IS NOT NULL
-       AND coming_soon_at > NOW()
-       AND kind IN ('movie', 'series')
-       AND maturity_rating <= $1
+     FROM videos v
+     WHERE v.coming_soon_at IS NOT NULL
+       AND v.coming_soon_at > NOW()
+       AND v.kind IN ('movie', 'series')
+       AND v.maturity_rating <= $1
+       AND ${videoTenantSql('v')}
        AND (
          is_published = FALSE
          OR workflow_status <> 'published'
@@ -116,12 +119,13 @@ async function listNewReleases(maturityMax = 18, limit = 16) {
     `SELECT id, title, slug, synopsis_short, poster_url, backdrop_url,
             monetization, rental_price_kz, release_year, maturity_rating,
             kind, released_at
-     FROM videos
-     WHERE is_published = TRUE
-       AND workflow_status = 'published'
-       AND kind IN ('movie', 'series')
-       AND maturity_rating <= $1
-       AND released_at IS NOT NULL
+     FROM videos v
+     WHERE v.is_published = TRUE
+       AND v.workflow_status = 'published'
+       AND v.kind IN ('movie', 'series')
+       AND v.maturity_rating <= $1
+       AND ${videoTenantSql('v')}
+       AND v.released_at IS NOT NULL
        AND released_at > NOW() - INTERVAL '45 days'
      ORDER BY released_at DESC
      LIMIT $2`,

@@ -1,6 +1,7 @@
 'use strict';
 
 const { query } = require('../config/database');
+const { videoTenantSql } = require('../utils/tenantScope');
 
 async function upsertPreference({ profileId, contentId, notInterested, markedWatched }) {
   const result = await query(
@@ -53,7 +54,8 @@ async function clearNotInterested(profileId, contentId) {
 async function markWatchedInProgress(profileId, contentId) {
   // Force progress to ~100% so Continuar a assistir some e Histórico reflecte
   const video = await query(
-    `SELECT id, duration_seconds, kind, series_id FROM videos WHERE id = $1`,
+    `SELECT v.id, v.duration_seconds, v.kind, v.series_id FROM videos v
+     WHERE v.id = $1 AND ${videoTenantSql('v')}`,
     [contentId]
   );
   if (!video.rowCount) return null;
@@ -106,6 +108,7 @@ async function listOriginals(maturityMax = 18, limit = 18) {
        AND v.workflow_status = 'published'
        AND v.is_original = TRUE
        AND v.kind IN ('movie', 'series')
+       AND ${videoTenantSql('v')}
        AND COALESCE(v.maturity_rating, 12) <= $1
      ORDER BY v.updated_at DESC
      LIMIT $2`,

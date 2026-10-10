@@ -35,7 +35,8 @@ async function listPacks() {
 
 async function getPack(idOrSlug) {
   await featureFlagService.assertEnabled('tvod_packs_enabled');
-  let row = await phase26Repository.findPackById(idOrSlug);
+  const { isUuid } = require('../utils/tenantScope');
+  let row = isUuid(idOrSlug) ? await phase26Repository.findPackById(idOrSlug) : null;
   if (!row) row = await phase26Repository.findPackBySlug(idOrSlug);
   if (!row || !row.is_active) throw createError(404, 'Pack não encontrado', 'PACK_NOT_FOUND');
   const items = await phase26Repository.packItems(row.id);
@@ -151,22 +152,13 @@ async function joinPremiere(userId, eventId, meta = {}) {
     throw createError(403, 'A transmissão ainda não está ao vivo', 'NOT_LIVE');
   }
 
-  // Entitlement: se ligada a conteúdo, exige acesso válido (SVOD/TVOD/pack/AVOD)
   if (row.content_id) {
-    const contentRepository = require('../repositories/contentRepository');
-    const accessControlService = require('./accessControlService');
-    const { mapContentPublic } = require('../utils/mappers');
-    const contentRow = await contentRepository.findPublishedById(row.content_id);
-    if (!contentRow) {
-      throw createError(404, 'Conteúdo da estreia indisponível', 'CONTENT_NOT_FOUND');
-    }
-    const access = await accessControlService.resolveAccess(userId, mapContentPublic(contentRow));
-    if (!access.canWatch) {
-      throw createError(403, access.message || 'Sem acesso a esta estreia', 'NOT_ENTITLED', {
-        action: access.action,
-        denialCode: access.denialCode,
-      });
-    }
+    const { env } = require('../config/env');
+    const entitlementService = require('./entitlementService');
+    await entitlementService.authorizePublishedContent(userId, row.content_id, {
+      territory: env.market?.country || 'AO',
+      modality: 'live',
+    });
   }
 
   let playback = { hlsUrl: row.hls_url, embedUrl: null, expiresAt: null };

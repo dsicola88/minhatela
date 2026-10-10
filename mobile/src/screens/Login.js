@@ -14,7 +14,14 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { PrimaryButton, FieldLabel } from '../components/ui';
 import { colors, brand, layout } from '../theme/tokens';
-import { login, register, applyAuthSession } from '../services/auth';
+import {
+  login,
+  register,
+  applyAuthSession,
+  mfaSetup,
+  mfaSetupConfirm,
+  mfaVerifyLogin,
+} from '../services/auth';
 import { oauthLogin, buildDemoOAuthToken } from '../services/phase25';
 import { getDeviceIdentity } from '../platform/deviceIdentity';
 
@@ -29,6 +36,10 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [acceptTerms, setAcceptTerms] = useState(false);
+  const [mfaTicket, setMfaTicket] = useState('');
+  const [mfaSecret, setMfaSecret] = useState('');
+  const [mfaCode, setMfaCode] = useState('');
+  const [mfaStep, setMfaStep] = useState('');
 
   const cardWidth = useMemo(
     () => Math.min(440, isCompact ? width - 32 : 440),
@@ -71,7 +82,39 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
     setLoading(true);
     try {
       if (mode === 'login') {
-        await login({ email, password });
+        if (mfaStep === 'code') {
+          await mfaVerifyLogin(mfaTicket, mfaCode);
+          onSuccess?.();
+          return;
+        }
+        if (mfaStep === 'setup') {
+          await mfaSetupConfirm(mfaTicket, mfaCode);
+          const again = await login({ email, password });
+          if (again.mfaRequired) {
+            setMfaTicket(again.mfaTicket);
+            setMfaStep('code');
+            setMfaCode('');
+            setError('MFA activo. Introduza o código da app autenticadora.');
+            return;
+          }
+          onSuccess?.();
+          return;
+        }
+        const data = await login({ email, password });
+        if (data.mfaSetupRequired) {
+          const setup = await mfaSetup(data.mfaTicket);
+          setMfaTicket(data.mfaTicket);
+          setMfaSecret(setup.secret || '');
+          setMfaStep('setup');
+          setError('');
+          return;
+        }
+        if (data.mfaRequired) {
+          setMfaTicket(data.mfaTicket);
+          setMfaStep('code');
+          setError('');
+          return;
+        }
       } else {
         if (!acceptTerms) {
           setError('Aceite os Termos e a Política de Privacidade para continuar');
@@ -206,6 +249,33 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
                   </View>
                 </View>
 
+                {mfaStep === 'setup' && mfaSecret ? (
+                  <View style={{ marginTop: 16, marginBottom: 8 }}>
+                    <FieldLabel>Segredo MFA (Google Authenticator)</FieldLabel>
+                    <Text selectable style={{ color: colors.gold, fontFamily: Platform.OS === 'web' ? 'monospace' : undefined }}>
+                      {mfaSecret}
+                    </Text>
+                    <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 8 }}>
+                      Adicione o segredo na app autenticadora e introduza o código de 6 dígitos.
+                    </Text>
+                  </View>
+                ) : null}
+
+                {mfaStep ? (
+                  <View style={{ marginBottom: 8, marginTop: 12 }}>
+                    <FieldLabel>Código MFA</FieldLabel>
+                    <TextInput
+                      value={mfaCode}
+                      onChangeText={setMfaCode}
+                      keyboardType="number-pad"
+                      placeholder="000000"
+                      placeholderTextColor={colors.muted}
+                      style={inputStyle}
+                      maxLength={6}
+                    />
+                  </View>
+                ) : null}
+
                 {error ? (
                   <Text style={{ color: colors.red, marginTop: 12, marginBottom: 4 }}>
                     {error}
@@ -266,7 +336,15 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
                 )}
 
                 <PrimaryButton
-                  label={mode === 'login' ? 'Entrar' : 'Registar'}
+                  label={
+                    mfaStep === 'setup'
+                      ? 'Confirmar MFA'
+                      : mfaStep === 'code'
+                        ? 'Verificar MFA'
+                        : mode === 'login'
+                          ? 'Entrar'
+                          : 'Registar'
+                  }
                   onPress={handleSubmit}
                   loading={loading}
                   style={{ marginTop: 20 }}

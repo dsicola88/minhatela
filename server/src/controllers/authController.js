@@ -21,6 +21,44 @@ async function login(req, res) {
   res.json(result);
 }
 
+async function mfaVerifyLogin(req, res) {
+  const result = await authService.completeMfaLogin(req.body, deviceMeta(req));
+  res.json(result);
+}
+
+async function mfaEnroll(req, res) {
+  res.json(await require('../services/mfaService').enroll(req.user.id));
+}
+
+async function mfaConfirm(req, res) {
+  res.json(
+    await require('../services/mfaService').confirm(req.user.id, req.body.code, { ip: req.ip })
+  );
+}
+
+async function mfaSetup(req, res) {
+  res.json(await require('../services/mfaService').enrollWithTicket(req.body.mfaTicket));
+}
+
+async function mfaSetupConfirm(req, res) {
+  res.json(
+    await require('../services/mfaService').confirmWithTicket(req.body.mfaTicket, req.body.code, {
+      ip: req.ip,
+    })
+  );
+}
+
+async function mfaDisable(req, res) {
+  res.json(
+    await require('../services/mfaService').disable(
+      req.user.id,
+      req.body.code,
+      { ip: req.ip },
+      req.user.roles || []
+    )
+  );
+}
+
 async function refresh(req, res) {
   const result = await authService.refresh({
     refreshToken: req.body.refreshToken,
@@ -108,6 +146,12 @@ async function resendVerification(req, res) {
 module.exports = {
   register,
   login,
+  mfaVerifyLogin,
+  mfaEnroll,
+  mfaConfirm,
+  mfaSetup,
+  mfaSetupConfirm,
+  mfaDisable,
   refresh,
   logout,
   sessions,

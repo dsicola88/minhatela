@@ -142,7 +142,11 @@ async function findOwned(contentId, creatorId) {
 }
 
 async function findById(contentId) {
-  const result = await query(`SELECT * FROM videos WHERE id = $1 LIMIT 1`, [contentId]);
+  const { opsVideoSql } = require('../utils/tenantScope');
+  const result = await query(
+    `SELECT * FROM videos v WHERE v.id = $1 AND ${opsVideoSql('v')} LIMIT 1`,
+    [contentId]
+  );
   return result.rows[0] || null;
 }
 
@@ -176,12 +180,14 @@ async function submitForReview(contentId, creatorId) {
 }
 
 async function listForModeration(status = 'submitted') {
+  const { opsVideoSql } = require('../utils/tenantScope');
   const result = await query(
     `SELECT v.*, c.display_name AS creator_display_name, u.email AS creator_email
      FROM videos v
      LEFT JOIN creators c ON c.id = v.creator_id
      LEFT JOIN users u ON u.id = c.user_id
      WHERE v.workflow_status = $1::content_workflow
+       AND ${opsVideoSql('v')}
      ORDER BY v.submitted_at ASC NULLS LAST, v.created_at ASC`,
     [status]
   );

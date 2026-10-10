@@ -9,7 +9,7 @@ const { healthCheck } = require('./config/database');
 const { requestId } = require('./middleware/requestId');
 const { errorHandler } = require('./middleware/errorHandler');
 const { rateLimit } = require('./middleware/rateLimit');
-const { requireAuth, requireRoles } = require('./middleware/auth');
+const { requireAuth, requireRoles, requireStaffMfa } = require('./middleware/auth');
 const { logger } = require('./utils/logger');
 const { asyncHandler } = require('./utils/asyncHandler');
 
@@ -64,10 +64,27 @@ function createApp() {
         `SELECT id FROM transactions WHERE proof_url = $1 AND user_id = $2 LIMIT 1`,
         [proofPath, req.user.id]
       );
+      const isSuper = (req.user.roles || []).includes('super_admin');
       const isAdmin =
         req.user.isAdmin ||
         (req.user.roles || []).some((r) => ['admin', 'super_admin', 'moderator'].includes(r));
-      if (!owned.rowCount && !isAdmin) {
+      let staffOk = false;
+      if (isAdmin && !owned.rowCount) {
+        if (isSuper) {
+          staffOk = true;
+        } else {
+          const { opsUserSql } = require('./utils/tenantScope');
+          const scoped = await query(
+            `SELECT t.id FROM transactions t
+             JOIN users u ON u.id = t.user_id
+             WHERE t.proof_url = $1 AND ${opsUserSql('u')}
+             LIMIT 1`,
+            [proofPath]
+          );
+          staffOk = scoped.rowCount > 0;
+        }
+      }
+      if (!owned.rowCount && !staffOk) {
         return res.status(404).json({ error: true, code: 'NOT_FOUND' });
       }
       return res.sendFile(path.join(env.uploadsDir, 'proofs', filename));
@@ -122,6 +139,7 @@ function createApp() {
     '/ops',
     requireAuth,
     requireRoles('admin', 'super_admin', 'moderator'),
+    requireStaffMfa,
     async (_req, res) => {
       try {
         const status = await require('./services/opsService').collectOpsStatus();
@@ -141,6 +159,7 @@ function createApp() {
     '/metrics',
     requireAuth,
     requireRoles('admin', 'super_admin', 'moderator'),
+    requireStaffMfa,
     async (_req, res) => {
       try {
         const metrics = await require('./services/metricsService').collectMetrics();
@@ -179,6 +198,7 @@ function createApp() {
   app.use('/api/payments', paymentRoutes);
   app.use('/api/creator-studio', creatorStudioRoutes);
   app.use('/api/creators', creatorStudioRoutes);
+  app.use('/api/company', require('./routes/companyPortalRoutes'));
   app.use('/api/ads', adRoutes);
   app.use('/api/advertisers', adRoutes);
   app.use('/api/analytics', analyticsRoutes);

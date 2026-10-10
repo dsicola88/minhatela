@@ -56,11 +56,13 @@ async function updateStatus(id, status) {
 }
 
 async function listPending() {
+  const { opsVideoSql } = require('../utils/tenantScope');
   const result = await query(
     `SELECT c.*, u.email, u.full_name
      FROM creators c
      JOIN users u ON u.id = c.user_id
      WHERE c.status = 'pending'
+       AND ${opsVideoSql('c')}
      ORDER BY c.created_at ASC`
   );
   return result.rows;

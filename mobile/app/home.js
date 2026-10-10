@@ -26,11 +26,13 @@ export default function HomeRoute() {
           setDetailsOpen(true);
         }}
         onPlay={(item) => router.push(`/watch/${item.id}`)}
-        onCreatorStudio={() => router.push('/creator-studio')}
-        onAds={() => router.push('/ads')}
+        onCreatorStudio={
+          user?.capabilities?.creatorStudio ? () => router.push('/creator-studio') : undefined
+        }
+        onAds={user?.roles?.includes('advertiser') ? () => router.push('/ads') : undefined}
         onSearch={() => router.push('/search')}
         onAdmin={
-          user?.isAdmin
+          user?.capabilities?.adminConsole || user?.isAdmin
             ? () => router.push('/admin')
             : undefined
         }

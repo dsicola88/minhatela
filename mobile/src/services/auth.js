@@ -69,6 +69,29 @@ export async function login({ email, password }) {
     deviceName: device.deviceName,
     platform: device.platform,
   });
+  if (data?.mfaRequired || data?.mfaSetupRequired) {
+    return data;
+  }
+  await persistAuth(data);
+  return data;
+}
+
+export async function mfaSetup(mfaTicket) {
+  return api.post('/api/auth/mfa/setup', { mfaTicket });
+}
+
+export async function mfaSetupConfirm(mfaTicket, code) {
+  return api.post('/api/auth/mfa/setup/confirm', { mfaTicket, code });
+}
+
+export async function mfaVerifyLogin(mfaTicket, code) {
+  const device = await getDeviceIdentity();
+  const data = await api.post('/api/auth/mfa/verify', {
+    mfaTicket,
+    code,
+    deviceName: device.deviceName,
+    platform: device.platform,
+  });
   await persistAuth(data);
   return data;
 }

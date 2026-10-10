@@ -19,7 +19,8 @@ async function listUsers({ q, limit = 40, offset = 0 } = {}) {
      FROM users u
      LEFT JOIN user_roles ur ON ur.user_id = u.id
      LEFT JOIN roles r ON r.id = ur.role_id
-     WHERE ($1::text IS NULL
+     WHERE ${require('../utils/tenantScope').opsUserSql('u')}
+       AND ($1::text IS NULL
             OR LOWER(u.email) LIKE $1
             OR LOWER(u.full_name) LIKE $1)
      GROUP BY u.id
@@ -29,7 +30,8 @@ async function listUsers({ q, limit = 40, offset = 0 } = {}) {
   );
   const count = await query(
     `SELECT COUNT(*)::int AS c FROM users u
-     WHERE ($1::text IS NULL
+     WHERE ${require('../utils/tenantScope').opsUserSql('u')}
+       AND ($1::text IS NULL
             OR LOWER(u.email) LIKE $1
             OR LOWER(u.full_name) LIKE $1)`,
     [needle]
@@ -54,6 +56,30 @@ async function updateUser(actorId, userId, body, meta = {}) {
   const allowedStatus = new Set(['none', 'premium_active', 'premium_expired']);
   if (body.subscriptionStatus && !allowedStatus.has(body.subscriptionStatus)) {
     throw createError(400, 'subscriptionStatus inválido', 'VALIDATION');
+  }
+  const { opsUserSql } = require('../utils/tenantScope');
+  const visible = await query(
+    `SELECT 1 FROM users u WHERE u.id = $1 AND ${opsUserSql('u')}`,
+    [userId]
+  );
+  if (!visible.rowCount) throw createError(404, 'Utilizador não encontrado', 'NOT_FOUND');
+
+  if (body.roleCode === 'super_admin') {
+    const actorRoles = await require('../repositories/userRepository').getRoles(actorId);
+    if (!actorRoles.includes('super_admin')) {
+      throw createError(403, 'Apenas SuperAdmin pode promover SuperAdmin', 'FORBIDDEN');
+    }
+    const gate = await require('./fourEyesService').request({
+      actorId,
+      action: 'role.grant_super_admin',
+      resourceType: 'user',
+      resourceId: userId,
+      payload: { roleCode: 'super_admin' },
+      reason: body.reason || 'promoção SuperAdmin',
+    });
+    if (!gate.executeNow) {
+      return { pendingFourEyes: true, request: gate.request };
+    }
   }
   const result = await query(
     `UPDATE users SET
@@ -399,6 +425,7 @@ async function listAllCampaigns({ status, limit = 50 } = {}) {
      FROM campaigns c
      JOIN advertisers a ON a.id = c.advertiser_id
      WHERE ($1::text IS NULL OR c.status::text = $1)
+       AND ${require('../utils/tenantScope').opsVideoSql('c')}
      ORDER BY c.created_at DESC
      LIMIT $2`,
     [status || null, Math.min(100, Number(limit) || 50)]
@@ -420,15 +447,18 @@ async function listAllCampaigns({ status, limit = 50 } = {}) {
 
 /* ─── Catalog CMS ───────────────────────────────────────── */
 
-async function listCatalog({ q, limit = 40, offset = 0 } = {}) {
+async function listCatalog({ q, limit = 40, offset = 0, superAdmin = false } = {}) {
   const needle = q ? `%${String(q).trim().toLowerCase()}%` : null;
+  const { videoTenantSql } = require('../utils/tenantScope');
+  const tenantSql = superAdmin ? 'TRUE' : videoTenantSql('v');
   const result = await query(
-    `SELECT id, title, slug, kind, monetization, rental_price_kz, is_published,
-            is_featured, workflow_status, bunny_video_id, poster_url, updated_at
-     FROM videos
-     WHERE kind IN ('movie', 'series', 'episode')
-       AND ($1::text IS NULL OR LOWER(title) LIKE $1 OR LOWER(slug) LIKE $1)
-     ORDER BY updated_at DESC
+    `SELECT v.id, v.title, v.slug, v.kind, v.monetization, v.rental_price_kz, v.is_published,
+            v.is_featured, v.workflow_status, v.bunny_video_id, v.poster_url, v.updated_at
+     FROM videos v
+     WHERE v.kind IN ('movie', 'series', 'episode')
+       AND ${tenantSql}
+       AND ($1::text IS NULL OR LOWER(v.title) LIKE $1 OR LOWER(v.slug) LIKE $1)
+     ORDER BY v.updated_at DESC
      LIMIT $2 OFFSET $3`,
     [needle, Math.min(100, Number(limit) || 40), Math.max(0, Number(offset) || 0)]
   );
@@ -463,8 +493,10 @@ async function patchCatalogTitle(actorId, contentId, body, meta = {}) {
     }
   }
 
+  const { videoTenantSql } = require('../utils/tenantScope');
+  const tenantSql = meta.superAdmin ? 'TRUE' : videoTenantSql('v');
   const result = await query(
-    `UPDATE videos SET
+    `UPDATE videos v SET
        is_published = COALESCE($2, is_published),
        is_featured = COALESCE($3, is_featured),
        monetization = CASE
@@ -479,8 +511,8 @@ async function patchCatalogTitle(actorId, contentId, body, meta = {}) {
        bunny_video_id = CASE WHEN $8::boolean THEN $9 ELSE bunny_video_id END,
        coming_soon_at = CASE WHEN $10::boolean THEN $11 ELSE coming_soon_at END,
        updated_at = NOW()
-     WHERE id = $1
-     RETURNING id, title, is_published, is_featured, monetization, rental_price_kz, workflow_status, bunny_video_id, coming_soon_at`,
+     WHERE v.id = $1 AND ${tenantSql}
+     RETURNING v.id, v.title, v.is_published, v.is_featured, v.monetization, v.rental_price_kz, v.workflow_status, v.bunny_video_id, v.coming_soon_at`,
     [
       contentId,
       body.isPublished === undefined ? null : Boolean(body.isPublished),
@@ -539,8 +571,8 @@ async function upsertPack(actorId, body, meta = {}) {
     .replace(/[^a-z0-9-]+/g, '-')
     .replace(/^-|-$/g, '');
   const result = await query(
-    `INSERT INTO tvod_packs (slug, title, description, poster_url, price_kz, rental_hours, is_active, sort_order)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+    `INSERT INTO tvod_packs (slug, title, description, poster_url, price_kz, rental_hours, is_active, sort_order, tenant_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8, ${require('../utils/tenantScope').tenantWriteSql()})
      ON CONFLICT (slug) DO UPDATE SET
        title = EXCLUDED.title,
        description = EXCLUDED.description,
@@ -550,6 +582,7 @@ async function upsertPack(actorId, body, meta = {}) {
        is_active = EXCLUDED.is_active,
        sort_order = EXCLUDED.sort_order,
        updated_at = NOW()
+     WHERE tvod_packs.tenant_id IS NOT DISTINCT FROM EXCLUDED.tenant_id
      RETURNING *`,
     [
       slug,
@@ -563,6 +596,9 @@ async function upsertPack(actorId, body, meta = {}) {
     ]
   );
   const pack = result.rows[0];
+  if (!pack) {
+    throw createError(409, 'Slug de pack já usado noutro tenant', 'PACK_SLUG_TAKEN');
+  }
   if (Array.isArray(body.videoIds)) {
     await query(`DELETE FROM tvod_pack_items WHERE pack_id = $1`, [pack.id]);
     for (let i = 0; i < body.videoIds.length; i += 1) {

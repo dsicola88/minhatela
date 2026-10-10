@@ -3,6 +3,7 @@
 const { query } = require('../config/database');
 const trendingRepository = require('./trendingRepository');
 const engagementRepository = require('./engagementRepository');
+const { videoTenantSql } = require('../utils/tenantScope');
 
 function mapCard(row) {
   return {
@@ -27,15 +28,16 @@ function mapCard(row) {
 
 async function listGenres() {
   const result = await query(
-    `SELECT genre AS name, COUNT(*)::int AS count
-     FROM videos
-     WHERE is_published = TRUE
-       AND workflow_status = 'published'
-       AND kind IN ('movie', 'series')
-       AND genre IS NOT NULL
-       AND genre <> ''
-     GROUP BY genre
-     ORDER BY count DESC, genre ASC
+    `SELECT v.genre AS name, COUNT(*)::int AS count
+     FROM videos v
+     WHERE v.is_published = TRUE
+       AND v.workflow_status = 'published'
+       AND v.kind IN ('movie', 'series')
+       AND v.genre IS NOT NULL
+       AND v.genre <> ''
+       AND ${videoTenantSql('v')}
+     GROUP BY v.genre
+     ORDER BY count DESC, v.genre ASC
      LIMIT 40`
   );
   return result.rows.map((r) => ({
@@ -57,14 +59,15 @@ async function listByGenre(genre, maturityMax = 18, limit = 40) {
     `SELECT id, title, slug, synopsis_short, poster_url, backdrop_url,
             monetization, rental_price_kz, release_year, maturity_rating,
             kind, genre
-     FROM videos
-     WHERE is_published = TRUE
-       AND workflow_status = 'published'
-       AND kind IN ('movie', 'series')
-       AND maturity_rating <= $3
+     FROM videos v
+     WHERE v.is_published = TRUE
+       AND v.workflow_status = 'published'
+       AND v.kind IN ('movie', 'series')
+       AND v.maturity_rating <= $3
+       AND ${videoTenantSql('v')}
        AND (
-         genre ILIKE $1
-         OR genre ILIKE $2
+         v.genre ILIKE $1
+         OR v.genre ILIKE $2
        )
      ORDER BY COALESCE(released_at, created_at) DESC
      LIMIT $4`,
@@ -82,12 +85,13 @@ async function getNewAndHot(maturityMax = 18) {
       `SELECT id, title, slug, synopsis_short, poster_url, backdrop_url,
               monetization, rental_price_kz, release_year, maturity_rating,
               kind, genre
-       FROM videos
-       WHERE is_published = TRUE
-         AND workflow_status = 'published'
-         AND kind IN ('movie', 'series')
-         AND maturity_rating <= $1
-         AND is_featured = TRUE
+       FROM videos v
+       WHERE v.is_published = TRUE
+         AND v.workflow_status = 'published'
+         AND v.kind IN ('movie', 'series')
+         AND v.maturity_rating <= $1
+         AND v.is_featured = TRUE
+         AND ${videoTenantSql('v')}
        ORDER BY updated_at DESC
        LIMIT 12`,
       [maturityMax]

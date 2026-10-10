@@ -2,6 +2,8 @@
 
 const { query } = require('../config/database');
 const discoveryRepository = require('../repositories/discoveryRepository');
+const { videoTenantSql } = require('../utils/tenantScope');
+const { createError } = require('../utils/errors');
 
 /**
  * Recommendation Service (heurístico, preparado para ML).
@@ -16,7 +18,7 @@ async function forProfile(profileId, limit = 18) {
     `WITH watched AS (
        SELECT v.id, v.genre, v.monetization
        FROM watch_progress wp
-       JOIN videos v ON v.id = wp.video_id
+       JOIN videos v ON v.id = wp.video_id AND ${videoTenantSql('v')}
        WHERE wp.profile_id = $1
        ORDER BY wp.updated_at DESC
        LIMIT 20
@@ -49,6 +51,8 @@ async function forProfile(profileId, limit = 18) {
      LEFT JOIN popular p ON p.content_id = v.id
      WHERE v.is_published = TRUE
        AND v.workflow_status = 'published'
+       AND v.kind IN ('movie', 'series')
+       AND ${videoTenantSql('v')}
        AND v.id NOT IN (SELECT id FROM watched)
      ORDER BY v.id, affinity ASC, popularity DESC, v.updated_at DESC
      LIMIT $2`,
@@ -85,6 +89,8 @@ async function popularAngola(limit = 18) {
       AND ae.created_at > NOW() - INTERVAL '45 days'
      WHERE v.is_published = TRUE
        AND v.workflow_status = 'published'
+       AND v.kind IN ('movie', 'series')
+       AND ${videoTenantSql('v')}
      GROUP BY v.id
      ORDER BY
        CASE WHEN v.country_code = 'AO' THEN 0 ELSE 1 END,
@@ -101,7 +107,7 @@ async function becauseYouWatched(profileId, limit = 12) {
   const last = await query(
     `SELECT v.id, v.title, v.genre
      FROM watch_progress wp
-     JOIN videos v ON v.id = wp.video_id
+     JOIN videos v ON v.id = wp.video_id AND ${videoTenantSql('v')}
      WHERE wp.profile_id = $1
      ORDER BY wp.updated_at DESC
      LIMIT 1`,
@@ -119,10 +125,15 @@ async function becauseYouWatched(profileId, limit = 12) {
 /** Mais como isto — rail pós-créditos / ficha (Netflix end-screen). */
 async function moreLikeThis(contentId, { profileId, limit = 12 } = {}) {
   if (!contentId) return { items: [] };
+  const seed = await query(
+    `SELECT v.title FROM videos v WHERE v.id = $1 AND ${videoTenantSql('v')}`,
+    [contentId]
+  );
+  if (!seed.rowCount) {
+    throw createError(404, 'Conteúdo não encontrado', 'CONTENT_NOT_FOUND');
+  }
+  const seedTitle = seed.rows[0].title;
   const items = await discoveryRepository.related(contentId, limit);
-  let seedTitle = null;
-  const seed = await query(`SELECT title FROM videos WHERE id = $1`, [contentId]);
-  if (seed.rowCount) seedTitle = seed.rows[0].title;
 
   // Se perfil tem histórico no mesmo género, prioriza títulos não vistos
   if (profileId && items.length) {

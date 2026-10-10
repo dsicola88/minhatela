@@ -22,11 +22,15 @@ async function collectOpsStatus() {
     qoeErrors,
   ] = await Promise.all([
     query(
-      `SELECT COUNT(*)::int AS c FROM support_tickets
-       WHERE status IN ('open', 'in_progress')`
+      `SELECT COUNT(*)::int AS c FROM support_tickets st
+       JOIN users u ON u.id = st.user_id
+       WHERE st.status IN ('open', 'in_progress')
+         AND ${require('../utils/tenantScope').opsUserSql('u')}`
     ).catch(() => ({ rows: [{ c: 0 }] })),
     query(
-      `SELECT COUNT(*)::int AS c FROM transactions WHERE status = 'pendente'`
+      `SELECT COUNT(*)::int AS c FROM transactions t
+       JOIN users u ON u.id = t.user_id
+       WHERE t.status = 'pendente' AND ${require('../utils/tenantScope').opsUserSql('u')}`
     ).catch(() => ({ rows: [{ c: 0 }] })),
     query(
       `SELECT COUNT(*)::int AS c FROM playback_sessions

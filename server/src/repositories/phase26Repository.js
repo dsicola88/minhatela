@@ -1,6 +1,7 @@
 'use strict';
 
 const { query } = require('../config/database');
+const { videoTenantSql } = require('../utils/tenantScope');
 
 async function listPacks() {
   const result = await query(
@@ -10,24 +11,31 @@ async function listPacks() {
                  'id', v.id, 'title', v.title, 'posterUrl', v.poster_url, 'kind', v.kind
                ) ORDER BY i.sort_order)
                FROM tvod_pack_items i
-               JOIN videos v ON v.id = i.video_id
+               JOIN videos v ON v.id = i.video_id AND ${videoTenantSql('v')}
                WHERE i.pack_id = p.id),
               '[]'::json
             ) AS items
      FROM tvod_packs p
      WHERE p.is_active = TRUE
+       AND ${videoTenantSql('p')}
      ORDER BY p.sort_order ASC, p.title ASC`
   );
   return result.rows;
 }
 
 async function findPackById(id) {
-  const result = await query(`SELECT * FROM tvod_packs WHERE id = $1`, [id]);
+  const result = await query(
+    `SELECT * FROM tvod_packs p WHERE p.id = $1 AND ${videoTenantSql('p')}`,
+    [id]
+  );
   return result.rows[0] || null;
 }
 
 async function findPackBySlug(slug) {
-  const result = await query(`SELECT * FROM tvod_packs WHERE slug = $1`, [slug]);
+  const result = await query(
+    `SELECT * FROM tvod_packs p WHERE p.slug = $1 AND ${videoTenantSql('p')}`,
+    [slug]
+  );
   return result.rows[0] || null;
 }
 
@@ -35,7 +43,7 @@ async function packItems(packId) {
   const result = await query(
     `SELECT v.id, v.title, v.poster_url, v.kind, v.monetization, v.rental_price_kz
      FROM tvod_pack_items i
-     JOIN videos v ON v.id = i.video_id
+     JOIN videos v ON v.id = i.video_id AND ${videoTenantSql('v')}
      WHERE i.pack_id = $1
      ORDER BY i.sort_order`,
     [packId]
@@ -48,7 +56,7 @@ async function hasActivePackForVideo(userId, videoId) {
     `SELECT pe.expires_at, pe.pack_id, p.title AS pack_title
      FROM pack_entitlements pe
      JOIN tvod_pack_items i ON i.pack_id = pe.pack_id
-     JOIN tvod_packs p ON p.id = pe.pack_id
+     JOIN tvod_packs p ON p.id = pe.pack_id AND ${videoTenantSql('p')}
      WHERE pe.user_id = $1
        AND i.video_id = $2
        AND pe.expires_at > NOW()
@@ -173,10 +181,12 @@ async function refreshCommunityRating(contentId) {
 }
 
 async function adminListPacks() {
+  const { opsVideoSql } = require('../utils/tenantScope');
   const result = await query(
     `SELECT p.*,
             (SELECT COUNT(*)::int FROM tvod_pack_items i WHERE i.pack_id = p.id) AS item_count
      FROM tvod_packs p
+     WHERE ${opsVideoSql('p')}
      ORDER BY p.sort_order, p.title`
   );
   return result.rows;

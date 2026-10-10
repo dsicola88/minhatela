@@ -1,6 +1,7 @@
 'use strict';
 
 const { query } = require('../config/database');
+const { opsVideoSql, opsUserSql } = require('../utils/tenantScope');
 const auditRepository = require('../repositories/auditRepository');
 const { env } = require('../config/env');
 const { formatKz } = require('../utils/money');
@@ -23,52 +24,78 @@ async function getCommandCenter() {
     watchToday,
     recentAudit,
   ] = await Promise.all([
-    query(`SELECT COUNT(*)::int AS c FROM users`),
+    query(`SELECT COUNT(*)::int AS c FROM users u WHERE ${opsUserSql('u')}`),
     query(
-      `SELECT COUNT(*)::int AS c FROM users
-       WHERE subscription_status = 'premium_active'
-         AND (premium_expires_at IS NULL OR premium_expires_at > NOW())`
+      `SELECT COUNT(*)::int AS c FROM users u
+       WHERE ${opsUserSql('u')}
+         AND u.subscription_status = 'premium_active'
+         AND (u.premium_expires_at IS NULL OR u.premium_expires_at > NOW())`
     ),
-    query(`SELECT COUNT(*)::int AS c FROM transactions WHERE status = 'pendente'`),
     query(
-      `SELECT COALESCE(SUM(amount_kz), 0)::int AS c,
+      `SELECT COUNT(*)::int AS c FROM transactions t
+       JOIN users u ON u.id = t.user_id
+       WHERE t.status = 'pendente' AND ${opsUserSql('u')}`
+    ),
+    query(
+      `SELECT COALESCE(SUM(t.amount_kz), 0)::int AS c,
               COUNT(*)::int AS n
-       FROM transactions
-       WHERE status = 'pago' AND paid_at::date = CURRENT_DATE`
+       FROM transactions t
+       JOIN users u ON u.id = t.user_id
+       WHERE t.status = 'pago' AND t.paid_at::date = CURRENT_DATE AND ${opsUserSql('u')}`
     ),
     query(
-      `SELECT COALESCE(SUM(amount_kz), 0)::int AS c
-       FROM transactions
-       WHERE status = 'pago' AND paid_at >= NOW() - INTERVAL '7 days'`
+      `SELECT COALESCE(SUM(t.amount_kz), 0)::int AS c
+       FROM transactions t
+       JOIN users u ON u.id = t.user_id
+       WHERE t.status = 'pago' AND t.paid_at >= NOW() - INTERVAL '7 days' AND ${opsUserSql('u')}`
     ),
     query(
-      `SELECT COUNT(*)::int AS c FROM videos
-       WHERE is_published = TRUE AND workflow_status = 'published'
-         AND kind IN ('movie', 'series')`
+      `SELECT COUNT(*)::int AS c FROM videos v
+       WHERE v.is_published = TRUE AND v.workflow_status = 'published'
+         AND v.kind IN ('movie', 'series')
+         AND ${opsVideoSql('v')}`
     ),
     query(
-      `SELECT COUNT(*)::int AS c FROM videos
-       WHERE kind = 'series' AND is_published = TRUE AND workflow_status = 'published'`
+      `SELECT COUNT(*)::int AS c FROM videos v
+       WHERE v.kind = 'series' AND v.is_published = TRUE AND v.workflow_status = 'published'
+         AND ${opsVideoSql('v')}`
     ),
-    query(`SELECT COUNT(*)::int AS c FROM creators WHERE status = 'pending'`),
-    query(`SELECT COUNT(*)::int AS c FROM videos WHERE workflow_status = 'submitted'`),
-    query(`SELECT COUNT(*)::int AS c FROM creator_payouts WHERE status = 'pending'`),
-    query(`SELECT COUNT(*)::int AS c FROM campaigns WHERE status = 'pending_review'`),
     query(
-      `SELECT COUNT(*)::int AS c FROM support_tickets
-       WHERE status IN ('open', 'in_progress')`
+      `SELECT COUNT(*)::int AS c FROM creators c WHERE c.status = 'pending' AND ${opsVideoSql('c')}`
+    ),
+    query(
+      `SELECT COUNT(*)::int AS c FROM videos v
+       WHERE v.workflow_status = 'submitted' AND ${opsVideoSql('v')}`
+    ),
+    query(
+      `SELECT COUNT(*)::int AS c FROM creator_payouts p
+       JOIN creators c ON c.id = p.creator_id
+       WHERE p.status = 'pending' AND ${opsVideoSql('c')}`
+    ),
+    query(
+      `SELECT COUNT(*)::int AS c FROM campaigns c
+       WHERE c.status = 'pending_review' AND ${opsVideoSql('c')}`
+    ),
+    query(
+      `SELECT COUNT(*)::int AS c FROM support_tickets st
+       JOIN users u ON u.id = st.user_id
+       WHERE st.status IN ('open', 'in_progress') AND ${opsUserSql('u')}`
     ).catch(() => ({ rows: [{ c: 0 }] })),
     query(
-      `SELECT COUNT(*)::int AS c FROM playback_sessions
-       WHERE is_active = TRUE
-         AND allowed = TRUE
-         AND ended_at IS NULL
-         AND last_heartbeat_at > NOW() - INTERVAL '90 seconds'`
+      `SELECT COUNT(*)::int AS c FROM playback_sessions ps
+       LEFT JOIN videos v ON v.id = ps.content_id
+       WHERE ps.is_active = TRUE
+         AND ps.allowed = TRUE
+         AND ps.ended_at IS NULL
+         AND ps.last_heartbeat_at > NOW() - INTERVAL '90 seconds'
+         AND (v.id IS NULL OR ${opsVideoSql('v')})`
     ),
     query(
-      `SELECT COUNT(*)::int AS c FROM analytics_events
-       WHERE event_name = 'video_started'
-         AND created_at::date = CURRENT_DATE`
+      `SELECT COUNT(*)::int AS c FROM analytics_events ae
+       JOIN videos v ON v.id = ae.content_id
+       WHERE ae.event_name = 'video_started'
+         AND ae.created_at::date = CURRENT_DATE
+         AND ${opsVideoSql('v')}`
     ).catch(() => ({ rows: [{ c: 0 }] })),
     auditRepository.listRecent({ limit: 12 }),
   ]);
@@ -151,6 +178,7 @@ async function listPendingCampaigns() {
      FROM campaigns c
      JOIN advertisers a ON a.id = c.advertiser_id
      WHERE c.status = 'pending_review'
+       AND ${opsVideoSql('c')}
      ORDER BY c.created_at ASC
      LIMIT 50`
   );
@@ -183,6 +211,8 @@ async function getLiveStreams() {
        AND ps.allowed = TRUE
        AND ps.ended_at IS NULL
        AND ps.last_heartbeat_at > NOW() - INTERVAL '90 seconds'
+       AND (v.id IS NULL OR ${opsVideoSql('v')})
+       AND ${opsUserSql('u')}
      ORDER BY ps.last_heartbeat_at DESC
      LIMIT 40`
   );

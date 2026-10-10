@@ -1,6 +1,7 @@
 'use strict';
 
 const { query } = require('../config/database');
+const { videoTenantSql } = require('../utils/tenantScope');
 
 async function listByContent(contentId) {
   const result = await query(
@@ -26,8 +27,9 @@ async function listByContent(contentId) {
 async function getPerson(slugOrId) {
   const result = await query(
     `SELECT id, slug, full_name, bio, photo_url, nationality, role_default
-     FROM people
-     WHERE slug = $1 OR id::text = $1
+     FROM people p
+     WHERE (p.slug = $1 OR p.id::text = $1)
+       AND ${videoTenantSql('p')}
      LIMIT 1`,
     [slugOrId]
   );
@@ -40,6 +42,7 @@ async function getPerson(slugOrId) {
      FROM content_people cp
      JOIN videos v ON v.id = cp.content_id
      WHERE cp.person_id = $1
+       AND ${videoTenantSql('v')}
        AND v.is_published = TRUE
        AND v.workflow_status = 'published'
        AND v.kind IN ('movie', 'series')

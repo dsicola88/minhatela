@@ -7,7 +7,7 @@ export default function AdminIndexRoute() {
   const { isAuthenticated, user } = useAuth();
 
   if (!isAuthenticated) return <Redirect href="/login" />;
-  if (!user?.isAdmin) return <Redirect href="/home" />;
+  if (!(user?.capabilities?.adminConsole || user?.isAdmin)) return <Redirect href="/home" />;
 
   return <AdminCommandCenter onBack={() => router.replace('/home')} />;
 }

@@ -1,6 +1,7 @@
 'use strict';
 
 const { query } = require('../config/database');
+const { videoTenantSql } = require('../utils/tenantScope');
 
 async function findSeriesEpisodes(seriesId) {
   const result = await query(
@@ -9,12 +10,13 @@ async function findSeriesEpisodes(seriesId) {
             kind, series_id, season_number, episode_number, episode_title,
             intro_end_seconds, credits_start_seconds, maturity_rating,
             bunny_video_id, is_published, workflow_status
-     FROM videos
-     WHERE series_id = $1
-       AND kind = 'episode'
-       AND is_published = TRUE
-       AND workflow_status = 'published'
-     ORDER BY season_number ASC, episode_number ASC`,
+     FROM videos v
+     WHERE v.series_id = $1
+       AND v.kind = 'episode'
+       AND v.is_published = TRUE
+       AND v.workflow_status = 'published'
+       AND ${videoTenantSql('v')}
+     ORDER BY v.season_number ASC, v.episode_number ASC`,
     [seriesId]
   );
   return result.rows;
@@ -40,8 +42,8 @@ async function findEpisodeProgress(profileId, seriesId) {
 
 async function findNextEpisode(episodeId) {
   const current = await query(
-    `SELECT id, series_id, season_number, episode_number, kind
-     FROM videos WHERE id = $1`,
+    `SELECT v.id, v.series_id, v.season_number, v.episode_number, v.kind
+     FROM videos v WHERE v.id = $1 AND ${videoTenantSql('v')}`,
     [episodeId]
   );
   const ep = current.rows[0];
@@ -51,14 +53,15 @@ async function findNextEpisode(episodeId) {
     `SELECT id, title, slug, synopsis_short, poster_url, backdrop_url,
             monetization, duration_seconds, season_number, episode_number,
             episode_title, series_id, kind, intro_end_seconds, credits_start_seconds
-     FROM videos
-     WHERE series_id = $1
-       AND kind = 'episode'
-       AND is_published = TRUE
-       AND workflow_status = 'published'
+     FROM videos v
+     WHERE v.series_id = $1
+       AND v.kind = 'episode'
+       AND v.is_published = TRUE
+       AND v.workflow_status = 'published'
+       AND ${videoTenantSql('v')}
        AND (
-         season_number > $2
-         OR (season_number = $2 AND episode_number > $3)
+         v.season_number > $2
+         OR (v.season_number = $2 AND v.episode_number > $3)
        )
      ORDER BY season_number ASC, episode_number ASC
      LIMIT 1`,
@@ -69,9 +72,10 @@ async function findNextEpisode(episodeId) {
 
 async function findSeriesById(seriesId) {
   const result = await query(
-    `SELECT * FROM videos
-     WHERE id = $1 AND kind = 'series'
-       AND is_published = TRUE AND workflow_status = 'published'`,
+    `SELECT * FROM videos v
+     WHERE v.id = $1 AND v.kind = 'series'
+       AND v.is_published = TRUE AND v.workflow_status = 'published'
+       AND ${videoTenantSql('v')}`,
     [seriesId]
   );
   return result.rows[0] || null;
@@ -80,12 +84,13 @@ async function findSeriesById(seriesId) {
 async function findFirstEpisode(seriesId) {
   const result = await query(
     `SELECT *
-     FROM videos
-     WHERE series_id = $1
-       AND kind = 'episode'
-       AND is_published = TRUE
-       AND workflow_status = 'published'
-     ORDER BY season_number ASC, episode_number ASC
+     FROM videos v
+     WHERE v.series_id = $1
+       AND v.kind = 'episode'
+       AND v.is_published = TRUE
+       AND v.workflow_status = 'published'
+       AND ${videoTenantSql('v')}
+     ORDER BY v.season_number ASC, v.episode_number ASC
      LIMIT 1`,
     [seriesId]
   );
@@ -101,6 +106,7 @@ async function findContinueEpisode(profileId, seriesId) {
      WHERE wp.profile_id = $1
        AND v.series_id = $2
        AND v.kind = 'episode'
+       AND ${videoTenantSql('v')}
        AND wp.completed = FALSE
        AND wp.position_seconds > 15
      ORDER BY wp.updated_at DESC
@@ -118,6 +124,7 @@ async function findContinueEpisode(profileId, seriesId) {
        AND v.kind = 'episode'
        AND v.is_published = TRUE
        AND v.workflow_status = 'published'
+       AND ${videoTenantSql('v')}
        AND (wp.id IS NULL OR wp.completed = FALSE)
      ORDER BY v.season_number ASC, v.episode_number ASC
      LIMIT 1`,

@@ -2,6 +2,7 @@
 
 const crypto = require('crypto');
 const { query } = require('../config/database');
+const { videoTenantSql } = require('../utils/tenantScope');
 
 async function insertRiskSignal({
   transactionId,
@@ -55,6 +56,7 @@ async function listHighRiskPending({ minScore = 40, limit = 50 } = {}) {
      ) r ON TRUE
      WHERE t.status = 'pendente'
        AND t.risk_score >= $1
+       AND ${require('../utils/tenantScope').opsUserSql('u')}
      ORDER BY t.risk_score DESC, t.created_at ASC
      LIMIT $2`,
     [minScore, limit]
@@ -96,7 +98,8 @@ async function countUserSubmissions24h(userId) {
 
 async function listEncodingQueue({ status, limit = 40 } = {}) {
   const params = [];
-  let where = `WHERE kind IN ('movie', 'episode')`;
+  const { opsVideoSql } = require('../utils/tenantScope');
+  let where = `WHERE kind IN ('movie', 'episode') AND ${opsVideoSql('videos')}`;
   if (status) {
     params.push(status);
     where += ` AND encoding_status = $${params.length}`;
@@ -134,7 +137,7 @@ async function updateEncoding(contentId, { encodingStatus, encodingError }) {
          END,
          encoding_updated_at = NOW(),
          updated_at = NOW()
-     WHERE id = $1
+     WHERE id = $1 AND ${require('../utils/tenantScope').opsVideoSql('')}
      RETURNING id, title, kind, encoding_status, encoding_error, encoding_updated_at, bunny_video_id`,
     [contentId, encodingStatus || null, encodingError || null]
   );
@@ -143,8 +146,8 @@ async function updateEncoding(contentId, { encodingStatus, encodingError }) {
 
 async function getScrubAssets(contentId) {
   const result = await query(
-    `SELECT id, sprite_vtt_url, sprite_image_url, duration_seconds, title
-     FROM videos WHERE id = $1`,
+    `SELECT v.id, v.sprite_vtt_url, v.sprite_image_url, v.duration_seconds, v.title
+     FROM videos v WHERE v.id = $1 AND ${videoTenantSql('v')}`,
     [contentId]
   );
   return result.rows[0] || null;

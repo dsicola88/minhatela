@@ -265,6 +265,17 @@ async function reviewTransaction({
   if (!existing) {
     throw createError(404, 'Transação não encontrada', 'NOT_FOUND');
   }
+  const { opsUserSql } = require('../utils/tenantScope');
+  const { query } = require('../config/database');
+  const scoped = await query(
+    `SELECT 1 FROM transactions t
+     JOIN users u ON u.id = t.user_id
+     WHERE t.id = $1 AND ${opsUserSql('u')}`,
+    [transactionId]
+  );
+  if (!scoped.rowCount) {
+    throw createError(404, 'Transação não encontrada', 'NOT_FOUND');
+  }
   if (existing.status !== STATUS.PENDING) {
     throw createError(
       409,

@@ -20,7 +20,11 @@ async function listBlocked(userId, profileId) {
 
 async function blockTitle(userId, profileId, contentId) {
   await assertOwnedProfile(userId, profileId);
-  const check = await query(`SELECT id FROM videos WHERE id = $1`, [contentId]);
+  const { videoTenantSql } = require('../utils/tenantScope');
+  const check = await query(
+    `SELECT v.id FROM videos v WHERE v.id = $1 AND ${videoTenantSql('v')}`,
+    [contentId]
+  );
   if (!check.rowCount) {
     throw createError(404, 'Título não encontrado', 'CONTENT_NOT_FOUND');
   }

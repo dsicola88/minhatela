@@ -351,7 +351,9 @@ async function run() {
   let adminToken = null;
 
   await step('Superadmin · login empresa', async () => {
-    const r = await req('POST', '/api/auth/login', {
+    const totp = require('../src/utils/totp');
+    let secret = process.env.E2E_MFA_SECRET || null;
+    let r = await req('POST', '/api/auth/login', {
       body: {
         email: SUPERADMIN.email,
         password: SUPERADMIN.password,
@@ -360,6 +362,36 @@ async function run() {
       },
     });
     assert(r.status === 200, `admin login ${r.status} ${r.json?.message || r.json?.code}`);
+    if (r.json?.mfaSetupRequired) {
+      const setup = await req('POST', '/api/auth/mfa/setup', {
+        body: { mfaTicket: r.json.mfaTicket },
+      });
+      assert(setup.status === 200 && setup.json?.secret, `mfa setup ${setup.status}`);
+      secret = setup.json.secret;
+      const confirmed = await req('POST', '/api/auth/mfa/setup/confirm', {
+        body: { mfaTicket: r.json.mfaTicket, code: totp.generate(secret) },
+      });
+      assert(confirmed.ok || confirmed.json?.enabled, `mfa confirm ${confirmed.status}`);
+      r = await req('POST', '/api/auth/login', {
+        body: {
+          email: SUPERADMIN.email,
+          password: SUPERADMIN.password,
+          deviceName: 'E2E Admin Console',
+          platform: 'web',
+        },
+      });
+    }
+    if (r.json?.mfaRequired) {
+      assert(secret, 'mfa secret after enroll');
+      r = await req('POST', '/api/auth/mfa/verify', {
+        body: {
+          mfaTicket: r.json.mfaTicket,
+          code: totp.generate(secret),
+          deviceName: 'E2E Admin Console',
+          platform: 'web',
+        },
+      });
+    }
     adminToken = r.json.token || r.json.accessToken;
     assert(adminToken, 'admin token');
     const me = await req('GET', '/api/auth/me', { token: adminToken });
@@ -509,7 +541,7 @@ async function run() {
     const help = await req('GET', '/api/support/help', { token: customerToken });
     assert(help.status === 200, `help ${help.status}`);
     const oauth = await req('POST', '/api/auth/oauth/google', { body: {} });
-    assert([400, 401, 429].includes(oauth.status), `oauth gate ${oauth.status}`);
+    assert([400, 401, 429, 503].includes(oauth.status), `oauth gate ${oauth.status}`);
   });
 
   await step('Segurança · cliente sem acesso admin', async () => {

@@ -67,12 +67,14 @@ async function listByUser(userId) {
 }
 
 async function listPending() {
+  const { opsUserSql } = require('../utils/tenantScope');
   const result = await query(
     `SELECT t.*, u.email, u.full_name, v.title AS video_title
      FROM transactions t
      JOIN users u ON u.id = t.user_id
      LEFT JOIN videos v ON v.id = t.video_id
      WHERE t.status = $1
+       AND ${opsUserSql('u')}
      ORDER BY COALESCE(t.risk_score, 0) DESC, t.created_at ASC`,
     [STATUS.PENDING]
   );

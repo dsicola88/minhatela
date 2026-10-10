@@ -2,6 +2,7 @@
 
 const { query } = require('../config/database');
 const { env } = require('../config/env');
+const { videoTenantSql } = require('../utils/tenantScope');
 
 async function createSession(session) {
   const result = await query(
@@ -44,6 +45,7 @@ async function listContinueWatching(profileId, limit = 12, maturityMax = 18) {
      LEFT JOIN videos s ON s.id = v.series_id AND s.kind = 'series'
      LEFT JOIN device_sessions ds ON ds.id = wp.last_device_id
      WHERE wp.profile_id = $1
+       AND ${videoTenantSql('v')}
        AND wp.completed = FALSE
        AND wp.hidden_from_row = FALSE
        AND wp.position_seconds > 15

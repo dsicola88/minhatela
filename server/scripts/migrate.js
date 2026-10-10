@@ -26,6 +26,14 @@ async function appliedIds() {
 }
 
 async function migrate() {
+  const dbUrl = process.env.DATABASE_URL || '';
+  if (
+    /railway|onrender|amazonaws\.com|supabase\.co/i.test(dbUrl) &&
+    process.env.ALLOW_REMOTE_MIGRATE !== '1'
+  ) {
+    logger.error('migrate.blocked_remote_host');
+    throw new Error('BLOCKED: migrate recusa host remoto sem ALLOW_REMOTE_MIGRATE=1');
+  }
   await ensureTable();
   const applied = await appliedIds();
   const files = fs

@@ -1,10 +1,11 @@
 'use strict';
 
 /**
- * Camada mínima de autorização / ownership (Fase 27).
- * Backend é a autoridade — não duplicar estas regras no cliente.
+ * Autorização / ownership — o backend é a autoridade.
+ * Roles JWT descrevem capacidades; permissions em role_permissions confirmam.
  */
 const profileRepository = require('../repositories/profileRepository');
+const rbacService = require('./rbacService');
 const { createError } = require('../utils/errors');
 
 async function assertProfileOwned(userId, profileId, { required = true } = {}) {
@@ -21,13 +22,46 @@ async function assertProfileOwned(userId, profileId, { required = true } = {}) {
 
 function assertAdminRole(user) {
   const roles = user?.roles || [];
-  const ok =
-    user?.isAdmin ||
-    roles.includes('admin') ||
-    roles.includes('super_admin') ||
-    roles.includes('moderator');
-  if (!ok) {
+  if (!rbacService.isStaff(roles)) {
     throw createError(403, 'Permissão insuficiente', 'FORBIDDEN');
+  }
+  return true;
+}
+
+function assertSuperAdmin(user) {
+  if (!rbacService.isSuperAdmin(user?.roles || [])) {
+    throw createError(403, 'Apenas SuperAdmin', 'FORBIDDEN');
+  }
+  return true;
+}
+
+async function assertPermission(user, permissionCode) {
+  const roles = user?.roles || [];
+  if (rbacService.isSuperAdmin(roles)) return true;
+  const perms = await rbacService.permissionsForRoles(roles);
+  if (!rbacService.hasPermission(perms, permissionCode)) {
+    throw createError(403, 'Permissão insuficiente', 'FORBIDDEN');
+  }
+  return true;
+}
+
+function requirePermission(permissionCode) {
+  return async (req, _res, next) => {
+    try {
+      await assertPermission(req.user, permissionCode);
+      return next();
+    } catch (err) {
+      return next(err);
+    }
+  };
+}
+
+async function assertSameTenant(user, resourceTenantId) {
+  if (!resourceTenantId) return true;
+  if (rbacService.isSuperAdmin(user?.roles || [])) return true;
+  const tenantId = user?.tenantId || (await rbacService.tenantIdForUser(user.id));
+  if (tenantId && String(resourceTenantId) !== String(tenantId)) {
+    throw createError(404, 'Recurso não encontrado', 'NOT_FOUND');
   }
   return true;
 }
@@ -35,4 +69,8 @@ function assertAdminRole(user) {
 module.exports = {
   assertProfileOwned,
   assertAdminRole,
+  assertSuperAdmin,
+  assertPermission,
+  requirePermission,
+  assertSameTenant,
 };

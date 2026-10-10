@@ -88,17 +88,18 @@ async function listReminders(userId) {
 
 async function listGenres() {
   const result = await query(
-    `SELECT genre, COUNT(*)::int AS count
-     FROM videos
-     WHERE genre IS NOT NULL
-       AND genre <> ''
-       AND kind IN ('movie', 'series')
+    `SELECT v.genre, COUNT(*)::int AS count
+     FROM videos v
+     WHERE v.genre IS NOT NULL
+       AND v.genre <> ''
+       AND v.kind IN ('movie', 'series')
+       AND ${require('../utils/tenantScope').videoTenantSql('v')}
        AND (
-         (is_published = TRUE AND workflow_status = 'published')
-         OR (coming_soon_at IS NOT NULL AND coming_soon_at > NOW())
+         (v.is_published = TRUE AND v.workflow_status = 'published')
+         OR (v.coming_soon_at IS NOT NULL AND v.coming_soon_at > NOW())
        )
-     GROUP BY genre
-     ORDER BY count DESC, genre ASC
+     GROUP BY v.genre
+     ORDER BY count DESC, v.genre ASC
      LIMIT 30`
   );
   return result.rows;

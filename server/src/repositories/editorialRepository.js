@@ -1,6 +1,7 @@
 'use strict';
 
 const { query } = require('../config/database');
+const { videoTenantSql, opsVideoSql, tenantWriteSql } = require('../utils/tenantScope');
 
 function mapCollection(row) {
   return {
@@ -40,6 +41,7 @@ async function listPublished({ placement = 'home', maturityMax = 18 } = {}) {
     `SELECT c.*
      FROM editorial_collections c
      WHERE c.is_published = TRUE
+       AND ${videoTenantSql('c')}
        AND c.placement = $1
        AND (c.starts_at IS NULL OR c.starts_at <= NOW())
        AND (c.ends_at IS NULL OR c.ends_at > NOW())
@@ -56,6 +58,7 @@ async function listPublished({ placement = 'home', maturityMax = 18 } = {}) {
        FROM editorial_collection_items i
        JOIN videos v ON v.id = i.content_id
        WHERE i.collection_id = $1
+         AND ${videoTenantSql('v')}
          AND v.is_published = TRUE
          AND v.workflow_status = 'published'
          AND v.kind IN ('movie', 'series')
@@ -75,7 +78,7 @@ async function listPublished({ placement = 'home', maturityMax = 18 } = {}) {
 
 async function getBySlug(slug, maturityMax = 18) {
   const result = await query(
-    `SELECT * FROM editorial_collections WHERE slug = $1 LIMIT 1`,
+    `SELECT * FROM editorial_collections c WHERE c.slug = $1 AND ${videoTenantSql('c')} LIMIT 1`,
     [slug]
   );
   const row = result.rows[0];
@@ -87,6 +90,7 @@ async function getBySlug(slug, maturityMax = 18) {
      FROM editorial_collection_items i
      JOIN videos v ON v.id = i.content_id
      WHERE i.collection_id = $1
+       AND ${videoTenantSql('v')}
        AND v.maturity_rating <= $2
      ORDER BY i.sort_order ASC`,
     [row.id, maturityMax]
@@ -97,8 +101,11 @@ async function getBySlug(slug, maturityMax = 18) {
 async function adminList() {
   const result = await query(
     `SELECT c.*,
-            (SELECT COUNT(*)::int FROM editorial_collection_items i WHERE i.collection_id = c.id) AS item_count
+            (SELECT COUNT(*)::int FROM editorial_collection_items i
+              JOIN videos v ON v.id = i.content_id AND ${opsVideoSql('v')}
+              WHERE i.collection_id = c.id) AS item_count
      FROM editorial_collections c
+     WHERE ${opsVideoSql('c')}
      ORDER BY c.sort_order ASC, c.updated_at DESC`
   );
   return result.rows.map((r) => ({ ...mapCollection(r), itemCount: r.item_count }));
@@ -115,8 +122,8 @@ async function adminCreate({
 }) {
   const result = await query(
     `INSERT INTO editorial_collections
-      (slug, title, subtitle, sort_order, placement, is_published, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7)
+      (slug, title, subtitle, sort_order, placement, is_published, created_by, tenant_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7, ${tenantWriteSql()})
      RETURNING *`,
     [
       slug,
@@ -140,7 +147,7 @@ async function adminUpdate(id, body) {
        placement = COALESCE($5, placement),
        is_published = COALESCE($6, is_published),
        updated_at = NOW()
-     WHERE id = $1
+     WHERE id = $1 AND ${opsVideoSql('editorial_collections')}
      RETURNING *`,
     [
       id,
@@ -175,14 +182,24 @@ async function adminSetItems(collectionId, items = []) {
 
 async function getBySlugAdmin(idOrSlug) {
   const result = await query(
-    `SELECT * FROM editorial_collections
-     WHERE id::text = $1 OR slug = $1
+    `SELECT * FROM editorial_collections c
+     WHERE (c.id::text = $1 OR c.slug = $1) AND ${opsVideoSql('c')}
      LIMIT 1`,
     [idOrSlug]
   );
   const row = result.rows[0];
   if (!row) return null;
-  return getBySlug(row.slug, 18);
+  const items = await query(
+    `SELECT v.id, v.title, v.slug, v.synopsis_short, v.poster_url, v.backdrop_url,
+            v.monetization, v.rental_price_kz, v.release_year, v.kind,
+            v.maturity_rating, v.trailer_url, i.badge AS item_badge
+     FROM editorial_collection_items i
+     JOIN videos v ON v.id = i.content_id
+     WHERE i.collection_id = $1 AND ${opsVideoSql('v')}
+     ORDER BY i.sort_order ASC`,
+    [row.id]
+  );
+  return { ...mapCollection(row), videos: items.rows.map(mapCard) };
 }
 
 module.exports = {

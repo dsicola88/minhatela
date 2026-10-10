@@ -2,6 +2,8 @@
 
 const { query } = require('../config/database');
 
+const { videoTenantSql } = require('../utils/tenantScope');
+
 const BROWSE_KINDS = `v.kind IN ('movie', 'series')`;
 
 async function findPublishedById(id) {
@@ -17,6 +19,7 @@ async function findPublishedById(id) {
      LEFT JOIN video_categories vc ON vc.video_id = v.id
      LEFT JOIN categories c ON c.id = vc.category_id
      WHERE v.id = $1
+       AND ${videoTenantSql('v')}
        AND (
          (v.is_published = TRUE AND v.workflow_status = 'published')
          OR (v.coming_soon_at IS NOT NULL AND v.coming_soon_at > NOW())
@@ -36,6 +39,7 @@ async function findFeatured(maturityMax = 18) {
        AND v.workflow_status = 'published'
        AND v.maturity_rating <= $1
        AND ${BROWSE_KINDS}
+       AND ${videoTenantSql('v')}
      ORDER BY v.updated_at DESC
      LIMIT 1`,
     [maturityMax]
@@ -73,6 +77,7 @@ async function findHomeRows(maturityMax = 18) {
        AND v.workflow_status = 'published'
        AND v.maturity_rating <= $1
        AND ${BROWSE_KINDS}
+       AND ${videoTenantSql('v')}
      WHERE c.is_active = TRUE
      GROUP BY c.id
      ORDER BY c.sort_order ASC`,
@@ -81,27 +86,10 @@ async function findHomeRows(maturityMax = 18) {
   return result.rows;
 }
 
-async function hasActiveRights(contentId, territory = 'AO') {
-  const result = await query(
-    `SELECT 1
-     FROM content_rights
-     WHERE content_id = $1
-       AND territory = $2
-       AND status = 'active'
-       AND starts_at <= NOW()
-       AND (ends_at IS NULL OR ends_at > NOW())
-     LIMIT 1`,
-    [contentId, territory]
-  );
-
-  if (result.rowCount > 0) return true;
-
-  const anyRights = await query(
-    `SELECT 1 FROM content_rights WHERE content_id = $1 LIMIT 1`,
-    [contentId]
-  );
-
-  return anyRights.rowCount === 0;
+async function hasActiveRights(contentId, territory = 'AO', modality = null) {
+  const rightsService = require('../services/rightsService');
+  const decision = await rightsService.canDistribute({ contentId, territory, modality });
+  return decision.ok;
 }
 
 module.exports = {

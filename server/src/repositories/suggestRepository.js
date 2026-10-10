@@ -1,6 +1,7 @@
 'use strict';
 
 const { query } = require('../config/database');
+const { videoTenantSql } = require('../utils/tenantScope');
 
 async function suggest({ q, limit = 8, maturityMax = 18 }) {
   const term = String(q || '').trim();
@@ -11,6 +12,7 @@ async function suggest({ q, limit = 8, maturityMax = 18 }) {
       `SELECT id, title, slug, kind, poster_url, monetization, release_year
        FROM videos v
        WHERE v.kind IN ('movie', 'series')
+         AND ${videoTenantSql('v')}
          AND (
            (v.is_published = TRUE AND v.workflow_status = 'published')
            OR (v.coming_soon_at IS NOT NULL AND v.coming_soon_at > NOW())
@@ -28,21 +30,23 @@ async function suggest({ q, limit = 8, maturityMax = 18 }) {
       [term, maturityMax, Math.min(12, Number(limit) || 8)]
     ),
     query(
-      `SELECT DISTINCT genre
-       FROM videos
-       WHERE genre IS NOT NULL
-         AND genre ILIKE '%' || $1 || '%'
-         AND is_published = TRUE
+      `SELECT DISTINCT v.genre
+       FROM videos v
+       WHERE v.genre IS NOT NULL
+         AND v.genre ILIKE '%' || $1 || '%'
+         AND v.is_published = TRUE
+         AND ${videoTenantSql('v')}
        ORDER BY genre
        LIMIT 6`,
       [term]
     ).catch(() => ({ rows: [] })),
     query(
-      `SELECT DISTINCT creator_name
-       FROM videos
-       WHERE creator_name IS NOT NULL
-         AND creator_name ILIKE '%' || $1 || '%'
-         AND is_published = TRUE
+      `SELECT DISTINCT v.creator_name
+       FROM videos v
+       WHERE v.creator_name IS NOT NULL
+         AND v.creator_name ILIKE '%' || $1 || '%'
+         AND v.is_published = TRUE
+         AND ${videoTenantSql('v')}
        ORDER BY creator_name
        LIMIT 6`,
       [term]

@@ -15,12 +15,23 @@ async function requireAuth(req, _res, next) {
 
   try {
     const payload = jwt.verify(token, env.jwtSecret);
+    let tenantId = payload.tenantId || null;
+    if (!tenantId) {
+      try {
+        tenantId = await require('../services/rbacService').tenantIdForUser(payload.sub);
+      } catch {
+        tenantId = null;
+      }
+    }
+
     req.user = {
       id: payload.sub,
       email: payload.email,
       subscriptionStatus: payload.subscriptionStatus,
       roles: payload.roles || [],
       isAdmin: Boolean(payload.isAdmin),
+      tenantId,
+      mfaVerified: Boolean(payload.mfaVerified),
       sessionId: payload.sid || null,
     };
 
@@ -33,18 +44,27 @@ async function requireAuth(req, _res, next) {
       authSessionRepository.touch(payload.sid).catch(() => {});
     }
 
-    return next();
+    const { runWithTenant } = require('../utils/tenantScope');
+    const platformScope = (payload.roles || []).includes('super_admin');
+    return runWithTenant(tenantId, () => next(), { platformScope });
   } catch {
     return next(createError(401, 'Sessão inválida ou expirada', 'INVALID_TOKEN'));
   }
 }
 
+function requireStaffMfa(req, _res, next) {
+  const mfaService = require('../services/mfaService');
+  const rbac = require('../services/rbacService');
+  if (!mfaService.staffMfaRequired()) return next();
+  if (!rbac.isStaff(req.user?.roles || [])) return next();
+  if (req.user?.mfaVerified) return next();
+  return next(createError(401, 'MFA obrigatório para staff', 'MFA_REQUIRED'));
+}
+
 function requireRoles(...roles) {
   return (req, _res, next) => {
     const userRoles = req.user?.roles || [];
-    const allowed =
-      req.user?.isAdmin ||
-      roles.some((role) => userRoles.includes(role));
+    const allowed = roles.some((role) => userRoles.includes(role));
 
     if (!allowed) {
       return next(createError(403, 'Permissão insuficiente', 'FORBIDDEN'));
@@ -71,4 +91,10 @@ function optionalProfile(req, _res, next) {
   next();
 }
 
-module.exports = { requireAuth, requireRoles, requireExactRoles, optionalProfile };
+module.exports = {
+  requireAuth,
+  requireRoles,
+  requireExactRoles,
+  requireStaffMfa,
+  optionalProfile,
+};

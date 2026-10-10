@@ -11,5 +11,10 @@ export default function CreatorStudioRoute() {
     return <Redirect href="/login" />;
   }
 
-  return <CreatorStudioScreen onBack={() => router.replace('/home')} />;
+  return (
+    <CreatorStudioScreen
+      onBack={() => router.replace('/home')}
+      onCompany={() => router.push('/company')}
+    />
+  );
 }

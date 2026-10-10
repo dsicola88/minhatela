@@ -342,3 +342,45 @@ export default {
   reviewReport,
   resolveProofUrl,
 };
+
+export async function fetchAcquisitions(params = {}) {
+  const q = new URLSearchParams();
+  if (params.status) q.set('status', params.status);
+  const qs = q.toString();
+  return api.get(`/api/admin/acquisitions${qs ? `?${qs}` : ''}`);
+}
+
+export async function createAcquisition(body) {
+  return api.post('/api/admin/acquisitions', body);
+}
+
+export async function updateAcquisition(id, body) {
+  return api.patch(`/api/admin/acquisitions/${id}`, body);
+}
+
+export async function fetchRights(params = {}) {
+  const q = new URLSearchParams();
+  if (params.contentId) q.set('contentId', params.contentId);
+  const qs = q.toString();
+  return api.get(`/api/admin/rights${qs ? `?${qs}` : ''}`);
+}
+
+export async function createRight(body) {
+  return api.post('/api/admin/rights', body);
+}
+
+export async function fetchTenants() {
+  return api.get('/api/admin/tenants');
+}
+
+export async function updateTenant(id, body) {
+  return api.patch(`/api/admin/tenants/${id}`, body);
+}
+
+export async function fetchApprovals() {
+  return api.get('/api/admin/approvals');
+}
+
+export async function decideApproval(id, body) {
+  return api.post(`/api/admin/approvals/${id}/decide`, body);
+}
