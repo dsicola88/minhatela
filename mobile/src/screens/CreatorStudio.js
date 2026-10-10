@@ -33,7 +33,7 @@ const STATUS_LABEL = {
   active: 'Activo',
 };
 
-export default function CreatorStudio({ onBack }) {
+export default function CreatorStudio({ onBack, onCompany }) {
   const { width } = useWindowDimensions();
   const isCompact = width < 900;
   const [loading, setLoading] = useState(true);
@@ -189,9 +189,17 @@ export default function CreatorStudio({ onBack }) {
         <Text style={{ color: colors.text, fontSize: 28, fontWeight: '800', marginBottom: 8 }}>
           Estúdio de Criadores
         </Text>
-        <Text style={{ color: colors.muted, marginBottom: 24, lineHeight: 22 }}>
+        <Text style={{ color: colors.muted, marginBottom: 16, lineHeight: 22 }}>
           Submeta filmes, séries e documentários. Nada é publicado sem revisão da MinhaTela.
         </Text>
+        <Text style={{ color: colors.textSecondary, marginBottom: 24, fontSize: 13 }}>
+          Dashboard · My Content · Uploads · Submissions · Analytics · Revenue · Payouts
+        </Text>
+        {onCompany ? (
+          <Pressable onPress={onCompany} style={{ marginBottom: 20 }}>
+            <Text style={{ color: colors.gold, fontWeight: '700' }}>Abrir portal da produtora →</Text>
+          </Pressable>
+        ) : null}
 
         {error ? <ErrorState message={error} onRetry={load} /> : null}
 
@@ -210,6 +218,38 @@ export default function CreatorStudio({ onBack }) {
             <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700', marginBottom: 14 }}>
               Tornar-se criador
             </Text>
+            <FieldLabel>Tipo de conta</FieldLabel>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+              {[
+                { id: 'creator', label: 'Criador de conteúdo' },
+                { id: 'filmmaker', label: 'Cineasta independente' },
+                { id: 'producer', label: 'Produtor' },
+                { id: 'production_company', label: 'Produtora' },
+              ].map((opt) => (
+                <Pressable
+                  key={opt.id}
+                  onPress={() => setRegisterForm((s) => ({ ...s, type: opt.id }))}
+                  style={{
+                    paddingVertical: 8,
+                    paddingHorizontal: 12,
+                    borderRadius: 4,
+                    borderWidth: 1,
+                    borderColor: registerForm.type === opt.id ? colors.gold : colors.border,
+                    backgroundColor: registerForm.type === opt.id ? '#2a2108' : '#181818',
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: registerForm.type === opt.id ? colors.gold : colors.textSecondary,
+                      fontWeight: '700',
+                      fontSize: 12,
+                    }}
+                  >
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
             <FieldLabel>Nome artístico / produtora</FieldLabel>
             <TextInput
               value={registerForm.displayName}
@@ -269,10 +309,12 @@ export default function CreatorStudio({ onBack }) {
 
             {data.analytics ? (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 22 }}>
-                <Stat label="Publicados" value={data.analytics.content.published} />
-                <Stat label="Submissões" value={data.analytics.content.submitted} />
-                <Stat label="Views" value={data.analytics.views} />
-                <Stat label="Receita (Kz)" value={data.analytics.revenueKz} gold />
+                <Stat label="Publicados" value={data.analytics.content?.published || 0} />
+                <Stat label="Submissões" value={data.analytics.content?.submitted || 0} />
+                <Stat label="Views" value={data.analytics.views || 0} />
+                <Stat label="Espetadores" value={data.analytics.uniqueViewers || 0} />
+                <Stat label="Fãs / lista" value={data.analytics.subscribers || 0} />
+                <Stat label="Receita (Kz)" value={data.analytics.revenueKz || 0} gold />
               </View>
             ) : null}
 

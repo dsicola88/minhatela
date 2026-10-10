@@ -16,44 +16,75 @@ async function createDraft(payload) {
   const slugBase = slugify(payload.title) || `content-${Date.now()}`;
   const slug = `${slugBase}-${Math.random().toString(36).slice(2, 7)}`;
 
-  const result = await query(
+  const args = [
+    payload.title,
+    slug,
+    payload.synopsisShort,
+    payload.synopsisFull || payload.synopsisShort,
+    payload.cast || null,
+    payload.creatorDisplayName || null,
+    payload.posterUrl,
+    payload.backdropUrl || payload.posterUrl,
+    payload.trailerUrl || null,
+    payload.bunnyVideoId || null,
+    payload.monetization || 'avod',
+    payload.rentalPriceKz || null,
+    payload.durationSeconds || 0,
+    payload.releaseYear || new Date().getFullYear(),
+    payload.creatorId,
+    payload.ageRating || '12',
+    payload.languageCode || 'pt',
+    payload.countryCode || 'AO',
+    payload.genre || null,
+    payload.directorName || null,
+  ];
+
+  try {
+    const result = await query(
     `INSERT INTO videos (
       title, slug, synopsis_short, synopsis_full, cast_text, creator_name,
       poster_url, backdrop_url, trailer_url, bunny_video_id, monetization,
       rental_price_kz, duration_seconds, release_year, is_featured, is_published,
       workflow_status, creator_id, age_rating, language_code, country_code,
-      genre, director_name
+      genre, director_name, tenant_id, created_by_user_id, content_format,
+      production_company_id
     ) VALUES (
       $1,$2,$3,$4,$5,$6,
       $7,$8,$9,$10,$11,
       $12,$13,$14,FALSE,FALSE,
       'draft',$15,$16,$17,$18,
-      $19,$20
+      $19,$20,
+      (SELECT id FROM tenants WHERE slug = 'minhatela' LIMIT 1),
+      $21, COALESCE($22, 'movie'), $23
     ) RETURNING *`,
     [
-      payload.title,
-      slug,
-      payload.synopsisShort,
-      payload.synopsisFull || payload.synopsisShort,
-      payload.cast || null,
-      payload.creatorDisplayName || null,
-      payload.posterUrl,
-      payload.backdropUrl || payload.posterUrl,
-      payload.trailerUrl || null,
-      payload.bunnyVideoId || null,
-      payload.monetization || 'avod',
-      payload.rentalPriceKz || null,
-      payload.durationSeconds || 0,
-      payload.releaseYear || new Date().getFullYear(),
-      payload.creatorId,
-      payload.ageRating || '12',
-      payload.languageCode || 'pt',
-      payload.countryCode || 'AO',
-      payload.genre || null,
-      payload.directorName || null,
+      ...args,
+      payload.createdByUserId || null,
+      payload.contentFormat || payload.kind || 'movie',
+      payload.productionCompanyId || null,
     ]
-  );
-  return result.rows[0];
+    );
+    return result.rows[0];
+  } catch (err) {
+    if (!/column|tenants|does not exist/i.test(err.message || '')) throw err;
+    const result = await query(
+      `INSERT INTO videos (
+        title, slug, synopsis_short, synopsis_full, cast_text, creator_name,
+        poster_url, backdrop_url, trailer_url, bunny_video_id, monetization,
+        rental_price_kz, duration_seconds, release_year, is_featured, is_published,
+        workflow_status, creator_id, age_rating, language_code, country_code,
+        genre, director_name
+      ) VALUES (
+        $1,$2,$3,$4,$5,$6,
+        $7,$8,$9,$10,$11,
+        $12,$13,$14,FALSE,FALSE,
+        'draft',$15,$16,$17,$18,
+        $19,$20
+      ) RETURNING *`,
+      args
+    );
+    return result.rows[0];
+  }
 }
 
 async function updateOwnedDraft(contentId, creatorId, patch) {
@@ -191,7 +222,7 @@ async function moderate(contentId, { status, reviewerId, rejectionReason }) {
 }
 
 async function creatorAnalytics(creatorId) {
-  const [content, views, earnings] = await Promise.all([
+  const [content, views, earnings, audience] = await Promise.all([
     query(
       `SELECT
          COUNT(*)::int AS total,
@@ -213,12 +244,28 @@ async function creatorAnalytics(creatorId) {
        FROM creator_earnings WHERE creator_id = $1`,
       [creatorId]
     ),
+    query(
+      `SELECT
+         (SELECT COUNT(DISTINCT ae.user_id)::int
+            FROM analytics_events ae
+            JOIN videos v ON v.id = ae.content_id
+           WHERE v.creator_id = $1 AND ae.user_id IS NOT NULL) AS unique_viewers,
+         (SELECT COUNT(DISTINCT p.user_id)::int
+            FROM favorites f
+            JOIN videos v ON v.id = f.content_id
+            JOIN profiles p ON p.id = f.profile_id
+           WHERE v.creator_id = $1) AS subscribers
+`,
+      [creatorId]
+    ),
   ]);
 
   return {
     content: content.rows[0],
     views: views.rows[0].views,
     revenueKz: earnings.rows[0].total_kz,
+    uniqueViewers: audience.rows[0].unique_viewers || 0,
+    subscribers: audience.rows[0].subscribers || 0,
   };
 }
 
