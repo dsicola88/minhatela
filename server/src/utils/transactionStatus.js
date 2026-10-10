@@ -6,6 +6,7 @@ const STATUS = Object.freeze({
   REJECTED: 'rejeitado',
   CANCELLED: 'cancelled',
   EXPIRED: 'expirado',
+  REFUNDED: 'reembolsado',
 });
 
 const STATUS_API = Object.freeze({
@@ -14,6 +15,7 @@ const STATUS_API = Object.freeze({
   rejeitado: 'rejected',
   cancelled: 'cancelled',
   expirado: 'expired',
+  reembolsado: 'refunded',
 });
 
 function toApiStatus(dbStatus) {

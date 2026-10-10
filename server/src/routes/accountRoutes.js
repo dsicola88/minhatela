@@ -12,6 +12,7 @@ const router = express.Router();
 router.use(requireAuth);
 
 router.get('/', asyncHandler(accountController.getAccount));
+router.post('/subscription/cancel', asyncHandler(accountController.cancelSubscription));
 router.get('/devices', asyncHandler(accountController.listDevices));
 router.delete('/devices/:deviceId', asyncHandler(accountController.revokeDevice));
 router.post('/devices/:deviceId/trust', asyncHandler(accountController.trustDevice));

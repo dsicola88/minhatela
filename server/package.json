@@ -11,6 +11,7 @@
     "seed": "node scripts/seed.js",
     "smoke": "node scripts/smoke.js",
     "e2e": "node scripts/e2e.js",
+    "verify": "node scripts/verify-internal.js",
     "phase27": "node scripts/phase27-security.js",
     "phase29": "node scripts/phase29-enterprise.js",
     "phase30": "node scripts/phase30-isolation.js",

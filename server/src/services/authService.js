@@ -96,12 +96,15 @@ async function issueSession(user, roles, meta = {}) {
     tenantId,
     Boolean(meta.mfaVerified)
   );
+  const publicUser = toPublicUser(user, roles, { tenantId, mfaEnabled: Boolean(meta.mfaVerified) });
+  const perms = await require('./rbacService').permissionsForRoles(roles);
+  publicUser.permissions = [...perms];
   return {
     token: accessToken,
     accessToken,
     refreshToken,
     sessionId: session.id,
-    user: toPublicUser(user, roles, { tenantId, mfaEnabled: Boolean(meta.mfaVerified) }),
+    user: publicUser,
   };
 }
 
@@ -323,7 +326,10 @@ async function me(userId) {
   user = await require('./subscriptionService').syncExpired(user);
   const roles = await userRepository.getRoles(userId);
   const tenantId = await require('./rbacService').tenantIdForUser(userId);
-  return toPublicUser(user, roles, { tenantId });
+  const publicUser = toPublicUser(user, roles, { tenantId });
+  const perms = await require('./rbacService').permissionsForRoles(roles);
+  publicUser.permissions = [...perms];
+  return publicUser;
 }
 
 async function listProfiles(userId) {
@@ -345,6 +351,13 @@ async function listProfiles(userId) {
 }
 
 async function requestPasswordReset({ email, ip, userAgent, appBaseUrl }) {
+  if (env.isProd && !env.smtp.host) {
+    throw createError(
+      503,
+      'Recuperação de palavra-passe temporariamente indisponível.',
+      'EMAIL_NOT_CONFIGURED'
+    );
+  }
   const normalized = String(email || '').toLowerCase().trim();
   if (!normalized) {
     throw createError(400, 'Email é obrigatório', 'VALIDATION');

@@ -8,6 +8,13 @@ async function getAccount(req, res) {
   res.json(result);
 }
 
+async function cancelSubscription(req, res) {
+  const result = await require('../services/subscriptionService').cancelForUser(req.user.id, {
+    reason: req.body?.reason || 'user_requested',
+  });
+  res.json(result);
+}
+
 async function listDevices(req, res) {
   const result = await deviceStreamService.listDevices(req.user.id);
   if (Array.isArray(result)) {
@@ -81,6 +88,7 @@ async function unlockProfile(req, res) {
 
 module.exports = {
   getAccount,
+  cancelSubscription,
   listDevices,
   trustDevice,
   renameDevice,

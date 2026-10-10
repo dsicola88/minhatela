@@ -87,7 +87,21 @@ function createApp() {
       if (!owned.rowCount && !staffOk) {
         return res.status(404).json({ error: true, code: 'NOT_FOUND' });
       }
-      return res.sendFile(path.join(env.uploadsDir, 'proofs', filename));
+      const diskPath = path.join(env.uploadsDir, 'proofs', filename);
+      if (require('fs').existsSync(diskPath)) {
+        return res.sendFile(diskPath);
+      }
+      const blob = await query(
+        `SELECT proof_bytes, proof_mime FROM transactions WHERE proof_url = $1 LIMIT 1`,
+        [proofPath]
+      );
+      const bytes = blob.rows[0]?.proof_bytes;
+      if (!bytes) {
+        return res.status(404).json({ error: true, code: 'PROOF_MISSING' });
+      }
+      res.setHeader('Content-Type', blob.rows[0].proof_mime || 'application/octet-stream');
+      res.setHeader('Cache-Control', 'private, max-age=120');
+      return res.send(bytes);
     })
   );
   app.use(

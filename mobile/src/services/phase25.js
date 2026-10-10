@@ -75,23 +75,6 @@ export function requestGoogleAccessToken(clientId) {
   );
 }
 
-/** JWT demo para OAuth até integrar SDK nativo Google/Apple */
-export function buildDemoOAuthToken({ provider, email, fullName, sub }) {
-  const header = { alg: 'none', typ: 'JWT' };
-  const payload = {
-    sub: sub || `mt-${provider}-${email}`,
-    email,
-    name: fullName || email.split('@')[0],
-    iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + 3600,
-  };
-  const enc = (obj) =>
-    typeof btoa === 'function'
-      ? btoa(JSON.stringify(obj)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_')
-      : Buffer.from(JSON.stringify(obj)).toString('base64url');
-  return `${enc(header)}.${enc(payload)}.demo`;
-}
-
 export default {
   oauthLogin,
   preloadGoogleIdentity,
@@ -100,5 +83,4 @@ export default {
   updateEncoding,
   fetchScrub,
   requestGoogleAccessToken,
-  buildDemoOAuthToken,
 };

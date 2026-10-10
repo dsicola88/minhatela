@@ -11,8 +11,10 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { WebView } from 'react-native-webview';
+import { Video, ResizeMode } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import * as ScreenCapture from 'expo-screen-capture';
+import { buildBunnyPlayerPage } from '../platform/bunnyPlayerPage';
 import { colors } from '../theme/tokens';
 import {
   startWatch,
@@ -71,7 +73,12 @@ export default function Watch({
   const [showTracks, setShowTracks] = useState(false);
   const [audioPref, setAudioPref] = useState('pt');
   const [subsPref, setSubsPref] = useState('off');
+  const [paused, setPaused] = useState(false);
+  const [adPlaying, setAdPlaying] = useState(false);
   const hideTimer = useRef(null);
+  const videoRef = useRef(null);
+  const webviewRef = useRef(null);
+  const webIframeRef = useRef(null);
   const progressTimer = useRef(null);
   const heartbeatTimer = useRef(null);
   const stillTimer = useRef(null);
@@ -125,6 +132,9 @@ export default function Watch({
         } else {
           positionRef.current = 5;
         }
+        const hasPreroll = Boolean(data?.ads?.enabled && data?.ads?.creative?.mediaUrl);
+        setAdPlaying(hasPreroll);
+        setPaused(hasPreroll);
 
         reportQoeSafe({
           eventType: 'startup',
@@ -177,14 +187,8 @@ export default function Watch({
           }
         }, HEARTBEAT_INTERVAL_MS);
 
-        if (data?.ads?.enabled && data?.ads?.decisionId) {
-          const waitMs = Math.min(
-            60000,
-            Math.max(4000, (Number(data.ads.creative?.durationSeconds) || 15) * 1000)
-          );
-          adCompleteTimer.current = setTimeout(() => {
-            completeAdImpression(data.ads.decisionId).catch(() => {});
-          }, waitMs);
+        if (data?.ads?.enabled && data?.ads?.decisionId && !data?.ads?.creative?.mediaUrl) {
+          // Sem criativo reproduzível: não facturar impressão fantasma.
         }
       } catch (err) {
         if (err.code === 'PIN_REQUIRED_PLAY' || err.code === 'PIN_INVALID') {
@@ -250,8 +254,27 @@ export default function Watch({
     hideTimer.current = setTimeout(() => setShowControls(false), 4200);
   }
 
-  function seekBy(delta) {
-    positionRef.current = Math.max(0, positionRef.current + delta);
+  function sendToPlayer(msg) {
+    const payload = JSON.stringify(msg);
+    if (videoRef.current) {
+      if (msg.type === 'seek') {
+        videoRef.current.setPositionAsync(Math.max(0, Number(msg.seconds) || 0) * 1000).catch(() => {});
+      }
+      if (msg.type === 'play') videoRef.current.playAsync?.().catch(() => {});
+      if (msg.type === 'pause') videoRef.current.pauseAsync?.().catch(() => {});
+      return;
+    }
+    if (webviewRef.current?.postMessage) {
+      webviewRef.current.postMessage(payload);
+    }
+    if (Platform.OS === 'web' && webIframeRef.current?.contentWindow) {
+      webIframeRef.current.contentWindow.postMessage(payload, '*');
+    }
+  }
+
+  function seekTo(seconds) {
+    positionRef.current = Math.max(0, seconds);
+    sendToPlayer({ type: 'seek', seconds: positionRef.current });
     saveWatchProgress(contentIdRef.current, {
       positionSeconds: positionRef.current,
       durationSeconds: durationRef.current || positionRef.current + 60,
@@ -259,29 +282,40 @@ export default function Watch({
     pokeControls();
   }
 
+  function seekBy(delta) {
+    seekTo(positionRef.current + delta);
+  }
+
+  function togglePlay() {
+    if (adPlaying) return;
+    const next = !paused;
+    setPaused(next);
+    sendToPlayer({ type: next ? 'pause' : 'play' });
+    pokeControls();
+  }
+
+  async function finishAd({ billed = true } = {}) {
+    if (billed && session?.ads?.decisionId) {
+      await completeAdImpression(session.ads.decisionId).catch(() => {});
+    }
+    setAdPlaying(false);
+    setPaused(false);
+    sendToPlayer({ type: 'play' });
+  }
+
   function skipIntro() {
     const end = session?.player?.introEndSeconds;
     if (!end) return;
-    positionRef.current = end;
     setIntroSkipped(true);
-    saveWatchProgress(contentIdRef.current, {
-      positionSeconds: end,
-      durationSeconds: durationRef.current || end + 60,
-    }).catch(() => {});
-    pokeControls();
+    seekTo(end);
   }
 
   function skipRecap() {
     const end = session?.player?.recapEndSeconds;
     if (!end) return;
-    positionRef.current = end;
     setRecapSkipped(true);
     setIntroSkipped(true);
-    saveWatchProgress(contentIdRef.current, {
-      positionSeconds: end,
-      durationSeconds: durationRef.current || end + 60,
-    }).catch(() => {});
-    pokeControls();
+    seekTo(end);
   }
 
   function goNext() {
@@ -374,6 +408,11 @@ export default function Watch({
   }, [onBack, videoId, session, introSkipped]);
 
   const embedUrl = session?.playback?.embedUrl;
+  const hlsUrl = session?.playback?.hlsUrl;
+  const useNativeHls = Platform.OS !== 'web' && Boolean(hlsUrl);
+  const playerPage = embedUrl
+    ? buildBunnyPlayerPage(embedUrl, { startSeconds: session?.resume?.positionSeconds || 0 })
+    : '';
   const content = session?.content;
   const seriesTitle = session?.series?.title;
   const epLabel =
@@ -389,6 +428,7 @@ export default function Watch({
         : 8)
   );
   const canSkipIntro =
+    !adPlaying &&
     Boolean(session?.player?.skipIntroEnabled) &&
     !introSkipped &&
     !recapSkipped &&
@@ -425,16 +465,14 @@ export default function Watch({
   function jumpToCredits() {
     const at = session?.player?.creditsStartSeconds;
     if (!at) return;
-    positionRef.current = at;
     setShowMoreLike(true);
-    pokeControls();
+    seekTo(at);
   }
 
   function jumpToPostCredits() {
     const at = session?.player?.postCreditsStartSeconds;
     if (!at) return;
-    positionRef.current = at;
-    pokeControls();
+    seekTo(at);
   }
 
   if (pinRequired) {
@@ -528,29 +566,96 @@ export default function Watch({
         </View>
       ) : (
         <Pressable style={{ flex: 1 }} onPress={pokeControls}>
-          {Platform.OS === 'web' ? (
-            <View style={{ flex: 1 }}>
-              {createElement('iframe', {
+          <View style={{ flex: 1, opacity: adPlaying ? 0 : 1 }}>
+            {useNativeHls ? (
+              <Video
+                ref={videoRef}
+                source={{ uri: hlsUrl }}
+                style={{ flex: 1, backgroundColor: colors.black }}
+                resizeMode={ResizeMode.CONTAIN}
+                shouldPlay={!paused && !adPlaying}
+                progressUpdateIntervalMillis={1000}
+                onPlaybackStatusUpdate={(status) => {
+                  if (!status?.isLoaded) return;
+                  positionRef.current = (status.positionMillis || 0) / 1000;
+                  if (status.durationMillis) {
+                    durationRef.current = status.durationMillis / 1000;
+                  }
+                  if (status.didJustFinish) setShowNext(true);
+                }}
+              />
+            ) : Platform.OS === 'web' ? (
+              createElement('iframe', {
+                ref: webIframeRef,
                 title,
-                src: embedUrl,
+                srcDoc: playerPage,
                 style: { border: 0, width: '100%', height: '100%' },
                 allow:
                   'accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen',
                 allowFullScreen: true,
-              })}
-            </View>
-          ) : (
-            <WebView
-              originWhitelist={['*']}
-              source={{
-                html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"/><style>html,body{margin:0;background:#000;height:100%}iframe{border:0;width:100%;height:100%}</style><script>document.addEventListener('contextmenu',e=>e.preventDefault())</script></head><body><iframe src="${embedUrl}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></body></html>`,
+              })
+            ) : (
+              <WebView
+                ref={webviewRef}
+                originWhitelist={['*']}
+                source={{ html: playerPage }}
+                onMessage={(event) => {
+                  try {
+                    const msg = JSON.parse(event.nativeEvent.data);
+                    if (msg.type === 'time' && msg.seconds) {
+                      positionRef.current = Number(msg.seconds) || positionRef.current;
+                      if (msg.duration) durationRef.current = Number(msg.duration);
+                    }
+                    if (msg.type === 'ended') setShowNext(true);
+                    if (msg.type === 'play') setPaused(false);
+                    if (msg.type === 'pause') setPaused(true);
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+                style={{ flex: 1, backgroundColor: colors.black, width, height }}
+                allowsFullscreenVideo
+                mediaPlaybackRequiresUserAction={false}
+                allowsInlineMediaPlayback
+              />
+            )}
+          </View>
+
+          {adPlaying && session?.ads?.creative?.mediaUrl ? (
+            <View
+              style={{
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                top: 0,
+                bottom: 0,
+                backgroundColor: colors.black,
               }}
-              style={{ flex: 1, backgroundColor: colors.black, width, height }}
-              allowsFullscreenVideo
-              mediaPlaybackRequiresUserAction={false}
-              allowsInlineMediaPlayback
-            />
-          )}
+            >
+              <Video
+                source={{ uri: session.ads.creative.mediaUrl }}
+                style={{ flex: 1 }}
+                resizeMode={ResizeMode.CONTAIN}
+                shouldPlay
+                onPlaybackStatusUpdate={(status) => {
+                  if (status?.didJustFinish) finishAd({ billed: true });
+                  if (status?.error) finishAd({ billed: false });
+                }}
+              />
+              <Text
+                style={{
+                  position: 'absolute',
+                  top: 24,
+                  left: 20,
+                  color: colors.gold,
+                  fontWeight: '700',
+                  fontSize: 12,
+                }}
+              >
+                {t('adLabel') || 'Publicidade'} · {session.ads.creative.title}
+              </Text>
+            </View>
+          ) : null}
 
           {canSkipIntro ? (
             <Focusable
@@ -882,7 +987,7 @@ export default function Watch({
                 <Focusable
                   id="watch-play"
                   autoFocus={!showNext}
-                  onPress={pokeControls}
+                  onPress={togglePlay}
                   style={{
                     width: 72,
                     height: 72,
@@ -894,7 +999,12 @@ export default function Watch({
                     justifyContent: 'center',
                   }}
                 >
-                  <Ionicons name="play" size={34} color={colors.text} style={{ marginLeft: 4 }} />
+                  <Ionicons
+                    name={paused ? 'play' : 'pause'}
+                    size={34}
+                    color={colors.text}
+                    style={{ marginLeft: paused ? 4 : 0 }}
+                  />
                 </Focusable>
                 <Focusable id="watch-seek-fwd" onPress={() => seekBy(10)}>
                   <Ionicons name="play-forward" size={28} color={colors.text} />

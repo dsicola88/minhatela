@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, layout } from '../theme/tokens';
 import { useBrandCopy } from '../context/AppConfigContext';
 import { useI18n } from '../i18n';
-import { getAccount, revokeDevice, updateProfile } from '../services/account';
+import { getAccount, revokeDevice, updateProfile, cancelSubscription } from '../services/account';
 import { trustDevice } from '../services/phase24';
 import {
   listAuthSessions,
@@ -347,6 +347,24 @@ export default function Account({
             icon="diamond-outline"
             onPress={onPlans}
           />
+          {premiumOn && effective?.source !== 'household' ? (
+            <Pressable
+              onPress={async () => {
+                try {
+                  const res = await cancelSubscription();
+                  setPromoMsg(res.message || 'Assinatura cancelada');
+                  await load();
+                } catch (err) {
+                  setPromoMsg(err.message || 'Não foi possível cancelar');
+                }
+              }}
+              style={{ marginTop: 10, marginBottom: 4 }}
+            >
+              <Text style={{ color: colors.muted, fontWeight: '700', fontSize: 13 }}>
+                Cancelar Premium (volta a AVOD)
+              </Text>
+            </Pressable>
+          ) : null}
           {expired ? (
             <Text style={{ color: colors.gold, fontSize: 13, marginTop: 8, lineHeight: 20 }}>
               O período acabou. Continua a ver o catálogo gratuito (com anúncios). Conteúdo Premium

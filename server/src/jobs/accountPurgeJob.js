@@ -17,6 +17,8 @@ async function logJob(jobName, status, details) {
  * Soft-delete contas cujo período de graça expirou + revoga sessões.
  */
 async function runAccountPurge() {
+  const { withJobLock, LOCKS } = require('./jobLock');
+  return withJobLock(LOCKS.accountPurge, 'account_purge', async () => {
   const started = Date.now();
   const purged = await complianceRepository.softDeleteDue();
 
@@ -38,6 +40,7 @@ async function runAccountPurge() {
     logger.info('jobs.account_purge', details);
   }
   return details;
+  });
 }
 
 let timer = null;

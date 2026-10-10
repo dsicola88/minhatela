@@ -553,6 +553,32 @@ async function run() {
     assert(help.status === 200, `help ${help.status}`);
     const oauth = await req('POST', '/api/auth/oauth/google', { body: {} });
     assert([400, 401, 429, 503].includes(oauth.status), `oauth gate ${oauth.status}`);
+    const fakeApple = [
+      Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url'),
+      Buffer.from(
+        JSON.stringify({
+          sub: 'e2e-forged',
+          aud: 'com.minhatela.app',
+          iss: 'https://appleid.apple.com',
+          exp: Math.floor(Date.now() / 1000) + 3600,
+        })
+      ).toString('base64url'),
+      'forged',
+    ].join('.');
+    const apple = await req('POST', '/api/auth/oauth/apple', { body: { idToken: fakeApple } });
+    assert([400, 401, 503].includes(apple.status), `apple gate ${apple.status}`);
+    assert(!apple.json?.token && !apple.json?.accessToken, 'apple forged must not issue session');
+  });
+
+  await step('Assinante · cancelar Premium volta a AVOD', async () => {
+    const r = await req('POST', '/api/account/subscription/cancel', {
+      token: customerToken,
+      body: { reason: 'e2e' },
+    });
+    assert(r.status === 200 && r.json?.cancelled, `cancel ${r.status} ${r.json?.code || ''}`);
+    const me = await req('GET', '/api/auth/me', { token: customerToken });
+    const status = me.json?.subscriptionStatus;
+    assert(status !== 'premium_active', `expected expired got ${status}`);
   });
 
   await step('Segurança · cliente sem acesso admin', async () => {

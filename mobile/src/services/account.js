@@ -36,6 +36,10 @@ export async function unlockProfile(profileId, pin) {
   return api.post(`/api/account/profiles/${profileId}/unlock`, { pin });
 }
 
+export async function cancelSubscription(body = {}) {
+  return api.post('/api/account/subscription/cancel', body);
+}
+
 export default {
   getAccount,
   listDevices,
@@ -46,4 +50,5 @@ export default {
   updateProfile,
   deleteProfile,
   unlockProfile,
+  cancelSubscription,
 };

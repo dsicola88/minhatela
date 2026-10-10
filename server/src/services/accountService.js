@@ -76,6 +76,7 @@ async function getAccount(userId) {
       deletionRequestedAt: user.deletion_requested_at || null,
       deletionScheduledAt: user.deletion_scheduled_at || null,
       roles,
+      permissions: [...(await require('./rbacService').permissionsForRoles(roles))],
       isAdmin: Boolean(user.is_admin) || roles.includes('admin'),
     },
     streams,

@@ -115,12 +115,41 @@ export const NAV_GROUPS = [
   },
 ];
 
+const ROLE_TABS = {
+  finance_manager: ['overview', 'payments'],
+  support_agent: ['overview', 'support'],
+  moderator: ['overview', 'moderation', 'reports'],
+  content_manager: [
+    'overview',
+    'cms',
+    'editorial',
+    'catalog',
+    'uploads',
+    'media',
+    'rights',
+    'acquisition',
+  ],
+};
+
 export function navGroupsForUser(user) {
   const roles = user?.roles || [];
   const isSuper = roles.includes('super_admin');
+  const isFullAdmin = isSuper || roles.includes('admin') || Boolean(user?.isAdmin);
+  const allowed = new Set();
+  if (!isFullAdmin) {
+    for (const role of roles) {
+      const tabs = ROLE_TABS[role];
+      if (tabs) tabs.forEach((id) => allowed.add(id));
+    }
+    if (!allowed.size) allowed.add('overview');
+  }
   return NAV_GROUPS.map((group) => {
     if (group.superOnly && !isSuper) return null;
-    const items = group.items.filter((item) => !item.superOnly || isSuper);
+    const items = group.items.filter((item) => {
+      if (item.superOnly && !isSuper) return false;
+      if (isFullAdmin) return true;
+      return allowed.has(item.id);
+    });
     if (!items.length) return null;
     return { ...group, items };
   }).filter(Boolean);

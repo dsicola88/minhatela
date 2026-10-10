@@ -4,10 +4,11 @@ const buckets = new Map();
 
 function rateLimit({ windowMs = 60_000, max = 120, keyFn } = {}) {
   return (req, res, next) => {
-    if (
-      process.env.E2E_DISABLE_RATE_LIMIT === 'true' ||
-      process.env.DISABLE_RATE_LIMIT === 'true'
-    ) {
+    const allowDisable =
+      process.env.NODE_ENV !== 'production' &&
+      (process.env.E2E_DISABLE_RATE_LIMIT === 'true' ||
+        process.env.DISABLE_RATE_LIMIT === 'true');
+    if (allowDisable) {
       return next();
     }
     const key = (keyFn ? keyFn(req) : req.ip) || 'anonymous';

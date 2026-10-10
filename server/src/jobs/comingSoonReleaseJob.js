@@ -17,6 +17,8 @@ async function logJob(jobName, status, details) {
  * Publica títulos cujo coming_soon_at já passou e notifica lembretes.
  */
 async function runComingSoonReleases() {
+  const { withJobLock, LOCKS } = require('./jobLock');
+  return withJobLock(LOCKS.comingSoon, 'coming_soon_releases', async () => {
   const started = Date.now();
   const due = await query(
     `SELECT id, title, slug
@@ -86,6 +88,7 @@ async function runComingSoonReleases() {
   await logJob('coming_soon_releases', 'ok', details);
   logger.info('job.coming_soon_releases', details);
   return details;
+  });
 }
 
 function startScheduler() {

@@ -32,15 +32,16 @@ const { requirePermission } = require('../services/authorizationService');
 
 router.get('/command-center', asyncHandler(adminOpsController.commandCenter));
 router.get('/dashboard', asyncHandler(adminOpsController.commandCenter));
-router.get('/audit', asyncHandler(adminOpsController.audit));
-router.get('/streams/live', asyncHandler(adminOpsController.liveStreams));
-router.get('/campaigns/pending', asyncHandler(adminOpsController.campaigns));
+router.get('/audit', requirePermission('support.tickets'), asyncHandler(adminOpsController.audit));
+router.get('/streams/live', requirePermission('catalog.moderate'), asyncHandler(adminOpsController.liveStreams));
+router.get('/campaigns/pending', requirePermission('ads.manage'), asyncHandler(adminOpsController.campaigns));
 
 router.get('/transactions/pending', elevated, requirePermission('finance.review'), asyncHandler(paymentController.pending));
 router.patch('/transactions/:id/status', elevated, requirePermission('finance.review'), asyncHandler(paymentController.review));
 
 router.get(
   '/creators/pending',
+  requirePermission('creators.manage'),
   asyncHandler(async (_req, res) => {
     const result = await creatorStudioService.adminListCreators();
     res.json(result);
@@ -314,6 +315,7 @@ router.get(
 
 router.get(
   '/payments/risk',
+  requirePermission('finance.review'),
   asyncHandler(require('../controllers/phase25Controller').paymentRisk)
 );
 

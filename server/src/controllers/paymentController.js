@@ -19,7 +19,7 @@ async function checkout(req, res) {
       req.headers['idempotency-key'] ||
       req.headers['x-idempotency-key'] ||
       req.body.idempotencyKey ||
-      null,
+      require('uuid').v4(),
   });
   res.status(result.idempotentReplay ? 200 : 201).json(result);
 }
@@ -52,9 +52,11 @@ async function review(req, res) {
     paid: STATUS.PAID,
     pending: STATUS.PENDING,
     rejected: STATUS.REJECTED,
+    refunded: STATUS.REFUNDED,
     pago: STATUS.PAID,
     pendente: STATUS.PENDING,
     rejeitado: STATUS.REJECTED,
+    reembolsado: STATUS.REFUNDED,
   };
 
   const result = await paymentService.reviewTransaction({

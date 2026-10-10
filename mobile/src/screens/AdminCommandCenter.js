@@ -116,7 +116,10 @@ export default function AdminCommandCenter({ onBack }) {
   const { themeId, statusBarStyle } = useTheme();
   const { user } = useAuth();
   const { refresh: refreshAppConfig } = useAppConfig();
-  const navGroups = useMemo(() => navGroupsForUser(user), [(user?.roles || []).join(',')]);
+  const navGroups = useMemo(
+    () => navGroupsForUser(user),
+    [(user?.roles || []).join(','), user?.isAdmin]
+  );
   const isCompact = width < 1080;
   const [tab, setTab] = useState('overview');
   const [approvals, setApprovals] = useState([]);

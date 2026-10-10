@@ -18,6 +18,8 @@ async function logJob(jobName, status, details) {
  * Notifica seguidores quando há episódios novos ainda não anunciados.
  */
 async function runNewEpisodeAlerts() {
+  const { withJobLock, LOCKS } = require('./jobLock');
+  return withJobLock(LOCKS.newEpisode, 'new_episode_alerts', async () => {
   const started = Date.now();
   let notified = 0;
   let episodes = 0;
@@ -80,6 +82,7 @@ async function runNewEpisodeAlerts() {
     logger.error('jobs.new_episode_alerts_failed', { message: err.message });
     throw err;
   }
+  });
 }
 
 let timer = null;

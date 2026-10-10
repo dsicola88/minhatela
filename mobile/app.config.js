@@ -39,9 +39,7 @@ module.exports = () => {
         ...expo.extra,
         apiBaseUrl,
         appPublicUrl,
-        googleClientId:
-          process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ||
-          '95844743288-j16f33j4dnhr992n45kkt9dn28c4jn20.apps.googleusercontent.com',
+        googleClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '',
       },
     },
   };

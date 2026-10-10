@@ -139,6 +139,16 @@ async function submitCheckout({
   }
 
   const proofUrl = `/uploads/proofs/${file.filename}`;
+  let proofBytes = null;
+  try {
+    proofBytes = fs.readFileSync(file.path);
+  } catch {
+    proofBytes = null;
+  }
+  const proofSha = proofBytes
+    ? require('crypto').createHash('sha256').update(proofBytes).digest('hex')
+    : null;
+
   let tx;
   try {
     tx = await transactionRepository.create({
@@ -169,6 +179,16 @@ async function submitCheckout({
       }
     }
     throw err;
+  }
+
+  if (proofBytes && tx?.id) {
+    await transactionRepository
+      .attachProofBlob(tx.id, {
+        bytes: proofBytes,
+        sha256: proofSha,
+        mime: file.mimetype || null,
+      })
+      .catch(() => {});
   }
 
   let risk = { riskScore: 0, decision: 'allow' };
@@ -257,8 +277,8 @@ async function reviewTransaction({
   ip,
   userAgent,
 }) {
-  if (![STATUS.PAID, STATUS.REJECTED].includes(status)) {
-    throw createError(400, 'Estado inválido. Use pago ou rejeitado', 'VALIDATION');
+  if (![STATUS.PAID, STATUS.REJECTED, STATUS.REFUNDED].includes(status)) {
+    throw createError(400, 'Estado inválido. Use pago, rejeitado ou reembolsado', 'VALIDATION');
   }
 
   const existing = await transactionRepository.findById(transactionId);
@@ -276,34 +296,46 @@ async function reviewTransaction({
   if (!scoped.rowCount) {
     throw createError(404, 'Transação não encontrada', 'NOT_FOUND');
   }
-  if (existing.status !== STATUS.PENDING) {
+  const isRefund = status === STATUS.REFUNDED;
+  if (!isRefund && existing.status !== STATUS.PENDING) {
     throw createError(
       409,
       `Transação já está ${toApiStatus(existing.status)}`,
       'TRANSACTION_NOT_PENDING'
     );
   }
+  if (isRefund && existing.status !== STATUS.PAID) {
+    throw createError(409, 'Só transacções pagas podem ser reembolsadas', 'NOT_REFUNDABLE');
+  }
 
   const tx = await transactionRepository.updateStatus(transactionId, status, adminNotes, {
     reviewerId: adminId,
     rejectionReason: status === STATUS.REJECTED ? adminNotes || null : null,
-    fromStatus: STATUS.PENDING,
+    fromStatus: isRefund ? STATUS.PAID : STATUS.PENDING,
   });
   if (!tx) {
     throw createError(409, 'Transação já processada (race)', 'TRANSACTION_RACE');
   }
 
-  if (status === STATUS.REJECTED) {
+  if (status === STATUS.REJECTED || isRefund) {
     try {
       await transactionRepository.revokeEntitlementsForTransaction(tx.id);
     } catch {
       /* best-effort */
     }
   }
+  if (isRefund && tx.type === 'subscription') {
+    await require('./subscriptionService').cancelForUser(tx.user_id, { reason: 'refund' }).catch(() => {});
+  }
 
   await auditRepository.write({
     actorId: adminId,
-    action: status === STATUS.PAID ? 'PAYMENT_APPROVED' : 'PAYMENT_REJECTED',
+    action:
+      status === STATUS.PAID
+        ? 'PAYMENT_APPROVED'
+        : isRefund
+          ? 'PAYMENT_REFUNDED'
+          : 'PAYMENT_REJECTED',
     entity: 'transaction',
     entityId: tx.id,
     metadata: { status, adminNotes: adminNotes || null },
@@ -312,7 +344,7 @@ async function reviewTransaction({
   });
 
   const user = await userRepository.findById(tx.user_id);
-  if (user) {
+  if (user && !isRefund) {
     await notificationService.notifyPaymentReviewed(
       user,
       tx,

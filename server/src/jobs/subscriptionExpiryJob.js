@@ -13,6 +13,8 @@ async function logJob(jobName, status, details) {
 }
 
 async function runSubscriptionExpiry() {
+  const { withJobLock, LOCKS } = require('./jobLock');
+  return withJobLock(LOCKS.subscriptionExpiry, 'subscription_expiry', async () => {
   const started = Date.now();
   const details = await subscriptionService.expireOverdue({ limit: 500 });
   details.ms = Date.now() - started;
@@ -21,6 +23,7 @@ async function runSubscriptionExpiry() {
     logger.info('jobs.subscription_expiry', details);
   }
   return details;
+  });
 }
 
 let timer = null;

@@ -27,7 +27,7 @@ async function deliver({ to, subject, text, html }) {
     if (env.isProd) {
       logger.warn('email.smtp_not_configured', { to, subject });
     }
-    return { queued: true, delivered: false };
+    return { queued: true, delivered: false, reason: 'smtp_missing' };
   }
 
   const info = await tx.sendMail({

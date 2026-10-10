@@ -18,6 +18,26 @@ async function findPendingRental(userId, videoId) {
   return result.rows[0] || null;
 }
 
+async function attachProofBlob(id, { bytes, sha256, mime }) {
+  await query(
+    `UPDATE transactions
+     SET proof_bytes = $2, proof_sha256 = $3, proof_mime = $4
+     WHERE id = $1`,
+    [id, bytes, sha256 || null, mime || null]
+  );
+}
+
+async function findProofByUrl(proofUrl) {
+  const result = await query(
+    `SELECT id, proof_url, proof_bytes, proof_mime, proof_sha256, user_id
+     FROM transactions
+     WHERE proof_url = $1
+     LIMIT 1`,
+    [proofUrl]
+  );
+  return result.rows[0] || null;
+}
+
 async function create({ userId, videoId, packId, type, paymentMethod, amountKz, proofUrl, idempotencyKey }) {
   const result = await query(
     `INSERT INTO transactions
@@ -94,7 +114,7 @@ async function updateStatus(
          rejection_reason = COALESCE($3, rejection_reason),
          reviewer_id = COALESCE($4, reviewer_id),
          reviewed_at = CASE
-           WHEN $1::text IN ('pago', 'rejeitado') THEN NOW()
+           WHEN $1::text IN ('pago', 'rejeitado', 'reembolsado') THEN NOW()
            ELSE reviewed_at
          END
      WHERE id = $5
@@ -144,4 +164,6 @@ module.exports = {
   findOwnedById,
   revokeEntitlementsForTransaction,
   findById,
+  attachProofBlob,
+  findProofByUrl,
 };

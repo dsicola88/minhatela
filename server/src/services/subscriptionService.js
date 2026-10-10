@@ -37,6 +37,30 @@ async function syncExpired(user) {
   return user;
 }
 
+async function cancelForUser(userId, { reason } = {}) {
+  const { createError } = require('../utils/errors');
+  const result = await query(
+    `UPDATE users
+     SET subscription_status = 'premium_expired',
+         premium_expires_at = NOW(),
+         updated_at = NOW()
+     WHERE id = $1
+       AND subscription_status = 'premium_active'
+     RETURNING id, subscription_status, premium_expires_at`,
+    [userId]
+  );
+  if (!result.rowCount) {
+    throw createError(409, 'Não há assinatura Premium activa para cancelar', 'NO_ACTIVE_SUBSCRIPTION');
+  }
+  return {
+    cancelled: true,
+    reason: reason || 'user_requested',
+    subscriptionStatus: 'premium_expired',
+    premiumExpiresAt: result.rows[0].premium_expires_at,
+    message: 'Assinatura cancelada. O catálogo gratuito (AVOD) continua disponível.',
+  };
+}
+
 async function expireOverdue({ limit = 500 } = {}) {
   const result = await query(
     `UPDATE users
@@ -60,4 +84,5 @@ module.exports = {
   publicStatus,
   syncExpired,
   expireOverdue,
+  cancelForUser,
 };

@@ -39,10 +39,9 @@ async function assertPermission(user, permissionCode) {
   const roles = user?.roles || [];
   if (rbacService.isSuperAdmin(roles)) return true;
   const perms = await rbacService.permissionsForRoles(roles);
-  if (!rbacService.hasPermission(perms, permissionCode)) {
-    throw createError(403, 'Permissão insuficiente', 'FORBIDDEN');
-  }
-  return true;
+  if (rbacService.hasPermission(perms, permissionCode)) return true;
+  if (roles.includes('admin') && perms.size === 0) return true;
+  throw createError(403, 'Permissão insuficiente', 'FORBIDDEN');
 }
 
 function requirePermission(permissionCode) {

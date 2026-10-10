@@ -24,25 +24,50 @@ for (const key of required) {
   }
 }
 
+function normalizeOrigin(value) {
+  return String(value || '')
+    .trim()
+    .replace(/\/$/, '');
+}
+
+function productionCorsAllowlist() {
+  const extras = String(process.env.CORS_ORIGIN || '')
+    .split(',')
+    .map(normalizeOrigin)
+    .filter(Boolean);
+  return [
+    ...extras,
+    normalizeOrigin(process.env.APP_PUBLIC_URL),
+    'https://minhatela.net',
+    'https://www.minhatela.net',
+    'https://minhatela.ao',
+    'https://www.minhatela.ao',
+    'https://minhatela.vercel.app',
+  ].filter(Boolean);
+}
+
 function parseCorsOrigin(value) {
-  if (value == null || value === '' || value === 'true') return true;
+  const isProd = process.env.NODE_ENV === 'production';
   if (value === 'false') return false;
 
-  const listed = String(value)
+  const listed = String(value == null || value === 'true' ? '' : value)
     .split(',')
-    .map((s) => s.trim())
+    .map(normalizeOrigin)
     .filter(Boolean);
 
-  if (listed.length === 0) return true;
+  if (!isProd) {
+    if (listed.length === 0) return true;
+    return function corsOriginCheck(origin, callback) {
+      if (!origin) return callback(null, true);
+      return callback(null, listed.includes(normalizeOrigin(origin)) ? origin : false);
+    };
+  }
 
-  // Lista fixa + previews Vercel (*.vercel.app) — evita NetworkError em deploys preview
+  const allowed = listed.length ? listed : productionCorsAllowlist();
   return function corsOriginCheck(origin, callback) {
     if (!origin) return callback(null, true);
-    const allowed =
-      listed.includes(origin) ||
-      /\.vercel\.app$/i.test(origin) ||
-      /\.vercel\.sh$/i.test(origin);
-    return callback(null, allowed ? origin : false);
+    const n = normalizeOrigin(origin);
+    return callback(null, allowed.includes(n) ? origin : false);
   };
 }
 
@@ -110,4 +135,4 @@ const env = Object.freeze({
   }),
 });
 
-module.exports = { env };
+module.exports = { env, parseCorsOrigin };

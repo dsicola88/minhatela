@@ -11,16 +11,55 @@ const { createError } = require('../utils/errors');
 const { env } = require('../config/env');
 const { logger } = require('../utils/logger');
 
-function decodeJwtPayload(token) {
+const jwt = require('jsonwebtoken');
+
+let appleJwksCache = { at: 0, keys: [] };
+
+async function loadAppleJwks() {
+  const now = Date.now();
+  if (appleJwksCache.keys.length && now - appleJwksCache.at < 60 * 60 * 1000) {
+    return appleJwksCache.keys;
+  }
+  const res = await fetch('https://appleid.apple.com/auth/keys');
+  if (!res.ok) {
+    throw createError(503, 'Validação Apple indisponível', 'OAUTH_JWKS_UNAVAILABLE');
+  }
+  const body = await res.json().catch(() => ({}));
+  const keys = Array.isArray(body.keys) ? body.keys : [];
+  if (!keys.length) {
+    throw createError(503, 'Validação Apple indisponível', 'OAUTH_JWKS_UNAVAILABLE');
+  }
+  appleJwksCache = { at: now, keys };
+  return keys;
+}
+
+async function verifyAppleToken(idToken, expectedAud) {
+  if (!idToken || String(idToken).length < 16) {
+    throw createError(400, 'idToken OAuth obrigatório', 'OAUTH_TOKEN_REQUIRED');
+  }
+  const decoded = jwt.decode(idToken, { complete: true });
+  if (!decoded?.header?.kid || !decoded?.payload) {
+    throw createError(401, 'Token Apple inválido', 'OAUTH_TOKEN_INVALID');
+  }
+  const keys = await loadAppleJwks();
+  const jwk = keys.find((k) => k.kid === decoded.header.kid);
+  if (!jwk) {
+    throw createError(401, 'Token Apple inválido', 'OAUTH_TOKEN_INVALID');
+  }
+  let key;
   try {
-    const parts = String(token || '').split('.');
-    if (parts.length < 2) return null;
-    const json = Buffer.from(parts[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString(
-      'utf8'
-    );
-    return JSON.parse(json);
+    key = crypto.createPublicKey({ key: jwk, format: 'jwk' });
   } catch {
-    return null;
+    throw createError(401, 'Token Apple inválido', 'OAUTH_TOKEN_INVALID');
+  }
+  try {
+    return jwt.verify(idToken, key, {
+      algorithms: ['RS256'],
+      audience: expectedAud,
+      issuer: 'https://appleid.apple.com',
+    });
+  } catch {
+    throw createError(401, 'Token Apple inválido', 'OAUTH_TOKEN_INVALID');
   }
 }
 
@@ -289,20 +328,10 @@ async function oauthLogin(provider, body, meta = {}) {
   if (provider === 'google') {
     payload = await verifyGoogleToken(body, expectedAud);
   } else {
-    const idToken = body.idToken || body.identityToken || body.token;
-    if (!idToken || String(idToken).length < 16) {
-      throw createError(400, 'idToken OAuth obrigatório', 'OAUTH_TOKEN_REQUIRED');
-    }
-    payload = decodeJwtPayload(idToken) || {};
-    if (!payload.sub || !payload.aud) {
-      throw createError(401, 'Token OAuth inválido', 'OAUTH_TOKEN_INVALID');
-    }
-    if (String(payload.aud) !== String(expectedAud)) {
-      throw createError(401, 'Token OAuth inválido (audience)', 'OAUTH_AUD_MISMATCH');
-    }
-    if (!payload.exp || payload.exp * 1000 < Date.now()) {
-      throw createError(401, 'Token OAuth expirado', 'OAUTH_EXPIRED');
-    }
+    payload = await verifyAppleToken(
+      body.idToken || body.identityToken || body.token,
+      expectedAud
+    );
   }
 
   const providerSub = provider === 'google' ? payload.sub : body.providerSub || payload.sub || body.sub;
@@ -364,7 +393,7 @@ async function oauthLogin(provider, body, meta = {}) {
 
   const rbac = require('./rbacService');
   const mfaService = require('./mfaService');
-  if (provider === 'google' && mfaService.staffMfaRequired() && rbac.isStaff(roles)) {
+  if (mfaService.staffMfaRequired() && rbac.isStaff(roles)) {
     const mfa = await mfaService.loadMfa(user.id);
     if (!mfa?.mfa_enabled_at) {
       return {
@@ -399,4 +428,5 @@ module.exports = {
   getScrub,
   playerExtras,
   oauthLogin,
+  verifyAppleToken,
 };
