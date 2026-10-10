@@ -27,9 +27,24 @@ async function decision(req, res) {
   res.json({ decision: result });
 }
 
+async function complete(req, res) {
+  const result = await adPlatformService.completeImpression(
+    req.user.id,
+    req.params.impressionId
+  );
+  res.json(result);
+}
+
+async function click(req, res) {
+  const result = await adPlatformService.recordClick(req.user.id, req.params.impressionId);
+  res.json(result);
+}
+
 module.exports = {
   register,
   portal,
   createCampaign,
   decision,
+  complete,
+  click,
 };

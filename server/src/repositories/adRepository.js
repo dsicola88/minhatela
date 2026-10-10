@@ -1,6 +1,7 @@
 'use strict';
 
 const { query } = require('../config/database');
+const { videoTenantSql, opsVideoSql, tenantWriteSql } = require('../utils/tenantScope');
 
 async function findActiveDecision({ placement = 'pre_roll' } = {}) {
   const result = await query(
@@ -9,6 +10,7 @@ async function findActiveDecision({ placement = 'pre_roll' } = {}) {
      FROM campaigns c
      JOIN ad_creatives cr ON cr.campaign_id = c.id AND cr.is_active = TRUE
      WHERE c.status = 'active'
+       AND ${videoTenantSql('c')}
        AND c.placement = $1
        AND c.starts_at <= NOW()
        AND c.ends_at > NOW()
@@ -31,26 +33,55 @@ async function recordImpression({
     `INSERT INTO ad_impressions
       (campaign_id, creative_id, content_id, user_id, placement)
      VALUES ($1,$2,$3,$4,$5)
-     RETURNING id`,
+     RETURNING id, campaign_id, content_id, completed`,
     [campaignId, creativeId || null, contentId || null, userId || null, placement]
-  );
-
-  // Custo por impressão simbólico (5 Kz) até CPM real
-  await query(
-    `UPDATE campaigns
-     SET spent_kz = LEAST(budget_kz, spent_kz + 5),
-         updated_at = NOW()
-     WHERE id = $1`,
-    [campaignId]
   );
 
   return result.rows[0];
 }
 
+async function completeImpression({ impressionId, userId, unitKz }) {
+  const billed = await query(
+    `UPDATE ad_impressions
+     SET completed = TRUE
+     WHERE id = $1
+       AND completed = FALSE
+       AND ($2::uuid IS NULL OR user_id = $2)
+     RETURNING id, campaign_id, content_id, user_id`,
+    [impressionId, userId || null]
+  );
+  const row = billed.rows[0];
+  if (!row) return null;
+
+  const unit = Math.max(1, Number(unitKz) || 1);
+  await query(
+    `UPDATE campaigns
+     SET spent_kz = LEAST(budget_kz, spent_kz + $2),
+         updated_at = NOW()
+     WHERE id = $1 AND spent_kz < budget_kz`,
+    [row.campaign_id, unit]
+  );
+  return { ...row, billedKz: unit };
+}
+
+async function recordClick({ impressionId, userId }) {
+  const result = await query(
+    `INSERT INTO ad_clicks (impression_id, campaign_id)
+     SELECT ai.id, ai.campaign_id
+     FROM ad_impressions ai
+     WHERE ai.id = $1
+       AND ($2::uuid IS NULL OR ai.user_id = $2)
+       AND NOT EXISTS (SELECT 1 FROM ad_clicks ac WHERE ac.impression_id = ai.id)
+     RETURNING id, campaign_id, impression_id`,
+    [impressionId, userId || null]
+  );
+  return result.rows[0] || null;
+}
+
 async function createAdvertiser({ userId, companyName, contactEmail }) {
   const result = await query(
-    `INSERT INTO advertisers (user_id, company_name, contact_email, status)
-     VALUES ($1,$2,$3,'active')
+    `INSERT INTO advertisers (user_id, company_name, contact_email, status, tenant_id)
+     VALUES ($1,$2,$3,'active', ${tenantWriteSql()})
      RETURNING *`,
     [userId, companyName, contactEmail]
   );
@@ -65,8 +96,8 @@ async function findAdvertiserByUser(userId) {
 async function createCampaign(payload) {
   const result = await query(
     `INSERT INTO campaigns
-      (advertiser_id, name, placement, budget_kz, starts_at, ends_at, status, targeting)
-     VALUES ($1,$2,$3,$4,$5,$6,'pending_review',$7::jsonb)
+      (advertiser_id, name, placement, budget_kz, starts_at, ends_at, status, targeting, tenant_id)
+     VALUES ($1,$2,$3,$4,$5,$6,'pending_review',$7::jsonb, ${tenantWriteSql()})
      RETURNING *`,
     [
       payload.advertiserId,
@@ -101,7 +132,9 @@ async function listCampaigns(advertiserId) {
 
 async function moderateCampaign(id, status) {
   const result = await query(
-    `UPDATE campaigns SET status = $2::campaign_status, updated_at = NOW() WHERE id = $1 RETURNING *`,
+    `UPDATE campaigns SET status = $2::campaign_status, updated_at = NOW()
+     WHERE id = $1 AND ${opsVideoSql('campaigns')}
+     RETURNING *`,
     [id, status]
   );
   return result.rows[0] || null;
@@ -133,6 +166,8 @@ async function campaignStats(advertiserId) {
 module.exports = {
   findActiveDecision,
   recordImpression,
+  completeImpression,
+  recordClick,
   createAdvertiser,
   findAdvertiserByUser,
   createCampaign,

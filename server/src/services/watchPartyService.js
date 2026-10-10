@@ -3,7 +3,6 @@
 const watchPartyRepository = require('../repositories/watchPartyRepository');
 const contentRepository = require('../repositories/contentRepository');
 const featureFlagService = require('./featureFlagService');
-const accessControlService = require('./accessControlService');
 const { mapContentPublic } = require('../utils/mappers');
 const { createError } = require('../utils/errors');
 const { env } = require('../config/env');
@@ -49,10 +48,17 @@ async function create(userId, body, meta = {}) {
     throw createError(400, 'Escolha um episódio ou filme', 'SERIES_NOT_PLAYABLE');
   }
 
-  const access = await accessControlService.resolveAccess(userId, content);
-  if (!access.canWatch) {
-    throw createError(403, access.message || 'Sem acesso para criar sala', 'NO_ACCESS');
-  }
+  const entitlementService = require('./entitlementService');
+  await entitlementService.authorizeWatch({
+    userId,
+    content: {
+      ...content,
+      tenant_id: row.tenant_id || null,
+      isPublished: true,
+      is_published: row.is_published,
+    },
+    territory: env.market?.country || 'AO',
+  });
 
   const room = await watchPartyRepository.createRoom({
     hostUserId: userId,
@@ -73,13 +79,22 @@ async function join(userId, code, body = {}, meta = {}) {
   const room = await watchPartyRepository.findActiveByCode(String(code || '').trim());
   if (!room) throw createError(404, 'Sala não encontrada ou terminada', 'ROOM_NOT_FOUND');
 
-  const content = mapContentPublic(
-    await contentRepository.findPublishedById(room.content_id)
-  );
-  const access = await accessControlService.resolveAccess(userId, content);
-  if (!access.canWatch) {
-    throw createError(403, 'Precisa de acesso ao título para entrar na sala', 'NO_ACCESS');
+  const contentRow = await contentRepository.findPublishedById(room.content_id);
+  if (!contentRow) {
+    throw createError(404, 'Sala não encontrada ou terminada', 'ROOM_NOT_FOUND');
   }
+  const content = mapContentPublic(contentRow);
+  const entitlementService = require('./entitlementService');
+  await entitlementService.authorizeWatch({
+    userId,
+    content: {
+      ...content,
+      tenant_id: contentRow.tenant_id || null,
+      isPublished: true,
+      is_published: contentRow.is_published,
+    },
+    territory: env.market?.country || 'AO',
+  });
 
   const joined = await watchPartyRepository.joinRoom({
     roomId: room.id,

@@ -7,6 +7,7 @@ import {
   Platform,
   useWindowDimensions,
   TextInput,
+  Linking,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { WebView } from 'react-native-webview';
@@ -30,6 +31,7 @@ import { useI18n } from '../i18n';
 import Focusable from '../tv/Focusable';
 import { getDataSaver, applyDataSaverToEmbedUrl } from '../platform/preferences';
 import { updatePlaybackPrefs } from '../services/phase24';
+import { completeAdImpression, clickAdImpression } from '../services/ads';
 
 const PROGRESS_INTERVAL_MS = 15000;
 const HEARTBEAT_INTERVAL_MS = 30000;
@@ -65,6 +67,7 @@ export default function Watch({ videoId, onBack, onNextEpisode, onWatchTogether,
   const progressTimer = useRef(null);
   const heartbeatTimer = useRef(null);
   const stillTimer = useRef(null);
+  const adCompleteTimer = useRef(null);
   const countdownTimer = useRef(null);
   const sessionIdRef = useRef(null);
   const contentIdRef = useRef(videoId);
@@ -164,6 +167,16 @@ export default function Watch({ videoId, onBack, onNextEpisode, onWatchTogether,
             // ignore
           }
         }, HEARTBEAT_INTERVAL_MS);
+
+        if (data?.ads?.enabled && data?.ads?.decisionId) {
+          const waitMs = Math.min(
+            60000,
+            Math.max(4000, (Number(data.ads.creative?.durationSeconds) || 15) * 1000)
+          );
+          adCompleteTimer.current = setTimeout(() => {
+            completeAdImpression(data.ads.decisionId).catch(() => {});
+          }, waitMs);
+        }
       } catch (err) {
         if (err.code === 'PIN_REQUIRED_PLAY' || err.code === 'PIN_INVALID') {
           if (mounted) {
@@ -198,6 +211,7 @@ export default function Watch({ videoId, onBack, onNextEpisode, onWatchTogether,
       if (progressTimer.current) clearInterval(progressTimer.current);
       if (heartbeatTimer.current) clearInterval(heartbeatTimer.current);
       if (stillTimer.current) clearTimeout(stillTimer.current);
+      if (adCompleteTimer.current) clearTimeout(adCompleteTimer.current);
 
       if (profileIdRef.current && contentIdRef.current) {
         saveWatchProgress(contentIdRef.current, {
@@ -865,7 +879,14 @@ export default function Watch({ videoId, onBack, onNextEpisode, onWatchTogether,
 
               <View>
                 {session?.ads?.enabled && session?.ads?.creative ? (
-                  <View
+                  <Pressable
+                    onPress={() => {
+                      if (session.ads.decisionId) {
+                        clickAdImpression(session.ads.decisionId).catch(() => {});
+                      }
+                      const url = session.ads.creative.clickUrl;
+                      if (url) Linking.openURL(url).catch(() => {});
+                    }}
                     style={{
                       marginBottom: 10,
                       padding: 8,
@@ -877,7 +898,7 @@ export default function Watch({ videoId, onBack, onNextEpisode, onWatchTogether,
                     <Text style={{ color: colors.gold, fontSize: 11, fontWeight: '600' }}>
                       {t('adLabel')} · {session.ads.creative.title}
                     </Text>
-                  </View>
+                  </Pressable>
                 ) : null}
 
                 <View

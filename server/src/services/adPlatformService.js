@@ -159,6 +159,7 @@ async function decideAd({ contentId, monetization, userId, placement = 'pre_roll
     placement,
     enabled: true,
     placeholder: false,
+    billed: false,
     decisionId: impression.id,
     creative: {
       id: active.creative_id,
@@ -168,6 +169,30 @@ async function decideAd({ contentId, monetization, userId, placement = 'pre_roll
       durationSeconds: active.duration_seconds,
     },
   };
+}
+
+async function completeImpression(userId, impressionId) {
+  const { env } = require('../config/env');
+  const unitKz = Math.max(1, Math.round(Number(env.adCpmKz || 5000) / 1000));
+  const row = await adRepository.completeImpression({ impressionId, userId, unitKz });
+  if (!row) {
+    return { impressionId, billedKz: 0, completed: true, alreadyCompleted: true };
+  }
+  const creatorEarningsService = require('./creatorEarningsService');
+  await creatorEarningsService.creditAdShare({
+    contentId: row.content_id,
+    impressionId: row.id,
+    amountKz: row.billedKz,
+  });
+  return { impressionId: row.id, billedKz: row.billedKz, completed: true };
+}
+
+async function recordClick(userId, impressionId) {
+  const row = await adRepository.recordClick({ impressionId, userId });
+  if (!row) {
+    return { clickId: null, impressionId, alreadyRecorded: true };
+  }
+  return { clickId: row.id, impressionId: row.impression_id };
 }
 
 async function adminModerateCampaign(adminId, campaignId, status) {
@@ -193,5 +218,7 @@ module.exports = {
   getPortal,
   createCampaign,
   decideAd,
+  completeImpression,
+  recordClick,
   adminModerateCampaign,
 };

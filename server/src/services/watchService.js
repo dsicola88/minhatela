@@ -4,7 +4,6 @@ const { randomUUID } = require('crypto');
 const contentRepository = require('../repositories/contentRepository');
 const profileRepository = require('../repositories/profileRepository');
 const playbackRepository = require('../repositories/playbackRepository');
-const accessControlService = require('./accessControlService');
 const bunnyService = require('./bunnyService');
 const adDecisionService = require('./adDecisionService');
 const deviceStreamService = require('./deviceStreamService');
@@ -116,32 +115,39 @@ async function startPlayback({
 
   const { env } = require('../config/env');
   const territory = env.market?.country || 'AO';
-  const rightsOk = await contentRepository.hasActiveRights(content.id, territory);
-  if (!rightsOk) {
-    throw createError(403, 'Conteúdo indisponível neste território', 'RIGHTS_DENIED');
-  }
-
-  const access = await accessControlService.resolveAccess(userId, content);
-
-  if (!access.canWatch) {
-    await playbackRepository.createSession({
-      id: randomUUID(),
+  const entitlementService = require('./entitlementService');
+  let access;
+  try {
+    const decision = await entitlementService.authorizeWatch({
       userId,
-      profileId,
-      contentId: content.id,
-      monetization: content.monetization,
-      allowed: false,
-      denialCode: access.denialCode,
-      bunnyVideoId: null,
-      expiresAt: null,
-      ip,
-      userAgent,
-      isActive: false,
+      content: {
+        ...content,
+        tenant_id: row.tenant_id || null,
+        isPublished: content.isPublished,
+        is_published: row.is_published,
+      },
+      territory,
     });
-
-    throw createError(403, access.message, access.denialCode || 'FORBIDDEN', {
-      access,
-    });
+    access = decision.access;
+  } catch (err) {
+    if (err.statusCode === 403 && err.details?.access) {
+      access = err.details.access;
+      await playbackRepository.createSession({
+        id: randomUUID(),
+        userId,
+        profileId,
+        contentId: content.id,
+        monetization: content.monetization,
+        allowed: false,
+        denialCode: access.denialCode,
+        bunnyVideoId: null,
+        expiresAt: null,
+        ip,
+        userAgent,
+        isActive: false,
+      });
+    }
+    throw err;
   }
 
   const { device, limit } = await deviceStreamService.acquireStreamSlot({

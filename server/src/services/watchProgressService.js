@@ -50,6 +50,22 @@ async function saveProgress({
     deviceId: safeDeviceId,
   });
 
+  if (completed) {
+    const { query } = require('../config/database');
+    const creatorEarningsService = require('./creatorEarningsService');
+    query(`SELECT creator_id FROM videos WHERE id = $1 LIMIT 1`, [contentId])
+      .then((vid) => {
+        const creatorId = vid.rows[0]?.creator_id;
+        if (!creatorId) return;
+        return creatorEarningsService.creditQualifiedView({
+          creatorId,
+          contentId,
+          userId,
+        });
+      })
+      .catch(() => {});
+  }
+
   return {
     contentId,
     profileId,

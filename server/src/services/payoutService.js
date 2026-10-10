@@ -36,20 +36,40 @@ async function requestPayout(userId, { amountKz, notes }) {
   }
 
   const amount = assertPositiveKz(amountKz);
-  const bal = await balance(creator.id);
-  if (amount > bal.availableKz) {
-    throw createError(400, 'Saldo insuficiente para payout', 'INSUFFICIENT_BALANCE', bal);
-  }
   if (amount < 5000) {
     throw createError(400, 'Payout mínimo: 5.000 Kz', 'MIN_PAYOUT');
   }
 
-  const result = await query(
-    `INSERT INTO creator_payouts (creator_id, amount_kz, status, method, notes)
-     VALUES ($1,$2,'pending','iban',$3)
-     RETURNING *`,
-    [creator.id, amount, notes || null]
-  );
+  const { withTransaction } = require('../config/database');
+  const result = await withTransaction(async (client) => {
+    await client.query(`SELECT id FROM creators WHERE id = $1 FOR UPDATE`, [creator.id]);
+    const [earned, paid] = await Promise.all([
+      client.query(
+        `SELECT COALESCE(SUM(amount_kz),0)::int AS total FROM creator_earnings WHERE creator_id = $1`,
+        [creator.id]
+      ),
+      client.query(
+        `SELECT COALESCE(SUM(amount_kz),0)::int AS total
+         FROM creator_payouts
+         WHERE creator_id = $1 AND status IN ('pending','paid')`,
+        [creator.id]
+      ),
+    ]);
+    const availableKz = Math.max(0, earned.rows[0].total - paid.rows[0].total);
+    if (amount > availableKz) {
+      throw createError(400, 'Saldo insuficiente para payout', 'INSUFFICIENT_BALANCE', {
+        earnedKz: earned.rows[0].total,
+        reservedOrPaidKz: paid.rows[0].total,
+        availableKz,
+      });
+    }
+    return client.query(
+      `INSERT INTO creator_payouts (creator_id, amount_kz, status, method, notes)
+       VALUES ($1,$2,'pending','iban',$3)
+       RETURNING *`,
+      [creator.id, amount, notes || null]
+    );
+  });
 
   await auditRepository.write({
     actorId: userId,
@@ -82,6 +102,7 @@ async function listPendingAdmin() {
      JOIN creators c ON c.id = p.creator_id
      JOIN users u ON u.id = c.user_id
      WHERE p.status = 'pending'
+       AND ${require('../utils/tenantScope').opsVideoSql('c')}
      ORDER BY p.created_at ASC`
   );
   return {

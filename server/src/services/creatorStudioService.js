@@ -135,6 +135,9 @@ async function createContent(userId, body) {
     bunnyVideoId,
     creatorId: creator.id,
     creatorDisplayName: creator.display_name,
+    createdByUserId: userId,
+    productionCompanyId: creator.production_company_id || null,
+    contentFormat: body.contentFormat || body.kind || 'movie',
   });
 
   return { content: mapContent(row) };
@@ -221,6 +224,46 @@ async function adminReviewCreator(adminId, creatorId, status) {
   return { creator: mapCreator(row) };
 }
 
+async function ensureDistributionRights(video) {
+  const rightsService = require('./rightsService');
+  const { env } = require('../config/env');
+  const territory = env.market?.country || 'AO';
+  const check = await rightsService.canDistribute({
+    contentId: video.id,
+    territory,
+    modality: video.monetization || 'avod',
+  });
+  if (check.ok) return check;
+
+  const { query } = require('../config/database');
+  await query(
+    `INSERT INTO content_rights (
+       content_id, owner_name, territory, license_type, status,
+       avod_allowed, svod_allowed, tvod_allowed
+     ) VALUES ($1,$2,$3,'ugc_distribution','active', TRUE, TRUE, TRUE)`,
+    [
+      video.id,
+      video.creator_name || video.creator_display_name || 'Criador MinhaTela',
+      territory,
+    ]
+  );
+
+  const again = await rightsService.canDistribute({
+    contentId: video.id,
+    territory,
+    modality: video.monetization || 'avod',
+  });
+  if (!again.ok) {
+    throw createError(
+      400,
+      'Não é possível publicar sem direitos de distribuição activos neste território',
+      'RIGHTS_REQUIRED',
+      { reason: again.reason }
+    );
+  }
+  return again;
+}
+
 async function adminListContent(status = 'submitted') {
   const rows = await creatorContentRepository.listForModeration(status);
   return { contents: rows.map(mapContent) };
@@ -238,8 +281,21 @@ async function adminModerateContent(adminId, contentId, { action, rejectionReaso
     throw createError(400, 'Acção inválida', 'VALIDATION');
   }
 
+  const pending = await creatorContentRepository.findById(contentId);
+  if (pending) {
+    const { query } = require('../config/database');
+    const owner = await query(
+      `SELECT c.user_id FROM videos v
+       JOIN creators c ON c.id = v.creator_id
+       WHERE v.id = $1 LIMIT 1`,
+      [contentId]
+    );
+    if (owner.rows[0]?.user_id && owner.rows[0].user_id === adminId) {
+      throw createError(403, 'Não pode aprovar o próprio conteúdo', 'SELF_APPROVAL_FORBIDDEN');
+    }
+  }
+
   if (status === 'published') {
-    const pending = await creatorContentRepository.findById(contentId);
     const { isValidBunnyVideoId } = require('../utils/bunnyAsset');
     if (!pending || !isValidBunnyVideoId(pending.bunny_video_id)) {
       throw createError(
@@ -248,9 +304,16 @@ async function adminModerateContent(adminId, contentId, { action, rejectionReaso
         'BUNNY_VIDEO_REQUIRED'
       );
     }
+    const encoding = String(pending.encoding_status || '').toLowerCase();
+    if (['processing', 'encoding', 'queued', 'error', 'failed'].includes(encoding)) {
+      throw createError(
+        400,
+        'Não é possível publicar enquanto o vídeo não estiver encoded (Bunny)',
+        'ENCODING_NOT_READY'
+      );
+    }
+    await ensureDistributionRights(pending);
   }
-
-  // Criador NÃO pode aprovar o próprio conteúdo — já garantido por requireRoles admin
   const row = await creatorContentRepository.moderate(contentId, {
     status,
     reviewerId: adminId,

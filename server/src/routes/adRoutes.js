@@ -15,4 +15,16 @@ router.get('/portal', requireAuth, asyncHandler(adController.portal));
 
 router.post('/campaigns', requireAuth, asyncHandler(adController.createCampaign));
 
+router.post(
+  '/impressions/:impressionId/complete',
+  requireAuth,
+  asyncHandler(adController.complete)
+);
+
+router.post(
+  '/impressions/:impressionId/click',
+  requireAuth,
+  asyncHandler(adController.click)
+);
+
 module.exports = router;

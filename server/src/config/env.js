@@ -96,6 +96,9 @@ const env = Object.freeze({
     supportEmail: process.env.MAIL_SUPPORT || 'support@minhatela.net',
     contactEmail: process.env.MAIL_CONTACT || 'contato@minhatela.net',
   }),
+  creatorViewKz: Number(process.env.CREATOR_VIEW_KZ || 2),
+  adCpmKz: Number(process.env.AD_CPM_KZ || 5000),
+  creatorAdShareBps: Number(process.env.CREATOR_AD_SHARE_BPS || 3000),
   market: Object.freeze({
     country: process.env.MARKET_COUNTRY || 'AO',
     timezone: process.env.MARKET_TIMEZONE || 'Africa/Luanda',

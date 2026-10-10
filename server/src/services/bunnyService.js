@@ -196,7 +196,8 @@ function getPlayerDefaults() {
     defaultQuality: '480p',
     forceHighQuality: false,
     allowedStartQualities: ['auto', '480p'],
-    drmReady: Boolean(env.bunny.tokenAuthKey),
+    drmReady: false,
+    cdnTokenAuth: Boolean(env.bunny.tokenAuthKey),
     offlineSupported: Boolean(env.bunny.cdnHostname),
   });
 }
