@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -11,11 +11,30 @@ import {
   RefreshControl,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { PrimaryButton } from '../components/ui';
-import { LoadingState, EmptyState, ErrorState } from '../components/StateViews';
-import { colors, brand, layout } from '../theme/tokens';
+import { LoadingState, EmptyState } from '../components/StateViews';
+import { colors } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
+import { useAuth } from '../context/AuthContext';
+import { useAppConfig } from '../context/AppConfigContext';
+import {
+  TAB_META,
+  StatusBadge,
+  PageHeader,
+  cardStyle,
+  inputStyle,
+  SectionTitle,
+  KpiCard,
+  QueueChip,
+  AuditRow,
+  AdminSidebar,
+  AdminMobileNav,
+  AdminTopBar,
+  AdminButton,
+  ActionRow,
+  AdminErrorBanner,
+  toneForStatus,
+} from './adminUi';
 import {
   fetchCommandCenter,
   fetchAuditLog,
@@ -41,9 +60,7 @@ import {
   setFeatureFlag,
   fetchEditorial,
   createEditorial,
-  updateEditorial,
   fetchAppConfig,
-  upsertAppConfig,
   fetchAdminPacks,
   fetchSurveySummary,
   fetchAdminPremieres,
@@ -64,167 +81,44 @@ import {
   fetchAllAdCampaigns,
   fetchCatalog,
   fetchReports,
+  fetchAcquisitions,
+  fetchRights,
+  fetchTenants,
+  createAcquisition,
+  fetchApprovals,
+  decideApproval,
 } from '../services/admin';
 import { fetchPendingPayouts, reviewPayout } from '../services/payouts';
-import Focusable from '../tv/Focusable';
 import {
   LandingPaymentsTab,
+  CopySettingsTab,
   UsersTab,
   PlansTab,
   LeadsTab,
   UploadsTab,
   AdsTab,
   CatalogCmsTab,
+  EditorialCollectionCard,
   ReportsTab,
+  AcquisitionTab,
+  RightsTab,
+  TenantsTab,
 } from './AdminEnterpriseSections';
 
-const TABS = [
-  { id: 'overview', label: 'Overview', icon: 'grid-outline' },
-  { id: 'landing', label: 'Landing / Pay', icon: 'color-palette-outline' },
-  { id: 'payments', label: 'Pagamentos', icon: 'card-outline' },
-  { id: 'users', label: 'Utilizadores', icon: 'people-outline' },
-  { id: 'plans', label: 'Planos', icon: 'pricetags-outline' },
-  { id: 'leads', label: 'Leads', icon: 'mail-outline' },
-  { id: 'support', label: 'Atendimento', icon: 'headset-outline' },
-  { id: 'moderation', label: 'Moderação', icon: 'shield-checkmark-outline' },
-  { id: 'ads', label: 'Anúncios', icon: 'megaphone-outline' },
-  { id: 'uploads', label: 'Uploads', icon: 'cloud-upload-outline' },
-  { id: 'cms', label: 'CMS Catálogo', icon: 'film-outline' },
-  { id: 'reports', label: 'Denúncias', icon: 'warning-outline' },
-  { id: 'editorial', label: 'Editorial', icon: 'albums-outline' },
-  { id: 'flags', label: 'Flags', icon: 'toggle-outline' },
-  { id: 'config', label: 'Config / Onboard', icon: 'settings-outline' },
-  { id: 'media', label: 'CDN / Encode', icon: 'cloud-outline' },
-  { id: 'catalog', label: 'Catálogo ops', icon: 'film-outline' },
-  { id: 'promos', label: 'Promos', icon: 'pricetag-outline' },
-  { id: 'live', label: 'Live', icon: 'radio-outline' },
-  { id: 'audit', label: 'Auditoria', icon: 'document-text-outline' },
-];
-
 function getCardStyle() {
-  return {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 6,
-    padding: 16,
-    marginBottom: 12,
-  };
-}
-
-function Kpi({ label, value, hint, alert }) {
-  return (
-    <View
-      style={{
-        flexGrow: 1,
-        flexBasis: 140,
-        minWidth: 140,
-        backgroundColor: '#0F0F0F',
-        borderWidth: 1,
-        borderColor: colors.border,
-        borderTopWidth: 3,
-        borderTopColor: alert ? colors.gold : colors.red,
-        borderRadius: 6,
-        padding: 14,
-      }}
-    >
-      <Text style={{ color: colors.muted, fontSize: 11, marginBottom: 6, letterSpacing: 0.6 }}>
-        {label}
-      </Text>
-      <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800' }}>{value}</Text>
-      {hint ? (
-        <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 6 }}>{hint}</Text>
-      ) : null}
-    </View>
-  );
-}
-
-function QueueChip({ label, count, onPress }) {
-  return (
-    <Focusable
-      id={`queue-${label}`}
-      onPress={onPress}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-        borderRadius: 4,
-        borderWidth: 1,
-        borderColor: count > 0 ? colors.gold : colors.border,
-        backgroundColor: count > 0 ? 'rgba(247,212,23,0.08)' : '#111',
-        marginRight: 10,
-        marginBottom: 10,
-      }}
-    >
-      <Text style={{ color: colors.text, fontWeight: '700' }}>{label}</Text>
-      <View
-        style={{
-          minWidth: 22,
-          height: 22,
-          borderRadius: 11,
-          backgroundColor: count > 0 ? colors.red : colors.border,
-          alignItems: 'center',
-          justifyContent: 'center',
-          paddingHorizontal: 6,
-        }}
-      >
-        <Text style={{ color: colors.text, fontSize: 11, fontWeight: '800' }}>{count}</Text>
-      </View>
-    </Focusable>
-  );
-}
-
-function SectionTitle({ children }) {
-  return (
-    <Text
-      style={{
-        color: colors.gold,
-        fontWeight: '700',
-        letterSpacing: 1,
-        marginTop: 8,
-        marginBottom: 12,
-      }}
-    >
-      {children}
-    </Text>
-  );
-}
-
-function AuditRow({ item }) {
-  return (
-    <View style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-      <Text style={{ color: colors.text, fontWeight: '700' }}>{item.action}</Text>
-      <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 2 }}>
-        {item.entity}
-        {item.actor?.email ? ` · ${item.actor.email}` : ''}
-        {item.ip ? ` · ${item.ip}` : ''}
-      </Text>
-      <Text style={{ color: colors.muted, fontSize: 11, marginTop: 4 }}>
-        {new Date(item.createdAt).toLocaleString('pt-AO')}
-      </Text>
-    </View>
-  );
-}
-
-function inputStyle(extra = {}) {
-  return {
-    borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.text,
-    padding: 10,
-    borderRadius: 4,
-    marginBottom: 10,
-    ...extra,
-  };
+  return cardStyle();
 }
 
 export default function AdminCommandCenter({ onBack }) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const isCompact = width < 900;
+  const { themeId, statusBarStyle } = useTheme();
+  const { user } = useAuth();
+  const { refresh: refreshAppConfig } = useAppConfig();
+  const isCompact = width < 1080;
   const [tab, setTab] = useState('overview');
+  const [approvals, setApprovals] = useState([]);
+  const [refreshedAt, setRefreshedAt] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -258,6 +152,10 @@ export default function AdminCommandCenter({ onBack }) {
   const [allAds, setAllAds] = useState([]);
   const [catalogTitles, setCatalogTitles] = useState([]);
   const [reports, setReports] = useState([]);
+  const [acquisitions, setAcquisitions] = useState([]);
+  const [rights, setRights] = useState([]);
+  const [tenants, setTenants] = useState([]);
+  const [acqTitle, setAcqTitle] = useState('');
   const [catalogQuery, setCatalogQuery] = useState('');
   const [userQuery, setUserQuery] = useState('');
   const [promoForm, setPromoForm] = useState({ code: '', days: '7', max: '1000' });
@@ -274,125 +172,216 @@ export default function AdminCommandCenter({ onBack }) {
   const [rejectTarget, setRejectTarget] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
   const [ticketNotes, setTicketNotes] = useState({});
+  const [tabLoading, setTabLoading] = useState(false);
+  const userQueryRef = useRef('');
+  const catalogQueryRef = useRef('');
+  userQueryRef.current = userQuery;
+  catalogQueryRef.current = catalogQuery;
 
-  const load = useCallback(async () => {
+  const applyConfigDrafts = (cfg) => {
+    const drafts = {};
+    (cfg.settings || []).forEach((s) => {
+      drafts[s.key] = JSON.stringify(s.value || {}, null, 2);
+    });
+    setConfigDrafts(drafts);
+  };
+
+  const loadCore = useCallback(async () => {
+    const [cc, ap] = await Promise.all([
+      fetchCommandCenter(),
+      fetchApprovals().catch(() => ({ items: [] })),
+    ]);
+    setCenter(cc);
+    setApprovals(ap.items || ap.requests || []);
+    setRefreshedAt(new Date());
+  }, []);
+
+  const loadTab = useCallback(async (nextTab) => {
+    if (nextTab === 'overview') return;
+    setTabLoading(true);
     try {
-      setError('');
-      const [
-        cc,
-        pay,
-        cr,
-        co,
-        po,
-        ca,
-        live,
-        au,
-        pr,
-        tk,
-        art,
-        fl,
-        ed,
-        cfg,
-        pk,
-        sv,
-        pm,
-        gf,
-        cd,
-        enc,
-        rk,
-        ex,
-        us,
-        pl,
-        ld,
-        up,
-        pf,
-        adsAll,
-        cat,
-        reps,
-      ] = await Promise.all([
-        fetchCommandCenter(),
+    if (nextTab === 'payments') {
+      const [pay, rk] = await Promise.all([
         fetchPendingPayments(),
+        fetchPaymentRisk(0).catch(() => ({ transactions: [] })),
+      ]);
+      setPayments(pay.transactions || []);
+      setRisk(rk.transactions || rk.items || []);
+      return;
+    }
+    if (nextTab === 'users') {
+      const us = await fetchUsers({ q: userQueryRef.current, limit: 40 }).catch(() => ({ users: [] }));
+      setUsers(us.users || []);
+      return;
+    }
+    if (nextTab === 'plans') {
+      const pl = await fetchAdminPlans().catch(() => ({ plans: [] }));
+      setAdminPlans(pl.plans || []);
+      return;
+    }
+    if (nextTab === 'leads') {
+      const ld = await fetchLeads({ limit: 50 }).catch(() => ({ leads: [] }));
+      setLeads(ld.leads || []);
+      return;
+    }
+    if (nextTab === 'support') {
+      const [tk, art] = await Promise.all([
+        fetchTickets(50).catch(() => ({ tickets: [] })),
+        fetchHelpArticles().catch(() => ({ articles: [] })),
+      ]);
+      setTickets(tk.tickets || []);
+      setArticles(art.articles || []);
+      return;
+    }
+    if (nextTab === 'moderation') {
+      const [cr, co, po, ca] = await Promise.all([
         fetchPendingCreators(),
         fetchPendingContent('submitted'),
         fetchPendingPayouts(),
         fetchPendingCampaigns(),
-        fetchLiveStreams(),
-        fetchAuditLog({ limit: 40 }),
-        fetchPromos().catch(() => ({ promos: [] })),
-        fetchTickets(50).catch(() => ({ tickets: [] })),
-        fetchHelpArticles().catch(() => ({ articles: [] })),
-        fetchFeatureFlags().catch(() => ({ flags: [] })),
-        fetchEditorial().catch(() => ({ collections: [] })),
-        fetchAppConfig().catch(() => ({ settings: [] })),
-        fetchAdminPacks().catch(() => ({ packs: [] })),
-        fetchSurveySummary().catch(() => null),
-        fetchAdminPremieres().catch(() => ({ events: [] })),
-        fetchAdminGifts().catch(() => ({ gifts: [] })),
-        fetchCdnHealth().catch(() => null),
-        fetchEncoding().catch(() => ({ items: [] })),
-        fetchPaymentRisk(0).catch(() => ({ transactions: [] })),
-        fetchExperiments().catch(() => ({ experiments: [] })),
-        fetchUsers({ limit: 40 }).catch(() => ({ users: [] })),
-        fetchAdminPlans().catch(() => ({ plans: [] })),
-        fetchLeads({ limit: 50 }).catch(() => ({ leads: [] })),
-        fetchUploads({ limit: 40 }).catch(() => ({ uploads: [] })),
-        fetchProofUploads(40).catch(() => ({ proofs: [] })),
-        fetchAllAdCampaigns({}).catch(() => ({ campaigns: [] })),
-        fetchCatalog({ limit: 40 }).catch(() => ({ titles: [] })),
-        fetchReports(40).catch(() => ({ reports: [] })),
       ]);
-      setCenter(cc);
-      setPayments(pay.transactions || []);
       setCreators(cr.creators || []);
       setContents(co.contents || []);
       setPayouts(po.payouts || []);
       setCampaigns(ca.campaigns || []);
-      setStreams(live.streams || []);
-      setAudit(au.items || []);
-      setPromos(pr.promos || []);
-      setTickets(tk.tickets || []);
-      setArticles(art.articles || []);
-      setFlags(fl.flags || []);
+      return;
+    }
+    if (nextTab === 'ads') {
+      const adsAll = await fetchAllAdCampaigns({}).catch(() => ({ campaigns: [] }));
+      setAllAds(adsAll.campaigns || []);
+      return;
+    }
+    if (nextTab === 'uploads') {
+      const [up, pf] = await Promise.all([
+        fetchUploads({ limit: 40 }).catch(() => ({ uploads: [] })),
+        fetchProofUploads(40).catch(() => ({ proofs: [] })),
+      ]);
+      setUploads(up.uploads || []);
+      setProofs(pf.proofs || []);
+      return;
+    }
+    if (nextTab === 'cms') {
+      const cat = await fetchCatalog({ q: catalogQueryRef.current, limit: 40 }).catch(() => ({ titles: [] }));
+      setCatalogTitles(cat.titles || []);
+      return;
+    }
+    if (nextTab === 'reports') {
+      const reps = await fetchReports(40).catch(() => ({ reports: [] }));
+      setReports(reps.reports || reps.items || []);
+      return;
+    }
+    if (nextTab === 'editorial') {
+      const ed = await fetchEditorial().catch(() => ({ collections: [] }));
       setCollections(ed.collections || []);
+      return;
+    }
+    if (nextTab === 'flags') {
+      const [fl, ex] = await Promise.all([
+        fetchFeatureFlags().catch(() => ({ flags: [] })),
+        fetchExperiments().catch(() => ({ experiments: [] })),
+      ]);
+      setFlags(fl.flags || []);
+      setExperiments(ex.experiments || ex.items || []);
+      return;
+    }
+    if (nextTab === 'landing' || nextTab === 'config') {
+      const cfg = await fetchAppConfig().catch(() => ({ settings: [] }));
       setSettings(cfg.settings || []);
+      applyConfigDrafts(cfg);
+      return;
+    }
+    if (nextTab === 'media') {
+      const [cd, enc] = await Promise.all([
+        fetchCdnHealth().catch(() => null),
+        fetchEncoding().catch(() => ({ items: [] })),
+      ]);
+      const items = cd?.items || cd?.checks || [];
+      setCdn({
+        items,
+        healthy: Boolean(cd?.healthy) || items.some((i) => i.ok),
+        latest: items[0] || null,
+      });
+      setEncoding(enc.items || enc.queue || []);
+      return;
+    }
+    if (nextTab === 'catalog') {
+      const [pk, sv, pm, gf] = await Promise.all([
+        fetchAdminPacks().catch(() => ({ packs: [] })),
+        fetchSurveySummary().catch(() => null),
+        fetchAdminPremieres().catch(() => ({ events: [] })),
+        fetchAdminGifts().catch(() => ({ gifts: [] })),
+      ]);
       setPacks(pk.packs || pk.items || []);
       setSurveys(sv);
       setPremieres(pm.events || pm.premieres || []);
       setGifts(gf.gifts || []);
-      setCdn(cd);
-      setEncoding(enc.items || enc.queue || []);
-      setRisk(rk.transactions || rk.items || []);
-      setExperiments(ex.experiments || ex.items || []);
-      setUsers(us.users || []);
-      setAdminPlans(pl.plans || []);
-      setLeads(ld.leads || []);
-      setUploads(up.uploads || []);
-      setProofs(pf.proofs || []);
-      setAllAds(adsAll.campaigns || []);
-      setCatalogTitles(cat.titles || []);
-      setReports(reps.reports || reps.items || []);
-      const drafts = {};
-      (cfg.settings || []).forEach((s) => {
-        drafts[s.key] = JSON.stringify(s.value || {}, null, 2);
-      });
-      setConfigDrafts(drafts);
+      return;
+    }
+    if (nextTab === 'promos') {
+      const pr = await fetchPromos().catch(() => ({ promos: [] }));
+      setPromos(pr.promos || []);
+      return;
+    }
+    if (nextTab === 'live') {
+      const live = await fetchLiveStreams();
+      setStreams(live.streams || []);
+      return;
+    }
+    if (nextTab === 'audit') {
+      const au = await fetchAuditLog({ limit: 40 });
+      setAudit(au.items || []);
+      return;
+    }
+    if (nextTab === 'acquisition') {
+      const d = await fetchAcquisitions({}).catch(() => ({ items: [] }));
+      setAcquisitions(d.items || []);
+      return;
+    }
+    if (nextTab === 'rights') {
+      const d = await fetchRights({}).catch(() => ({ items: [] }));
+      setRights(d.items || []);
+      return;
+    }
+    if (nextTab === 'tenants') {
+      const d = await fetchTenants().catch(() => ({ tenants: [] }));
+      setTenants(d.tenants || []);
+    }
+    } finally {
+      setTabLoading(false);
+    }
+  }, []);
+
+  const load = useCallback(async () => {
+    try {
+      setError('');
+      await loadCore();
+      await loadTab(tab);
     } catch (err) {
       setError(err.message || 'Falha ao carregar Console Empresa');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [loadCore, loadTab, tab]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    loadCore()
+      .catch((err) => setError(err.message || 'Falha ao carregar Console Empresa'))
+      .finally(() => setLoading(false));
+  }, [loadCore]);
+
+  useEffect(() => {
+    setError('');
+    loadTab(tab).catch((err) => setError(err.message || 'Falha ao carregar secção'));
+  }, [tab, loadTab]);
 
   async function run(id, fn) {
     setBusy(id);
     try {
       await fn();
-      await load();
+      await loadCore();
+      await loadTab(tab);
+      if (String(id).startsWith('cfg-')) await refreshAppConfig();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -400,9 +389,18 @@ export default function AdminCommandCenter({ onBack }) {
     }
   }
 
+  const roleLabel = (user?.roles || []).includes('super_admin')
+    ? 'SuperAdmin'
+    : (user?.roles || []).includes('admin')
+      ? 'Admin'
+      : user?.isAdmin
+        ? 'Admin'
+        : 'Staff';
+  const meta = TAB_META[tab] || { label: 'Console', group: 'Operações' };
+
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.black }}>
+      <View key={themeId} style={{ flex: 1, backgroundColor: colors.background }}>
         <LoadingState />
       </View>
     );
@@ -412,104 +410,30 @@ export default function AdminCommandCenter({ onBack }) {
   const queues = center?.queues || {};
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.black, paddingTop: insets.top }}>
-      <StatusBar style="light" />
+    <View key={themeId} style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top, flexDirection: isCompact ? 'column' : 'row' }}>
+      <StatusBar style={statusBarStyle} />
+      {isCompact ? null : (
+        <AdminSidebar tab={tab} onChange={setTab} attention={kpis.attentionRequired || 0} />
+      )}
+      <View style={{ flex: 1 }}>
+      <AdminTopBar
+        onBack={onBack}
+        group={meta.group}
+        title={meta.label}
+        roleLabel={roleLabel}
+        email={user?.email}
+        refreshedAt={refreshedAt}
+        attention={kpis.attentionRequired || 0}
+        compact={isCompact}
+      />
 
-      <View
-        style={{
-          paddingHorizontal: isCompact ? 16 : 32,
-          paddingVertical: 14,
-          borderBottomWidth: 1,
-          borderBottomColor: colors.border,
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 12,
-          maxWidth: layout.maxContentWidth,
-          width: '100%',
-          alignSelf: 'center',
-        }}
-      >
-        <Focusable id="admin-back" onPress={onBack}>
-          <Ionicons name="arrow-back" size={22} color={colors.text} />
-        </Focusable>
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: colors.red, fontWeight: '800', letterSpacing: 1.2, fontSize: 12 }}>
-            {brand.name.toUpperCase()} · EMPRESA
-          </Text>
-          <Text style={{ color: colors.text, fontSize: 20, fontWeight: '800' }}>
-            Console de Gestão
-          </Text>
-        </View>
-        {kpis.attentionRequired > 0 ? (
-          <View
-            style={{
-              backgroundColor: colors.gold,
-              paddingHorizontal: 10,
-              paddingVertical: 6,
-              borderRadius: 4,
-            }}
-          >
-            <Text style={{ color: colors.black, fontWeight: '800', fontSize: 12 }}>
-              {kpis.attentionRequired} em fila
-            </Text>
-          </View>
-        ) : null}
-      </View>
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingHorizontal: isCompact ? 16 : 32,
-          paddingVertical: 12,
-          gap: 8,
-        }}
-        style={{ maxHeight: 64, borderBottomWidth: 1, borderBottomColor: colors.border }}
-      >
-        {TABS.map((item) => {
-          const active = tab === item.id;
-          return (
-            <Focusable
-              key={item.id}
-              id={`tab-${item.id}`}
-              onPress={() => setTab(item.id)}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 8,
-                paddingHorizontal: 14,
-                paddingVertical: 10,
-                borderRadius: 4,
-                backgroundColor: active ? colors.text : 'transparent',
-                borderWidth: 1,
-                borderColor: active ? colors.text : colors.border,
-                marginRight: 8,
-              }}
-            >
-              <Ionicons
-                name={item.icon}
-                size={16}
-                color={active ? colors.black : colors.textSecondary}
-              />
-              <Text
-                style={{
-                  color: active ? colors.black : colors.textSecondary,
-                  fontWeight: '700',
-                  fontSize: 13,
-                }}
-              >
-                {item.label}
-              </Text>
-            </Focusable>
-          );
-        })}
-      </ScrollView>
+      {isCompact ? <AdminMobileNav tab={tab} onChange={setTab} /> : null}
 
       <ScrollView
         contentContainerStyle={{
-          padding: isCompact ? 16 : 32,
-          maxWidth: layout.maxContentWidth,
+          padding: isCompact ? 16 : 28,
           width: '100%',
+          maxWidth: 1180,
           alignSelf: 'center',
           paddingBottom: 80,
         }}
@@ -524,37 +448,42 @@ export default function AdminCommandCenter({ onBack }) {
           />
         }
       >
-        {error ? <ErrorState message={error} onRetry={load} /> : null}
+        <AdminErrorBanner message={error} onRetry={load} onDismiss={() => setError('')} />
+        {tabLoading ? (
+          <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 12 }}>A carregar secção…</Text>
+        ) : null}
 
         {tab === 'overview' ? (
           <View>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 24 }}>
-              <Kpi label="UTILIZADORES" value={kpis.users ?? '—'} hint={`${kpis.premiumUsers || 0} Premium`} />
-              <Kpi
+            <PageHeader
+              compact
+              subtitle="KPIs, filas e governação. Toda a autorização é validada no servidor."
+            />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 8 }}>
+              <KpiCard label="UTILIZADORES" value={kpis.users ?? '—'} hint={`${kpis.premiumUsers || 0} Premium`} />
+              <KpiCard
                 label="RECEITA HOJE"
                 value={center?.labels?.revenueToday || `${kpis.revenueTodayKz || 0} Kz`}
                 hint={`${kpis.paymentsToday || 0} pagamentos`}
               />
-              <Kpi label="7 DIAS" value={center?.labels?.revenue7d || '—'} />
-              <Kpi
+              <KpiCard label="7 DIAS" value={center?.labels?.revenue7d || '—'} />
+              <KpiCard
                 label="STREAMS LIVE"
                 value={kpis.activeStreams ?? 0}
                 hint={`${kpis.playsToday || 0} plays hoje`}
-                alert={kpis.activeStreams > 0}
+                tone={kpis.activeStreams > 0 ? 'success' : 'info'}
               />
-              <Kpi label="CATÁLOGO" value={kpis.publishedTitles ?? 0} hint={`${kpis.seriesCount || 0} séries`} />
-              <Kpi
+              <KpiCard label="CATÁLOGO" value={kpis.publishedTitles ?? 0} hint={`${kpis.seriesCount || 0} séries`} />
+              <KpiCard
                 label="ATENÇÃO"
                 value={kpis.attentionRequired ?? 0}
                 hint="filas abertas"
-                alert={kpis.attentionRequired > 0}
+                tone={kpis.attentionRequired > 0 ? 'warning' : 'success'}
               />
             </View>
 
-            <Text style={{ color: colors.gold, fontWeight: '700', letterSpacing: 1, marginBottom: 12 }}>
-              FILAS OPERACIONAIS
-            </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 28 }}>
+            <SectionTitle>Filas operacionais</SectionTitle>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 }}>
               <QueueChip label="Pagamentos" count={queues.payments || 0} onPress={() => setTab('payments')} />
               <QueueChip label="Atendimento" count={queues.tickets || 0} onPress={() => setTab('support')} />
               <QueueChip label="Criadores" count={queues.creators || 0} onPress={() => setTab('moderation')} />
@@ -563,9 +492,45 @@ export default function AdminCommandCenter({ onBack }) {
               <QueueChip label="Campanhas" count={queues.campaigns || 0} onPress={() => setTab('moderation')} />
             </View>
 
-            <Text style={{ color: colors.gold, fontWeight: '700', letterSpacing: 1, marginBottom: 12 }}>
-              AUDITORIA RECENTE
-            </Text>
+            {approvals.length > 0 ? (
+              <View>
+                <SectionTitle>Four-eyes pendente</SectionTitle>
+                {approvals.map((req) => (
+                  <View key={req.id} style={getCardStyle()}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: colors.text, fontWeight: '700' }}>{req.action}</Text>
+                        <Text style={{ color: colors.muted, marginTop: 4 }}>
+                          {req.resourceType} · {req.reason || '—'}
+                        </Text>
+                      </View>
+                      <StatusBadge tone="warning">{req.status || 'pending'}</StatusBadge>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+                      <AdminButton
+                        label="Aprovar"
+                        onPress={() =>
+                          run(`fe-${req.id}`, () =>
+                            decideApproval(req.id, { approve: true, reason: 'aprovação console' })
+                          )
+                        }
+                      />
+                      <AdminButton
+                        label="Rejeitar"
+                        variant="outline"
+                        onPress={() =>
+                          run(`fe-r-${req.id}`, () =>
+                            decideApproval(req.id, { approve: false, reason: 'rejeição console' })
+                          )
+                        }
+                      />
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            <SectionTitle>Auditoria recente</SectionTitle>
             {(center?.recentAudit || []).length === 0 ? (
               <EmptyState title="Sem eventos de auditoria" />
             ) : (
@@ -575,13 +540,7 @@ export default function AdminCommandCenter({ onBack }) {
         ) : null}
 
         {tab === 'landing' ? (
-          <LandingPaymentsTab
-            settings={settings}
-            configDrafts={configDrafts}
-            setConfigDrafts={setConfigDrafts}
-            run={run}
-            busy={busy}
-          />
+          <LandingPaymentsTab settings={settings} run={run} busy={busy} />
         ) : null}
 
         {tab === 'users' ? (
@@ -655,12 +614,10 @@ export default function AdminCommandCenter({ onBack }) {
 
         {tab === 'payments' ? (
           <View>
-            <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800', marginBottom: 8 }}>
-              Pagamentos pendentes
-            </Text>
-            <Text style={{ color: colors.muted, marginBottom: 20 }}>
-              Confirmação manual IBAN / Multicaixa — dispara entitlement e notificação.
-            </Text>
+            <PageHeader
+              compact
+              subtitle="Confirmação manual IBAN / Multicaixa. Aprovações disparam entitlement no servidor."
+            />
             {payments.length === 0 ? (
               <EmptyState title="Fila limpa" subtitle="Nenhum comprovativo à espera." />
             ) : (
@@ -677,25 +634,28 @@ export default function AdminCommandCenter({ onBack }) {
                         : tx.videoTitle || 'Aluguer'}{' '}
                     · {tx.amountKz?.toLocaleString('pt-AO')} Kz · {(tx.paymentMethod || '').toUpperCase()}
                   </Text>
-                  {tx.riskScore != null ? (
-                    <Text style={{ color: tx.riskScore >= 70 ? colors.gold : colors.muted, marginTop: 4 }}>
-                      Risco {tx.riskScore}
-                    </Text>
-                  ) : null}
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                    <StatusBadge tone="warning">{tx.status || 'pendente'}</StatusBadge>
+                    {tx.riskScore != null ? (
+                      <StatusBadge tone={tx.riskScore >= 70 ? 'danger' : 'warning'}>
+                        Risco {tx.riskScore}
+                      </StatusBadge>
+                    ) : null}
+                  </View>
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
                     {tx.proofUrl ? (
-                      <PrimaryButton
+                      <AdminButton
                         label="Comprovativo"
                         variant="outline"
                         onPress={() => Linking.openURL(resolveProofUrl(tx.proofUrl))}
                       />
                     ) : null}
-                    <PrimaryButton
+                    <AdminButton
                       label={busy === tx.id ? '…' : 'Aprovar'}
                       onPress={() => run(tx.id, () => reviewPayment(tx.id, { status: 'pago' }))}
                       disabled={busy === tx.id}
                     />
-                    <PrimaryButton
+                    <AdminButton
                       label="Rejeitar"
                       variant="outline"
                       onPress={() => {
@@ -726,12 +686,10 @@ export default function AdminCommandCenter({ onBack }) {
 
         {tab === 'support' ? (
           <View>
-            <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800', marginBottom: 8 }}>
-              Atendimento
-            </Text>
-            <Text style={{ color: colors.muted, marginBottom: 20 }}>
-              Tickets de suporte e artigos do Centro de Ajuda.
-            </Text>
+            <PageHeader
+              compact
+              subtitle="Tickets de suporte e artigos do Centro de Ajuda."
+            />
 
             <SectionTitle>Tickets abertos</SectionTitle>
             {tickets.length === 0 ? (
@@ -752,7 +710,7 @@ export default function AdminCommandCenter({ onBack }) {
                     style={inputStyle({ marginTop: 12 })}
                   />
                   <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
-                    <PrimaryButton
+                    <AdminButton
                       label="Em progresso"
                       variant="outline"
                       onPress={() =>
@@ -764,7 +722,7 @@ export default function AdminCommandCenter({ onBack }) {
                         )
                       }
                     />
-                    <PrimaryButton
+                    <AdminButton
                       label="Resolver"
                       onPress={() =>
                         run(`tk-r-${t.id}`, () =>
@@ -775,7 +733,7 @@ export default function AdminCommandCenter({ onBack }) {
                         )
                       }
                     />
-                    <PrimaryButton
+                    <AdminButton
                       label="Fechar"
                       variant="outline"
                       onPress={() =>
@@ -824,10 +782,13 @@ export default function AdminCommandCenter({ onBack }) {
                 multiline
                 style={inputStyle({ minHeight: 100, textAlignVertical: 'top' })}
               />
-              <PrimaryButton
+              <AdminButton
                 label={busy === 'article-create' ? '…' : 'Publicar artigo'}
                 onPress={() =>
                   run('article-create', async () => {
+                    if (!articleForm.slug.trim() || !articleForm.title.trim()) {
+                      throw new Error('Slug e título do artigo são obrigatórios');
+                    }
                     await upsertHelpArticle(articleForm);
                     setArticleForm({ slug: '', title: '', category: 'geral', bodyMd: '' });
                   })
@@ -841,7 +802,7 @@ export default function AdminCommandCenter({ onBack }) {
                   {a.slug} · {a.category} · {a.isPublished ? 'publicado' : 'rascunho'}
                 </Text>
                 <View style={{ marginTop: 10 }}>
-                  <PrimaryButton
+                  <AdminButton
                     label={a.isPublished ? 'Despublicar' : 'Publicar'}
                     variant="outline"
                     onPress={() =>
@@ -856,6 +817,10 @@ export default function AdminCommandCenter({ onBack }) {
 
         {tab === 'moderation' ? (
           <View>
+            <PageHeader
+              compact
+              subtitle="Criadores, conteúdo, payouts e campanhas à espera de decisão."
+            />
             <SectionTitle>Criadores</SectionTitle>
             {creators.length === 0 ? (
               <EmptyState title="Sem criadores pendentes" />
@@ -867,11 +832,11 @@ export default function AdminCommandCenter({ onBack }) {
                     {c.email} · {c.type}
                   </Text>
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-                    <PrimaryButton
+                    <AdminButton
                       label="Activar"
                       onPress={() => run(c.id, () => reviewCreator(c.id, 'active'))}
                     />
-                    <PrimaryButton
+                    <AdminButton
                       label="Rejeitar"
                       variant="outline"
                       onPress={() => run(c.id, () => reviewCreator(c.id, 'rejected'))}
@@ -890,13 +855,13 @@ export default function AdminCommandCenter({ onBack }) {
                   <Text style={{ color: colors.text, fontWeight: '700' }}>{item.title}</Text>
                   <Text style={{ color: colors.muted }}>{item.workflowStatus || item.status}</Text>
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-                    <PrimaryButton
+                    <AdminButton
                       label="Publicar"
                       onPress={() =>
                         run(item.id, () => moderateContent(item.id, { action: 'publish' }))
                       }
                     />
-                    <PrimaryButton
+                    <AdminButton
                       label="Rejeitar"
                       variant="outline"
                       onPress={() =>
@@ -923,11 +888,11 @@ export default function AdminCommandCenter({ onBack }) {
                     {p.displayName || p.creatorName} · {p.amountKz?.toLocaleString('pt-AO')} Kz
                   </Text>
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-                    <PrimaryButton
+                    <AdminButton
                       label="Pagar"
                       onPress={() => run(p.id, () => reviewPayout(p.id, { status: 'paid' }))}
                     />
-                    <PrimaryButton
+                    <AdminButton
                       label="Rejeitar"
                       variant="outline"
                       onPress={() => run(p.id, () => reviewPayout(p.id, { status: 'rejected' }))}
@@ -948,11 +913,11 @@ export default function AdminCommandCenter({ onBack }) {
                     {c.companyName} · {c.placement} · {c.budgetKz?.toLocaleString('pt-AO')} Kz
                   </Text>
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-                    <PrimaryButton
+                    <AdminButton
                       label="Activar"
                       onPress={() => run(c.id, () => reviewCampaign(c.id, 'active'))}
                     />
-                    <PrimaryButton
+                    <AdminButton
                       label="Rejeitar"
                       variant="outline"
                       onPress={() => run(c.id, () => reviewCampaign(c.id, 'rejected'))}
@@ -966,12 +931,10 @@ export default function AdminCommandCenter({ onBack }) {
 
         {tab === 'editorial' ? (
           <View>
-            <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800', marginBottom: 8 }}>
-              Colecções editoriais
-            </Text>
-            <Text style={{ color: colors.muted, marginBottom: 16 }}>
-              Controlam filas da Home (estilo Netflix rows).
-            </Text>
+            <PageHeader
+              compact
+              subtitle="Títulos das filas da Home. Editar e publicar altera o catálogo do consumidor."
+            />
             <View style={getCardStyle()}>
               <TextInput
                 value={editorialForm.slug}
@@ -995,10 +958,13 @@ export default function AdminCommandCenter({ onBack }) {
                 placeholderTextColor={colors.muted}
                 style={inputStyle()}
               />
-              <PrimaryButton
+              <AdminButton
                 label="Criar colecção"
                 onPress={() =>
                   run('ed-create', async () => {
+                    if (!editorialForm.slug.trim() || !editorialForm.title.trim()) {
+                      throw new Error('Slug e título são obrigatórios');
+                    }
                     await createEditorial(editorialForm);
                     setEditorialForm({ slug: '', title: '', subtitle: '' });
                   })
@@ -1009,24 +975,7 @@ export default function AdminCommandCenter({ onBack }) {
               <EmptyState title="Sem colecções" />
             ) : (
               collections.map((c) => (
-                <View key={c.id} style={getCardStyle()}>
-                  <Text style={{ color: colors.text, fontWeight: '700' }}>{c.title}</Text>
-                  <Text style={{ color: colors.muted }}>
-                    {c.slug} · {c.placement || 'home'} ·{' '}
-                    {c.isPublished !== false ? 'publicada' : 'rascunho'}
-                  </Text>
-                  <View style={{ marginTop: 10 }}>
-                    <PrimaryButton
-                      label={c.isPublished === false ? 'Publicar' : 'Despublicar'}
-                      variant="outline"
-                      onPress={() =>
-                        run(`ed-${c.id}`, () =>
-                          updateEditorial(c.id, { isPublished: c.isPublished === false })
-                        )
-                      }
-                    />
-                  </View>
-                </View>
+                <EditorialCollectionCard key={c.id} collection={c} run={run} />
               ))
             )}
           </View>
@@ -1034,12 +983,10 @@ export default function AdminCommandCenter({ onBack }) {
 
         {tab === 'flags' ? (
           <View>
-            <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800', marginBottom: 8 }}>
-              Feature flags
-            </Text>
-            <Text style={{ color: colors.muted, marginBottom: 16 }}>
-              Ligar/desligar capacidades da app sem deploy.
-            </Text>
+            <PageHeader
+              compact
+              subtitle="Ligar ou desligar capacidades da app sem deploy. Mutações só SuperAdmin."
+            />
             {flags.length === 0 ? (
               <EmptyState title="Sem flags" />
             ) : (
@@ -1081,8 +1028,9 @@ export default function AdminCommandCenter({ onBack }) {
                   <Text style={{ color: colors.text, fontWeight: '700' }}>
                     {e.key || e.name || e.id}
                   </Text>
-                  <Text style={{ color: colors.muted }}>
-                    {typeof e === 'object' ? JSON.stringify(e).slice(0, 120) : String(e)}
+                  <Text style={{ color: colors.muted, marginTop: 4 }}>
+                    {(e.variants || []).join(' / ') || '—'} · {e.assignments ?? 0} atribuições ·{' '}
+                    {e.isActive ? 'activa' : 'inactiva'}
                   </Text>
                 </View>
               ))
@@ -1091,80 +1039,58 @@ export default function AdminCommandCenter({ onBack }) {
         ) : null}
 
         {tab === 'config' ? (
-          <View>
-            <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800', marginBottom: 8 }}>
-              Configuração & Onboarding
-            </Text>
-            <Text style={{ color: colors.muted, marginBottom: 16 }}>
-              Onboarding, contactos de suporte e mensagens de marca. Exposto em GET /api/app/config.
-            </Text>
-            {settings.length === 0 ? (
-              <EmptyState title="Sem settings" subtitle="Corra a migração 025." />
-            ) : (
-              settings.map((s) => (
-                <View key={s.key} style={getCardStyle()}>
-                  <Text style={{ color: colors.gold, fontWeight: '800', letterSpacing: 1 }}>
-                    {s.key.toUpperCase()}
-                  </Text>
-                  {s.description ? (
-                    <Text style={{ color: colors.muted, marginTop: 4, marginBottom: 8 }}>
-                      {s.description}
-                    </Text>
-                  ) : null}
-                  <TextInput
-                    value={configDrafts[s.key] ?? ''}
-                    onChangeText={(v) => setConfigDrafts((d) => ({ ...d, [s.key]: v }))}
-                    multiline
-                    autoCapitalize="none"
-                    style={inputStyle({
-                      minHeight: 140,
-                      fontFamily: 'monospace',
-                      textAlignVertical: 'top',
-                    })}
-                  />
-                  <PrimaryButton
-                    label={busy === `cfg-${s.key}` ? '…' : 'Guardar'}
-                    onPress={() =>
-                      run(`cfg-${s.key}`, async () => {
-                        let parsed;
-                        try {
-                          parsed = JSON.parse(configDrafts[s.key] || '{}');
-                        } catch {
-                          throw new Error(`JSON inválido em ${s.key}`);
-                        }
-                        await upsertAppConfig(s.key, parsed, s.description);
-                      })
-                    }
-                  />
-                </View>
-              ))
-            )}
-          </View>
+          <CopySettingsTab
+            settings={settings}
+            configDrafts={configDrafts}
+            setConfigDrafts={setConfigDrafts}
+            run={run}
+            busy={busy}
+          />
         ) : null}
 
         {tab === 'media' ? (
           <View>
-            <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800', marginBottom: 8 }}>
-              CDN / Encoding
-            </Text>
-            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-              <PrimaryButton
-                label={busy === 'cdn-probe' ? 'A testar…' : 'Probe CDN'}
-                onPress={() =>
-                  run('cdn-probe', async () => {
-                    const r = await probeCdn();
-                    setCdn(r);
-                  })
-                }
-              />
-            </View>
+            <PageHeader
+              compact
+              subtitle="Saúde Bunny Stream e fila de encode. Sem JSON cru."
+              extra={
+                <AdminButton
+                  label={busy === 'cdn-probe' ? 'A testar…' : 'Probe CDN'}
+                  onPress={() =>
+                    run('cdn-probe', async () => {
+                      const r = await probeCdn();
+                      const items = r.checks || r.items || [];
+                      setCdn({
+                        items,
+                        healthy: Boolean(r.healthy) || items.some((i) => i.ok),
+                        latest: items[0] || null,
+                      });
+                    })
+                  }
+                />
+              }
+            />
             <View style={getCardStyle()}>
-              <Text style={{ color: colors.text, fontWeight: '700' }}>Estado Bunny / CDN</Text>
-              <Text style={{ color: colors.muted, marginTop: 8 }}>
-                {cdn
-                  ? JSON.stringify(cdn, null, 2).slice(0, 800)
-                  : 'Sem dados — execute Probe CDN.'}
-              </Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+                <Text style={{ color: colors.text, fontWeight: '700' }}>Bunny / CDN</Text>
+                <StatusBadge tone={cdn?.healthy ? 'success' : cdn?.latest ? 'warning' : 'info'}>
+                  {cdn?.healthy ? 'saudável' : cdn?.latest ? 'atenção' : 'sem probe'}
+                </StatusBadge>
+              </View>
+              {(cdn?.items || []).slice(0, 6).map((item) => (
+                <View
+                  key={item.id || item.probeType}
+                  style={{ marginTop: 10, flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}
+                >
+                  <Text style={{ color: colors.textSecondary, flex: 1 }}>
+                    {item.probeType || 'probe'} · {item.latencyMs ?? '—'} ms · HTTP {item.httpStatus ?? '—'}
+                  </Text>
+                  <StatusBadge tone={item.ok ? 'success' : 'danger'}>{item.ok ? 'ok' : 'falha'}</StatusBadge>
+                </View>
+              ))}
+              {cdn?.latest?.error ? (
+                <Text style={{ color: colors.gold, marginTop: 8 }}>{String(cdn.latest.error)}</Text>
+              ) : null}
             </View>
             <SectionTitle>Fila de encoding</SectionTitle>
             {encoding.length === 0 ? (
@@ -1172,12 +1098,14 @@ export default function AdminCommandCenter({ onBack }) {
             ) : (
               encoding.slice(0, 30).map((item) => (
                 <View key={item.id || item.contentId} style={getCardStyle()}>
-                  <Text style={{ color: colors.text, fontWeight: '700' }}>
-                    {item.title || item.contentId || item.id}
-                  </Text>
-                  <Text style={{ color: colors.muted }}>
-                    {item.status || item.encodingStatus || '—'}
-                  </Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+                    <Text style={{ color: colors.text, fontWeight: '700', flex: 1 }}>
+                      {item.title || item.contentId || item.id}
+                    </Text>
+                    <StatusBadge tone={toneForStatus(item.status || item.encodingStatus)}>
+                      {item.status || item.encodingStatus || '—'}
+                    </StatusBadge>
+                  </View>
                 </View>
               ))
             )}
@@ -1186,6 +1114,10 @@ export default function AdminCommandCenter({ onBack }) {
 
         {tab === 'catalog' ? (
           <View>
+            <PageHeader
+              compact
+              subtitle="Ofertas TVOD, inquéritos e janelas de live premiere."
+            />
             <SectionTitle>Packs TVOD</SectionTitle>
             {packs.length === 0 ? (
               <EmptyState title="Sem packs" />
@@ -1205,8 +1137,10 @@ export default function AdminCommandCenter({ onBack }) {
 
             <SectionTitle>NPS / Surveys</SectionTitle>
             <View style={getCardStyle()}>
-              <Text style={{ color: colors.muted }}>
-                {surveys ? JSON.stringify(surveys, null, 2).slice(0, 600) : 'Sem resumo NPS.'}
+              <Text style={{ color: colors.text, fontWeight: '700' }}>Resumo</Text>
+              <Text style={{ color: colors.muted, marginTop: 8 }}>
+                {surveys?.responses ?? surveys?.total ?? 0} respostas · NPS {surveys?.npsScore ?? '—'} ·
+                média {surveys?.avgNps ?? '—'} · promotores {surveys?.promoters ?? 0}
               </Text>
             </View>
 
@@ -1250,12 +1184,15 @@ export default function AdminCommandCenter({ onBack }) {
                 placeholderTextColor={colors.muted}
                 style={inputStyle()}
               />
-              <PrimaryButton
+              <AdminButton
                 label="Oferecer Premium"
                 onPress={() =>
                   run('gift-create', async () => {
+                    if (!giftForm.email.includes('@')) {
+                      throw new Error('Indique o email do destinatário');
+                    }
                     await createGift({
-                      recipientEmail: giftForm.email,
+                      recipientEmail: giftForm.email.trim().toLowerCase(),
                       days: Number(giftForm.days) || 30,
                       message: giftForm.note,
                     });
@@ -1274,7 +1211,7 @@ export default function AdminCommandCenter({ onBack }) {
                 </Text>
                 {g.status !== 'revoked' ? (
                   <View style={{ marginTop: 10 }}>
-                    <PrimaryButton
+                    <AdminButton
                       label="Revogar"
                       variant="outline"
                       onPress={() => run(`gift-${g.id}`, () => revokeGift(g.id))}
@@ -1288,9 +1225,7 @@ export default function AdminCommandCenter({ onBack }) {
 
         {tab === 'promos' ? (
           <View>
-            <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800', marginBottom: 8 }}>
-              Códigos promocionais
-            </Text>
+            <PageHeader compact subtitle="Códigos de dias Premium. Activar ou desactivar sem apagar histórico." />
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
               <TextInput
                 value={promoForm.code}
@@ -1316,12 +1251,13 @@ export default function AdminCommandCenter({ onBack }) {
                 keyboardType="number-pad"
                 style={inputStyle({ width: 90, marginBottom: 0 })}
               />
-              <PrimaryButton
+              <AdminButton
                 label={busy === 'promo-create' ? '…' : 'Criar'}
                 onPress={() =>
                   run('promo-create', async () => {
+                    if (!promoForm.code.trim()) throw new Error('Código promocional obrigatório');
                     await createPromo({
-                      code: promoForm.code,
+                      code: promoForm.code.trim().toUpperCase(),
                       valueInt: Number(promoForm.days) || 7,
                       maxRedemptions: Number(promoForm.max) || null,
                       kind: 'premium_days',
@@ -1346,7 +1282,7 @@ export default function AdminCommandCenter({ onBack }) {
                     {p.isActive ? 'activo' : 'inactivo'}
                   </Text>
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-                    <PrimaryButton
+                    <AdminButton
                       label={p.isActive ? 'Desactivar' : 'Activar'}
                       variant="outline"
                       onPress={() =>
@@ -1362,9 +1298,7 @@ export default function AdminCommandCenter({ onBack }) {
 
         {tab === 'live' ? (
           <View>
-            <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800', marginBottom: 8 }}>
-              Streams activos
-            </Text>
+            <PageHeader compact subtitle="Sessões de playback activas neste momento." />
             {streams.length === 0 ? (
               <EmptyState title="Ninguém a assistir agora" />
             ) : (
@@ -1382,9 +1316,7 @@ export default function AdminCommandCenter({ onBack }) {
 
         {tab === 'audit' ? (
           <View>
-            <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800', marginBottom: 8 }}>
-              Trilha de auditoria
-            </Text>
+            <PageHeader compact subtitle="Acções privilegiadas com actor, entidade e IP." />
             {audit.length === 0 ? (
               <EmptyState title="Sem registos" />
             ) : (
@@ -1392,6 +1324,33 @@ export default function AdminCommandCenter({ onBack }) {
             )}
           </View>
         ) : null}
+
+        {tab === 'acquisition' ? (
+          <View>
+            <TextInput
+              value={acqTitle}
+              onChangeText={setAcqTitle}
+              placeholder="Novo título a adquirir"
+              placeholderTextColor={colors.muted}
+              style={inputStyle()}
+            />
+            <AdminButton
+              label="Registar prospecto"
+              onPress={() =>
+                run('acq-new', async () => {
+                  if (!acqTitle.trim()) throw new Error('Título da aquisição é obrigatório');
+                  await createAcquisition({ title: acqTitle.trim(), notes: 'prospecto console' });
+                  setAcqTitle('');
+                  const d = await fetchAcquisitions({});
+                  setAcquisitions(d.items || []);
+                })
+              }
+            />
+            <AcquisitionTab items={acquisitions} run={run} />
+          </View>
+        ) : null}
+        {tab === 'rights' ? <RightsTab items={rights} /> : null}
+        {tab === 'tenants' ? <TenantsTab items={tenants} run={run} /> : null}
       </ScrollView>
 
       <Modal visible={Boolean(rejectTarget)} transparent animationType="fade">
@@ -1427,8 +1386,8 @@ export default function AdminCommandCenter({ onBack }) {
               multiline
             />
             <View style={{ flexDirection: 'row', gap: 10 }}>
-              <PrimaryButton label="Cancelar" variant="outline" onPress={() => setRejectTarget(null)} />
-              <PrimaryButton
+              <AdminButton label="Cancelar" variant="outline" onPress={() => setRejectTarget(null)} />
+              <AdminButton
                 label="Confirmar"
                 onPress={() => {
                   const target = rejectTarget;
@@ -1447,6 +1406,7 @@ export default function AdminCommandCenter({ onBack }) {
           </View>
         </View>
       </Modal>
+      </View>
     </View>
   );
 }

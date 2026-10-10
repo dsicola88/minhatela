@@ -453,7 +453,8 @@ async function listCatalog({ q, limit = 40, offset = 0, superAdmin = false } = {
   const tenantSql = superAdmin ? 'TRUE' : videoTenantSql('v');
   const result = await query(
     `SELECT v.id, v.title, v.slug, v.kind, v.monetization, v.rental_price_kz, v.is_published,
-            v.is_featured, v.workflow_status, v.bunny_video_id, v.poster_url, v.updated_at
+            v.is_featured, v.workflow_status, v.bunny_video_id, v.poster_url, v.updated_at,
+            v.synopsis_short
      FROM videos v
      WHERE v.kind IN ('movie', 'series', 'episode')
        AND ${tenantSql}
@@ -476,6 +477,7 @@ async function listCatalog({ q, limit = 40, offset = 0, superAdmin = false } = {
       bunnyVideoId: r.bunny_video_id,
       posterUrl: r.poster_url,
       updatedAt: r.updated_at,
+      synopsisShort: r.synopsis_short,
     })),
   };
 }
@@ -510,6 +512,9 @@ async function patchCatalogTitle(actorId, contentId, body, meta = {}) {
        END,
        bunny_video_id = CASE WHEN $8::boolean THEN $9 ELSE bunny_video_id END,
        coming_soon_at = CASE WHEN $10::boolean THEN $11 ELSE coming_soon_at END,
+       title = CASE WHEN $12::text IS NULL OR $12::text = '' THEN title ELSE $12 END,
+       synopsis_short = CASE WHEN $13::boolean THEN $14 ELSE synopsis_short END,
+       synopsis_full = CASE WHEN $15::boolean THEN $16 ELSE synopsis_full END,
        updated_at = NOW()
      WHERE v.id = $1 AND ${tenantSql}
      RETURNING v.id, v.title, v.is_published, v.is_featured, v.monetization, v.rental_price_kz, v.workflow_status, v.bunny_video_id, v.coming_soon_at`,
@@ -532,6 +537,11 @@ async function patchCatalogTitle(actorId, contentId, body, meta = {}) {
       body.comingSoonAt === undefined || body.clearComingSoon === true
         ? null
         : body.comingSoonAt,
+      body.title != null ? String(body.title).trim() : null,
+      body.synopsisShort !== undefined,
+      body.synopsisShort === undefined ? null : String(body.synopsisShort).trim(),
+      body.synopsisFull !== undefined,
+      body.synopsisFull === undefined ? null : String(body.synopsisFull).trim(),
     ]
   );
   const row = result.rows[0];

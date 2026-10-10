@@ -8,7 +8,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, brand, layout } from '../theme/tokens';
+import { colors, layout } from '../theme/tokens';
+import { useBrandCopy } from '../context/AppConfigContext';
 import { useTheme } from '../theme/ThemeContext';
 import { useI18n } from '../i18n';
 import Focusable from '../tv/Focusable';
@@ -39,6 +40,7 @@ export default function Navbar({
   const { t, locale, setLocale } = useI18n();
   const { isTV } = useDeviceProfile();
   const { isLight } = useTheme();
+  const branding = useBrandCopy();
 
   useEffect(() => {
     setSolid(scrollY > 40);
@@ -102,7 +104,7 @@ export default function Navbar({
                   letterSpacing: 1.4,
                 }}
               >
-                {brand.name.toUpperCase()}
+                {(branding.appName || 'MinhaTela').toUpperCase()}
               </Text>
             </View>
 

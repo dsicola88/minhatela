@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
   View,
   ScrollView,
@@ -14,10 +15,12 @@ import Billboard from '../components/Billboard';
 import MovieRow from '../components/MovieRow';
 import { LoadingState, ErrorState, EmptyState } from '../components/StateViews';
 import { colors, layout } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import { fetchHomeCatalog } from '../services/catalog';
 import { fetchUnreadCount } from '../services/engagement';
 import { fetchPendingSurvey, respondSurvey } from '../services/phase26';
 import { useI18n } from '../i18n';
+import { useBrandCopy } from '../context/AppConfigContext';
 
 export default function Home({
   onOpenDetails,
@@ -36,6 +39,8 @@ export default function Home({
   onBrowse,
 }) {
   const { t } = useI18n();
+  const { statusBarStyle } = useTheme();
+  const branding = useBrandCopy();
   const [scrollY, setScrollY] = useState(0);
   const [featured, setFeatured] = useState(null);
   const [rows, setRows] = useState([]);
@@ -55,8 +60,13 @@ export default function Home({
         fetchUnreadCount().catch(() => ({ unread: 0 })),
         fetchPendingSurvey().catch(() => ({ pending: null })),
       ]);
-      setFeatured(data.featured);
-      setRows(data.rows || []);
+      const rows = data.rows || [];
+      const featuredItem =
+        data.featured && data.featured.id
+          ? data.featured
+          : rows.flatMap((row) => row.videos || []).find((v) => v?.id) || null;
+      setFeatured(featuredItem);
+      setRows(rows);
       setUnread(notif.unread || 0);
       if (surveyData?.pending) setSurvey(surveyData.pending);
     } catch (err) {
@@ -70,6 +80,12 @@ export default function Home({
   useEffect(() => {
     load();
   }, [load]);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => setSurvey(null);
+    }, [])
+  );
 
   async function submitNps() {
     if (nps == null) return;
@@ -87,7 +103,7 @@ export default function Home({
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.black }}>
-      <StatusBar style="light" />
+      <StatusBar style={statusBarStyle} />
       <Navbar
         scrollY={scrollY}
         onProfile={onProfile}
@@ -127,6 +143,24 @@ export default function Home({
 
           {error ? <ErrorState message={error} onRetry={load} /> : null}
 
+          {branding.homeAnnouncement ? (
+            <View
+              style={{
+                marginHorizontal: 16,
+                marginTop: 8,
+                padding: 14,
+                borderRadius: 6,
+                borderWidth: 1,
+                borderColor: colors.gold,
+                backgroundColor: 'rgba(247,212,23,0.08)',
+              }}
+            >
+              <Text style={{ color: colors.text, fontSize: 14, lineHeight: 20 }}>
+                {branding.homeAnnouncement}
+              </Text>
+            </View>
+          ) : null}
+
           <View
             style={{
               marginTop: -24,
@@ -137,7 +171,10 @@ export default function Home({
             }}
           >
             {!error && rows.length === 0 ? (
-              <EmptyState title={t('emptyCatalog')} subtitle={t('emptySubtitle')} />
+              <EmptyState
+                title={branding.emptyCatalog || t('emptyCatalog')}
+                subtitle={branding.emptySubtitle || t('emptySubtitle')}
+              />
             ) : null}
 
             {rows.map((row) => {
@@ -164,14 +201,14 @@ export default function Home({
         <View
           style={{
             flex: 1,
-            backgroundColor: 'rgba(0,0,0,0.75)',
+            backgroundColor: colors.overlay,
             justifyContent: 'center',
             padding: 24,
           }}
         >
           <View
             style={{
-              backgroundColor: '#141414',
+              backgroundColor: colors.elevated,
               borderRadius: 8,
               borderWidth: 1,
               borderColor: colors.border,
@@ -198,7 +235,7 @@ export default function Home({
                     borderRadius: 4,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: nps === n ? colors.gold : '#222',
+                    backgroundColor: nps === n ? colors.gold : colors.surfaceSecondary,
                   }}
                 >
                   <Text
@@ -251,7 +288,7 @@ export default function Home({
                   alignItems: 'center',
                 }}
               >
-                <Text style={{ color: colors.text, fontWeight: '800' }}>Enviar</Text>
+                <Text style={{ color: '#FFFFFF', fontWeight: '800' }}>Enviar</Text>
               </Pressable>
             </View>
           </View>

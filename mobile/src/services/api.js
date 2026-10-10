@@ -6,15 +6,24 @@ import { getDeviceIdentity } from '../platform/deviceIdentity';
 function resolveApiBaseUrl() {
   const fromEnv = process.env.EXPO_PUBLIC_API_BASE_URL;
   const fromExtra = Constants.expoConfig?.extra?.apiBaseUrl;
-  const candidates = [fromEnv, fromExtra].filter(Boolean);
   const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
-  const isLocalHost = (u) =>
+  const pageHost = isBrowser ? String(window.location.hostname || '') : '';
+  const pageIsLocal = /^(localhost|127\.0\.0\.1)$/.test(pageHost);
+  const isLoopback = (u) =>
     /localhost|127\.0\.0\.1/.test(String(u || '')) ||
     String(u || '').includes('api.minhatela.net');
 
+  if (pageIsLocal) {
+    const local = [fromEnv, fromExtra, 'http://localhost:4000'].find(
+      (c) => c && (isLoopback(c) || String(c).includes('localhost'))
+    );
+    return String(local || 'http://localhost:4000').replace(/\/$/, '');
+  }
+
+  const candidates = [fromEnv, fromExtra].filter(Boolean);
   for (const c of candidates) {
-    if (isBrowser && isLocalHost(c)) continue;
-    if (c) return c.replace(/\/$/, '');
+    if (isBrowser && isLoopback(c)) continue;
+    if (c) return String(c).replace(/\/$/, '');
   }
   if (isBrowser) return 'https://minhatela-production.up.railway.app';
   return 'http://localhost:4000';

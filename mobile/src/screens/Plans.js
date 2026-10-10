@@ -9,7 +9,8 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, brand, layout } from '../theme/tokens';
+import { colors, layout } from '../theme/tokens';
+import { useBrandCopy } from '../context/AppConfigContext';
 import { PrimaryButton } from '../components/ui';
 import { fetchPlans } from '../services/plans';
 import Focusable from '../tv/Focusable';
@@ -18,6 +19,7 @@ import { ErrorState } from '../components/StateViews';
 export default function Plans({ onBack, onSubscribe, onPacks, currentStatus }) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
+  const branding = useBrandCopy();
   const isCompact = width < 768;
   const [loading, setLoading] = useState(true);
   const [plans, setPlans] = useState([]);
@@ -63,7 +65,7 @@ export default function Plans({ onBack, onSubscribe, onPacks, currentStatus }) {
           Planos
         </Text>
         <Text style={{ color: colors.red, fontWeight: '800', letterSpacing: 1 }}>
-          {brand.name.toUpperCase()}
+          {(branding.appName || 'MinhaTela').toUpperCase()}
         </Text>
       </View>
 

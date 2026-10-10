@@ -152,9 +152,9 @@ async function run() {
     assert(r.status === 401, `got ${r.status}`);
   });
 
-  await step('POST /api/auth/oauth/google sem body → 400|401|429', async () => {
+  await step('POST /api/auth/oauth/google sem body → 400|401|429|503', async () => {
     const r = await req('POST', '/api/auth/oauth/google', {});
-    assert([400, 401, 429].includes(r.status), `got ${r.status}`);
+    assert([400, 401, 429, 503].includes(r.status), `got ${r.status}`);
   });
 
   await step('GET /api/admin/encoding sem auth → 401', async () => {

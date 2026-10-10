@@ -14,7 +14,8 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, brand, layout } from '../theme/tokens';
+import { colors, layout } from '../theme/tokens';
+import { useBrandCopy } from '../context/AppConfigContext';
 import { useI18n } from '../i18n';
 import { getAccount, revokeDevice, updateProfile } from '../services/account';
 import { trustDevice } from '../services/phase24';
@@ -122,6 +123,7 @@ export default function Account({
   const { width } = useWindowDimensions();
   const { t } = useI18n();
   const { themeId, setTheme, available: themeOptions } = useTheme();
+  const branding = useBrandCopy();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [account, setAccount] = useState(null);
@@ -292,7 +294,7 @@ export default function Account({
           Conta
         </Text>
         <Text style={{ color: colors.red, fontWeight: '800', letterSpacing: 1 }}>
-          {brand.name.toUpperCase()}
+          {(branding.appName || 'MinhaTela').toUpperCase()}
         </Text>
       </View>
 

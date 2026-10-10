@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Video, ResizeMode } from 'expo-av';
 import { colors, layout, typography } from '../theme/tokens';
 import { useI18n } from '../i18n';
+import { useBrandCopy } from '../context/AppConfigContext';
 import { useDeviceProfile } from '../platform/device';
 import Focusable from '../tv/Focusable';
 
@@ -20,6 +21,10 @@ export default function Billboard({ item, onPlay, onMoreInfo, autoplayPreview = 
   const isCompact = width < 768;
   const { t } = useI18n();
   const { isTV } = useDeviceProfile();
+  const branding = useBrandCopy();
+  const playLabel = branding.playLabel || t('watch');
+  const moreInfoLabel = branding.moreInfoLabel || t('moreInfo');
+  const kicker = branding.billboardKicker || t('originalBadge');
   const [showTrailer, setShowTrailer] = useState(false);
   const [muted, setMuted] = useState(true);
 
@@ -40,7 +45,9 @@ export default function Billboard({ item, onPlay, onMoreInfo, autoplayPreview = 
           padding: 40,
         }}
       >
-        <Text style={{ color: colors.muted }}>{t('loadingFeatured')}</Text>
+        <Text style={{ color: colors.muted }}>
+          {t('emptyCatalog')}
+        </Text>
       </View>
     );
   }
@@ -107,7 +114,7 @@ export default function Billboard({ item, onPlay, onMoreInfo, autoplayPreview = 
                 textTransform: 'uppercase',
               }}
             >
-              {t('originalBadge')}
+              {kicker}
             </Text>
           </View>
 
@@ -153,7 +160,7 @@ export default function Billboard({ item, onPlay, onMoreInfo, autoplayPreview = 
               id="billboard-play"
               autoFocus
               onPress={() => onPlay?.(item)}
-              accessibilityLabel={t('watch')}
+              accessibilityLabel={playLabel}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -166,14 +173,14 @@ export default function Billboard({ item, onPlay, onMoreInfo, autoplayPreview = 
             >
               <Ionicons name="play" size={isTV ? 26 : 20} color={colors.black} />
               <Text style={{ color: colors.black, fontWeight: '700', fontSize: isTV ? 18 : 15 }}>
-                {t('watch')}
+                {playLabel}
               </Text>
             </Focusable>
 
             <Focusable
               id="billboard-info"
               onPress={() => onMoreInfo?.(item)}
-              accessibilityLabel={t('moreInfo')}
+              accessibilityLabel={moreInfoLabel}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -190,7 +197,7 @@ export default function Billboard({ item, onPlay, onMoreInfo, autoplayPreview = 
                 color={colors.text}
               />
               <Text style={{ color: colors.text, fontWeight: '600', fontSize: isTV ? 18 : 15 }}>
-                {t('moreInfo')}
+                {moreInfoLabel}
               </Text>
             </Focusable>
 

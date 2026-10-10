@@ -7,6 +7,7 @@ export function PrimaryButton({
   variant = 'primary',
   loading = false,
   disabled = false,
+  compact = false,
   style,
 }) {
   const isLightTheme = colors.id === 'light';
@@ -49,13 +50,13 @@ export function PrimaryButton({
           backgroundColor: theme.backgroundColor,
           borderWidth: 1,
           borderColor: hovered ? colors.gold : theme.borderColor,
-          paddingVertical: 14,
-          paddingHorizontal: 18,
-          borderRadius: 4,
+          paddingVertical: compact ? 8 : 14,
+          paddingHorizontal: compact ? 12 : 18,
+          borderRadius: compact ? 6 : 4,
           alignItems: 'center',
           justifyContent: 'center',
           opacity: disabled ? 0.5 : pressed ? 0.88 : 1,
-          minHeight: 48,
+          minHeight: compact ? 36 : 48,
         },
         style,
       ]}
@@ -63,7 +64,7 @@ export function PrimaryButton({
       {loading ? (
         <ActivityIndicator color={theme.textColor} />
       ) : (
-        <Text style={{ color: theme.textColor, fontWeight: '700', fontSize: 15 }}>
+        <Text style={{ color: theme.textColor, fontWeight: '700', fontSize: compact ? 13 : 15 }}>
           {label}
         </Text>
       )}

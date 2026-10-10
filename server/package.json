@@ -11,7 +11,10 @@
     "seed": "node scripts/seed.js",
     "smoke": "node scripts/smoke.js",
     "e2e": "node scripts/e2e.js",
-    "phase27": "node scripts/phase27-security.js"
+    "phase27": "node scripts/phase27-security.js",
+    "phase29": "node scripts/phase29-enterprise.js",
+    "phase30": "node scripts/phase30-isolation.js",
+    "phase31": "node scripts/phase31-readiness.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

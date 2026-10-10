@@ -6,6 +6,38 @@ const { createError } = require('../utils/errors');
 
 const PUBLIC_KEYS = new Set(['onboarding', 'branding', 'support', 'landing', 'payments']);
 
+const BRANDING_DEFAULTS = {
+  appName: 'MinhaTela',
+  tagline: 'A tua tela. A nossa Angola.',
+  billboardKicker: 'Original MinhaTela · Angola',
+  playLabel: 'Assistir',
+  moreInfoLabel: 'Mais informações',
+  homeAnnouncement: '',
+  emptyCatalog: 'Ainda não há conteúdos nesta secção.',
+  emptySubtitle: 'Volte em breve para novos lançamentos angolanos.',
+  maintenanceMessage: 'MinhaTela em manutenção. Voltamos em breve.',
+};
+
+const LANDING_DEFAULTS = {
+  enabled: true,
+  heroTitle: 'Cinema angolano. A tua tela.',
+  heroSubtitle: 'Filmes, séries e estreias ao vivo — com IBAN e Multicaixa.',
+  heroCtaPrimary: 'Começar grátis',
+  heroCtaSecondary: 'Ver planos',
+  heroImageUrl: null,
+  sections: [],
+  showLeadForm: true,
+  leadHeadline: 'Seja dos primeiros — deixa o teu contacto',
+};
+
+function mergePublicConfig(raw) {
+  return {
+    ...raw,
+    branding: { ...BRANDING_DEFAULTS, ...(raw.branding || {}) },
+    landing: { ...LANDING_DEFAULTS, ...(raw.landing || {}) },
+  };
+}
+
 function mapRow(row) {
   if (!row) return null;
   return {
@@ -40,7 +72,15 @@ async function adminUpsert(actorId, key, body, meta = {}) {
     throw createError(400, 'value JSON obrigatório', 'VALIDATION');
   }
 
-  const row = await appConfigRepository.upsert(safeKey, value, {
+  let next = value;
+  if (!Array.isArray(value)) {
+    const existing = await appConfigRepository.get(safeKey);
+    if (existing?.value && typeof existing.value === 'object' && !Array.isArray(existing.value)) {
+      next = { ...existing.value, ...value };
+    }
+  }
+
+  const row = await appConfigRepository.upsert(safeKey, next, {
     description: body?.description,
     updatedBy: actorId,
   });
@@ -50,7 +90,7 @@ async function adminUpsert(actorId, key, body, meta = {}) {
     action: 'app_config.upserted',
     entity: 'app_settings',
     entityId: safeKey,
-    metadata: { keys: Object.keys(value) },
+    metadata: { keys: Object.keys(next) },
     ip: meta.ip,
   });
 
@@ -69,14 +109,14 @@ async function publicBootstrap() {
     return {
       market: 'AO',
       currency: 'Kz',
-      config: out,
+      config: mergePublicConfig(out),
     };
   } catch (err) {
     // Tabela ainda não migrada ou DB intermitente — defaults seguros
     return {
       market: 'AO',
       currency: 'Kz',
-      config: {
+      config: mergePublicConfig({
         onboarding: {
           enabled: true,
           slides: [
@@ -88,12 +128,12 @@ async function publicBootstrap() {
             },
           ],
         },
-        branding: { tagline: 'A tua tela. A nossa Angola.', homeAnnouncement: null },
+        branding: {},
         support: {
           email: 'support@minhatela.net',
           hours: 'Seg–Sex 09:00–18:00 (WAT)',
         },
-      },
+      }),
       degraded: true,
     };
   }

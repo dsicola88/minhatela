@@ -40,3 +40,8 @@ body,
     color: var(--ao-text);
   }
 }
+
+/* Console empresa: sidebar e tabelas densas */
+[data-admin-console] {
+  font-feature-settings: 'ss01' on;
+}

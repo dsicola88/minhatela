@@ -20,6 +20,15 @@ A decisão de reprodução é **sempre** da API:
 
 Fluxo: autenticar → conteúdo → direitos → AVOD/SVOD/TVOD → ads → Bunny.
 
+Documentação enterprise:
+
+- [docs/architecture.md](./docs/architecture.md)
+- [docs/rbac.md](./docs/rbac.md)
+- [docs/content-lifecycle.md](./docs/content-lifecycle.md)
+- [docs/rights-management.md](./docs/rights-management.md)
+- [docs/entitlements.md](./docs/entitlements.md)
+- [docs/playback.md](./docs/playback.md)
+
 ## Estrutura
 
 ```text
