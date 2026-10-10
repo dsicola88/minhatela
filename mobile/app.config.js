@@ -14,20 +14,16 @@ module.exports = () => {
   const expo = appJson.expo;
   const fromEnv =
     process.env.EXPO_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || '';
-  const fromExtra = expo.extra?.apiBaseUrl || '';
-  const looksLocal =
-    !fromEnv ||
-    fromEnv.includes('localhost') ||
-    fromEnv.includes('127.0.0.1') ||
-    fromEnv.includes('api.minhatela.net'); // DNS ainda down — evita NetworkError
+  const hostedBuild = Boolean(process.env.VERCEL || process.env.EAS_BUILD || process.env.CI);
+  const envIsRemote =
+    Boolean(fromEnv) &&
+    !/localhost|127\.0\.0\.1|api\.minhatela\.net/.test(fromEnv);
 
-  const apiBaseUrl = !looksLocal
+  const apiBaseUrl = envIsRemote
     ? fromEnv
-    : fromExtra && !/localhost|127\.0\.0\.1/.test(fromExtra)
-      ? fromExtra
-      : process.env.NODE_ENV === 'production' || process.env.VERCEL
-        ? PRODUCTION_API
-        : 'http://localhost:4000';
+    : hostedBuild
+      ? PRODUCTION_API
+      : 'http://localhost:4000';
 
   const appPublicUrl =
     process.env.EXPO_PUBLIC_APP_PUBLIC_URL ||
@@ -43,6 +39,9 @@ module.exports = () => {
         ...expo.extra,
         apiBaseUrl,
         appPublicUrl,
+        googleClientId:
+          process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ||
+          '95844743288-j16f33j4dnhr992n45kkt9dn28c4jn20.apps.googleusercontent.com',
       },
     },
   };

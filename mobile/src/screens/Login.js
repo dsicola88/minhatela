@@ -13,7 +13,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { PrimaryButton, FieldLabel } from '../components/ui';
-import { colors, brand, layout } from '../theme/tokens';
+import { colors, layout } from '../theme/tokens';
+import { useBrandCopy } from '../context/AppConfigContext';
 import {
   login,
   register,
@@ -22,12 +23,14 @@ import {
   mfaSetupConfirm,
   mfaVerifyLogin,
 } from '../services/auth';
-import { oauthLogin, buildDemoOAuthToken } from '../services/phase25';
+import { oauthLogin, requestGoogleAccessToken } from '../services/phase25';
+import Constants from 'expo-constants';
 import { getDeviceIdentity } from '../platform/deviceIdentity';
 
 export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
   const { width, height } = useWindowDimensions();
   const isCompact = width < 768;
+  const branding = useBrandCopy();
   const [mode, setMode] = useState('login');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -48,30 +51,32 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
 
   async function handleOAuth(provider) {
     setError('');
-    const mail = (email || '').trim().toLowerCase();
-    if (!mail || !mail.includes('@')) {
-      setError(`Introduza o email e toque em ${provider === 'google' ? 'Google' : 'Apple'}.`);
+    if (provider === 'apple') {
+      setError('Login Apple ainda não está configurado. Use email ou Google.');
+      return;
+    }
+    if (Platform.OS !== 'web') {
+      setError('Login Google neste momento funciona no site. Na app use email e palavra-passe.');
       return;
     }
     setLoading(true);
     try {
+      const clientId = Constants.expoConfig?.extra?.googleClientId;
+      const accessToken = await requestGoogleAccessToken(clientId);
       const device = await getDeviceIdentity();
-      const idToken = buildDemoOAuthToken({
-        provider,
-        email: mail,
-        fullName: fullName || mail.split('@')[0],
-      });
-      const data = await oauthLogin(provider, {
-        idToken,
-        email: mail,
-        fullName: fullName || mail.split('@')[0],
+      const data = await oauthLogin('google', {
+        accessToken,
         deviceName: device.deviceName,
         platform: device.platform,
       });
+      if (data?.mfaRequired || data?.mfaSetupRequired) {
+        setError('Esta conta de staff precisa de MFA. Entre com email e palavra-passe.');
+        return;
+      }
       await applyAuthSession(data);
       onSuccess?.();
     } catch (err) {
-      setError(err.message || 'Falha no login social');
+      setError(err.message || 'Falha no login Google');
     } finally {
       setLoading(false);
     }
@@ -170,7 +175,7 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
                     letterSpacing: 2,
                   }}
                 >
-                  {brand.name.toUpperCase()}
+                  {(branding.appName || 'MinhaTela').toUpperCase()}
                 </Text>
               </View>
 
@@ -196,7 +201,7 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
                   {mode === 'login' ? 'Entrar' : 'Criar conta'}
                 </Text>
                 <Text style={{ color: colors.textSecondary, marginBottom: 24 }}>
-                  {brand.tagline}
+                  {branding.tagline}
                 </Text>
 
                 {mode === 'register' ? (

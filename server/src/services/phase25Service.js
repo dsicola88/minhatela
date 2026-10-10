@@ -232,6 +232,40 @@ function playerExtras(profile) {
   };
 }
 
+async function verifyGoogleToken(body, expectedAud) {
+  const idToken = body.idToken || body.identityToken;
+  const accessToken = body.accessToken;
+  const url = idToken
+    ? `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`
+    : accessToken
+      ? `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`
+      : null;
+  if (!url) {
+    throw createError(400, 'Token Google obrigatório', 'OAUTH_TOKEN_REQUIRED');
+  }
+
+  const res = await fetch(url);
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok || payload.error_description || payload.error) {
+    throw createError(401, 'Token Google inválido', 'OAUTH_TOKEN_INVALID');
+  }
+
+  const aud = String(payload.aud || '');
+  const azp = String(payload.azp || '');
+  if (aud !== String(expectedAud) && azp !== String(expectedAud)) {
+    throw createError(401, 'Token Google inválido (audience)', 'OAUTH_AUD_MISMATCH');
+  }
+  const emailVerified =
+    payload.email_verified === true || String(payload.email_verified) === 'true';
+  if (!emailVerified) {
+    throw createError(401, 'Email Google não verificado', 'OAUTH_EMAIL_UNVERIFIED');
+  }
+  if (payload.exp && Number(payload.exp) * 1000 < Date.now()) {
+    throw createError(401, 'Token Google expirado', 'OAUTH_EXPIRED');
+  }
+  return payload;
+}
+
 async function oauthLogin(provider, body, meta = {}) {
   await featureFlagService.assertEnabled('oauth_enabled', 'Login social temporariamente indisponível');
 
@@ -249,28 +283,36 @@ async function oauthLogin(provider, body, meta = {}) {
     );
   }
 
-  const idToken = body.idToken || body.identityToken || body.token;
-  if (!idToken || String(idToken).length < 16) {
-    throw createError(400, 'idToken OAuth obrigatório', 'OAUTH_TOKEN_REQUIRED');
+  let payload;
+  if (provider === 'google') {
+    payload = await verifyGoogleToken(body, expectedAud);
+  } else {
+    const idToken = body.idToken || body.identityToken || body.token;
+    if (!idToken || String(idToken).length < 16) {
+      throw createError(400, 'idToken OAuth obrigatório', 'OAUTH_TOKEN_REQUIRED');
+    }
+    payload = decodeJwtPayload(idToken) || {};
+    if (!payload.sub || !payload.aud) {
+      throw createError(401, 'Token OAuth inválido', 'OAUTH_TOKEN_INVALID');
+    }
+    if (String(payload.aud) !== String(expectedAud)) {
+      throw createError(401, 'Token OAuth inválido (audience)', 'OAUTH_AUD_MISMATCH');
+    }
+    if (!payload.exp || payload.exp * 1000 < Date.now()) {
+      throw createError(401, 'Token OAuth expirado', 'OAUTH_EXPIRED');
+    }
   }
 
-  const payload = decodeJwtPayload(idToken) || {};
-  if (!payload.sub || !payload.aud) {
-    throw createError(401, 'Token OAuth inválido', 'OAUTH_TOKEN_INVALID');
-  }
-  if (String(payload.aud) !== String(expectedAud)) {
-    throw createError(401, 'Token OAuth inválido (audience)', 'OAUTH_AUD_MISMATCH');
-  }
-  if (!payload.exp || payload.exp * 1000 < Date.now()) {
-    throw createError(401, 'Token OAuth expirado', 'OAUTH_EXPIRED');
-  }
-
-  const providerSub = body.providerSub || payload.sub || body.sub;
+  const providerSub = provider === 'google' ? payload.sub : body.providerSub || payload.sub || body.sub;
   if (!providerSub) {
     throw createError(401, 'Token OAuth sem subject', 'OAUTH_TOKEN_INVALID');
   }
 
-  let email = (body.email || payload.email || '').toLowerCase().trim();
+  let email = (
+    provider === 'google' ? payload.email : body.email || payload.email || ''
+  )
+    .toLowerCase()
+    .trim();
   const fullName =
     body.fullName ||
     payload.name ||
@@ -316,6 +358,24 @@ async function oauthLogin(provider, body, meta = {}) {
   if (!roles.includes('customer')) {
     await userRepository.assignRole(user.id, 'customer');
     roles.push('customer');
+  }
+
+  const rbac = require('./rbacService');
+  const mfaService = require('./mfaService');
+  if (provider === 'google' && mfaService.staffMfaRequired() && rbac.isStaff(roles)) {
+    const mfa = await mfaService.loadMfa(user.id);
+    if (!mfa?.mfa_enabled_at) {
+      return {
+        mfaSetupRequired: true,
+        mfaTicket: mfaService.signMfaTicket(user.id, 'mfa_enroll'),
+        message: 'Staff tem de activar MFA antes de entrar.',
+      };
+    }
+    return {
+      mfaRequired: true,
+      mfaTicket: mfaService.signMfaTicket(user.id, 'mfa'),
+      message: 'Introduza o código MFA.',
+    };
   }
 
   const authService = require('./authService');
