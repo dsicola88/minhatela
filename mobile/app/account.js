@@ -4,7 +4,7 @@ import { useAuth } from '../src/context/AuthContext';
 
 export default function AccountRoute() {
   const router = useRouter();
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, user, logout } = useAuth();
 
   if (!isAuthenticated) {
     return <Redirect href="/login" />;
@@ -29,6 +29,12 @@ export default function AccountRoute() {
       onNetwork={() => router.push('/network')}
       onLanguages={() => router.push('/languages')}
       onInvoices={() => router.push('/invoices')}
+      onCatalog={() => router.replace('/home')}
+      onCreatorStudio={() => router.push('/creator-studio')}
+      onAds={() => router.push('/ads')}
+      onAdmin={
+        user?.capabilities?.adminConsole || user?.isAdmin ? () => router.push('/admin') : undefined
+      }
       onLogout={async () => {
         await logout();
         router.replace('/login');

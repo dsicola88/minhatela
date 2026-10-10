@@ -1,11 +1,12 @@
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import ProfilesScreen from '../src/screens/Profiles';
 import { useAuth } from '../src/context/AuthContext';
+import { workspacePath } from '../src/navigation/destinations';
 
 export default function ProfilesRoute() {
   const router = useRouter();
   const { manage } = useLocalSearchParams();
-  const { isAuthenticated, selectProfile } = useAuth();
+  const { isAuthenticated, user, selectProfile } = useAuth();
 
   if (!isAuthenticated) {
     return <Redirect href="/login" />;
@@ -16,7 +17,7 @@ export default function ProfilesRoute() {
       initialManage={manage === '1' || manage === 'true'}
       onSelect={(profile) => {
         selectProfile(profile);
-        router.replace('/home');
+        router.replace(manage === '1' || manage === 'true' ? '/account' : workspacePath(user));
       }}
     />
   );

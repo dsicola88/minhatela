@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   View,
   Text,
+  Pressable,
   useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -33,6 +34,7 @@ export default function Navbar({
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [solid, setSolid] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const isCompact = width < 768;
   const { t, locale, setLocale } = useI18n();
   const { isTV } = useDeviceProfile();
@@ -103,6 +105,16 @@ export default function Navbar({
                 {brand.name.toUpperCase()}
               </Text>
             </View>
+
+            {showLinks && (isCompact || isTV) ? (
+              <Focusable
+                id="nav-menu"
+                onPress={() => setMenuOpen((open) => !open)}
+                accessibilityLabel="Menu"
+              >
+                <Ionicons name={menuOpen ? 'close' : 'menu'} size={isTV ? 32 : 26} color={colors.text} />
+              </Focusable>
+            ) : null}
 
             {showLinks && !isCompact && !isTV ? (
               <View style={{ flexDirection: 'row', gap: 22, alignItems: 'center' }}>
@@ -224,6 +236,39 @@ export default function Navbar({
             </Focusable>
           </View>
         </View>
+        {menuOpen && (isCompact || isTV) ? (
+          <View style={{ paddingTop: 12, gap: 4 }}>
+            {[
+              { label: t('navNewHot'), onPress: onNewHot },
+              { label: 'Estreias', onPress: onPremieres },
+              { label: 'Para si', onPress: onForYou },
+              { label: 'Categorias', onPress: onLanguages },
+              { label: t('navSeries'), onPress: onBrowse ? () => onBrowse('series') : null },
+              { label: t('navFilms'), onPress: onBrowse ? () => onBrowse('films') : null },
+              { label: t('navAngola'), onPress: onBrowse ? () => onBrowse('angola') : null },
+              { label: t('navMyList'), onPress: onMyList },
+              { label: 'Conta e definições', onPress: onProfile },
+              onCreatorStudio ? { label: 'Estúdio', onPress: onCreatorStudio } : null,
+              onAds ? { label: 'Anúncios', onPress: onAds } : null,
+              onAdmin ? { label: 'Administração', onPress: onAdmin } : null,
+            ]
+              .filter((item) => item?.onPress)
+              .map((item) => (
+                <Pressable
+                  key={item.label}
+                  onPress={() => {
+                    setMenuOpen(false);
+                    item.onPress();
+                  }}
+                  style={{ paddingVertical: isTV ? 14 : 10 }}
+                >
+                  <Text style={{ color: colors.text, fontSize: isTV ? 22 : 16, fontWeight: '600' }}>
+                    {item.label}
+                  </Text>
+                </Pressable>
+              ))}
+          </View>
+        ) : null}
       </LinearGradient>
     </View>
   );

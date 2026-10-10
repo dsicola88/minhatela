@@ -1,13 +1,14 @@
 import { Redirect, useRouter } from 'expo-router';
 import LoginScreen from '../src/screens/Login';
 import { useAuth } from '../src/context/AuthContext';
+import { workspacePath } from '../src/navigation/destinations';
 
 export default function LoginRoute() {
   const router = useRouter();
-  const { isAuthenticated, hasProfile, markAuthenticated } = useAuth();
+  const { isAuthenticated, hasProfile, user, markAuthenticated } = useAuth();
 
   if (isAuthenticated && hasProfile) {
-    return <Redirect href="/home" />;
+    return <Redirect href={workspacePath(user)} />;
   }
 
   if (isAuthenticated && !hasProfile) {

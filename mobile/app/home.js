@@ -26,10 +26,8 @@ export default function HomeRoute() {
           setDetailsOpen(true);
         }}
         onPlay={(item) => router.push(`/watch/${item.id}`)}
-        onCreatorStudio={
-          user?.capabilities?.creatorStudio ? () => router.push('/creator-studio') : undefined
-        }
-        onAds={user?.roles?.includes('advertiser') ? () => router.push('/ads') : undefined}
+        onCreatorStudio={() => router.push('/creator-studio')}
+        onAds={() => router.push('/ads')}
         onSearch={() => router.push('/search')}
         onAdmin={
           user?.capabilities?.adminConsole || user?.isAdmin

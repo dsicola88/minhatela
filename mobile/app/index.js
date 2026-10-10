@@ -2,9 +2,10 @@ import { Redirect } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 import { useAuth } from '../src/context/AuthContext';
 import { colors } from '../src/theme/tokens';
+import { workspacePath } from '../src/navigation/destinations';
 
 export default function Index() {
-  const { ready, isAuthenticated, hasProfile } = useAuth();
+  const { ready, isAuthenticated, hasProfile, user } = useAuth();
 
   if (!ready) {
     return (
@@ -29,5 +30,5 @@ export default function Index() {
     return <Redirect href="/profiles" />;
   }
 
-  return <Redirect href="/home" />;
+  return <Redirect href={workspacePath(user)} />;
 }

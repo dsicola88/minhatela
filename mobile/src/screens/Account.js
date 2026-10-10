@@ -113,6 +113,10 @@ export default function Account({
   onNetwork,
   onLanguages,
   onInvoices,
+  onCatalog,
+  onCreatorStudio,
+  onAds,
+  onAdmin,
 }) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -311,6 +315,18 @@ export default function Account({
           ) : null}
 
           <Text style={{ color: colors.gold, fontSize: 12, fontWeight: '700', letterSpacing: 1.2 }}>
+            ESPAÇOS
+          </Text>
+          {onCatalog ? <Row label="Catálogo" value="Assistir" icon="play-outline" onPress={onCatalog} /> : null}
+          {onCreatorStudio ? (
+            <Row label="Estúdio" value="Conteúdos" icon="film-outline" onPress={onCreatorStudio} />
+          ) : null}
+          {onAds ? <Row label="Anúncios" value="Campanhas" icon="megaphone-outline" onPress={onAds} /> : null}
+          {onAdmin ? (
+            <Row label="Administração" value="Consola" icon="shield-checkmark-outline" onPress={onAdmin} />
+          ) : null}
+
+          <Text style={{ color: colors.gold, fontSize: 12, fontWeight: '700', letterSpacing: 1.2, marginTop: 28 }}>
             ASSINATURA
           </Text>
           <Row
