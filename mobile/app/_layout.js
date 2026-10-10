@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../src/context/AuthContext';
+import { AppConfigProvider } from '../src/context/AppConfigContext';
 import { LanguageProvider } from '../src/i18n';
 import { FocusProvider } from '../src/tv/FocusContext';
 import { ThemeProvider, useTheme } from '../src/theme/ThemeContext';
@@ -35,9 +36,11 @@ function ThemedRoot() {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.black }}>
       <SafeAreaProvider>
         <LanguageProvider defaultLocale="pt">
-          <AuthProvider>
-            <AppShell />
-          </AuthProvider>
+          <AppConfigProvider>
+            <AuthProvider>
+              <AppShell />
+            </AuthProvider>
+          </AppConfigProvider>
         </LanguageProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
