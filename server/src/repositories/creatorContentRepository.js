@@ -150,7 +150,7 @@ async function listForModeration(status = 'submitted') {
      FROM videos v
      LEFT JOIN creators c ON c.id = v.creator_id
      LEFT JOIN users u ON u.id = c.user_id
-     WHERE v.workflow_status = $1
+     WHERE v.workflow_status = $1::content_workflow
      ORDER BY v.submitted_at ASC NULLS LAST, v.created_at ASC`,
     [status]
   );
@@ -163,8 +163,8 @@ async function moderate(contentId, { status, reviewerId, rejectionReason }) {
 
   const result = await query(
     `UPDATE videos
-     SET workflow_status = $2,
-         is_published = CASE WHEN $2 = 'published' THEN TRUE ELSE FALSE END,
+     SET workflow_status = $2::content_workflow,
+         is_published = CASE WHEN $2::text = 'published' THEN TRUE ELSE FALSE END,
          reviewed_at = NOW(),
          reviewer_id = $3,
          rejection_reason = $4,

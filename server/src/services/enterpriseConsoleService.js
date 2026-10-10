@@ -487,7 +487,10 @@ async function patchCatalogTitle(actorId, contentId, body, meta = {}) {
       body.isFeatured === undefined ? null : Boolean(body.isFeatured),
       body.monetization || null,
       body.rentalPriceKz !== undefined,
-      body.rentalPriceKz === null || body.rentalPriceKz === ''
+      body.rentalPriceKz === undefined ||
+        body.rentalPriceKz === null ||
+        body.rentalPriceKz === '' ||
+        Number.isNaN(Number(body.rentalPriceKz))
         ? null
         : Number(body.rentalPriceKz),
       body.workflowStatus || null,
