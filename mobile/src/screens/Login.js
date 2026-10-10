@@ -366,22 +366,13 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
                   >
                     OU CONTINUAR COM
                   </Text>
-                  <View style={{ flexDirection: 'row', gap: 10 }}>
-                    <PrimaryButton
-                      label="Google"
-                      variant="outline"
-                      onPress={() => handleOAuth('google')}
-                      disabled={loading}
-                      style={{ flex: 1 }}
-                    />
-                    <PrimaryButton
-                      label="Apple"
-                      variant="outline"
-                      onPress={() => handleOAuth('apple')}
-                      disabled={loading}
-                      style={{ flex: 1 }}
-                    />
-                  </View>
+                  <PrimaryButton
+                    label="Continuar com Google"
+                    variant="outline"
+                    onPress={() => handleOAuth('google')}
+                    disabled={loading}
+                    style={{ alignSelf: 'stretch' }}
+                  />
                 </View>
 
                 <Pressable
