@@ -13,6 +13,7 @@ const {
   periodDays,
   MIN_PAYOUT_KZ,
 } = require('../utils/studioRules');
+const { normalizePublicWebUrl } = require('../utils/publicWebUrl');
 
 function mapCreator(row) {
   if (!row) return null;
@@ -111,7 +112,7 @@ function studioGuide(creator, contents) {
       step: 3,
       of: 4,
       title: 'Filme na mesa da equipa',
-      body: 'Moderação decide se entra no catálogo. Recebe aviso da decisão.',
+      body: 'A equipa decide se entra no catálogo. Recebe um aviso da decisão.',
     };
   }
   return {
@@ -219,7 +220,7 @@ function monetizationRules() {
   const adSharePercent = Math.round(Number(env.creatorAdShareBps || 0) / 100);
   return {
     qualifiedView:
-      'Uma visualização válida conta quando a reprodução chega a 92% e essa pessoa ainda não foi contada nesse filme nesse dia.',
+      'Uma visualização válida é o filme visto quase até ao fim, uma vez por pessoa, filme e dia.',
     viewKz,
     adSharePercent,
     minPayoutKz: MIN_PAYOUT_KZ,
@@ -256,7 +257,7 @@ function studioTasks(creator, contents, payouts) {
   if (rejected.length) {
     tasks.push({
       id: 'fix-films',
-      title: `${rejected.length} filme(s) para corrigir`,
+      title: rejected.length === 1 ? '1 filme para corrigir' : `${rejected.length} filmes para corrigir`,
       detail: 'A recusa traz o motivo. Pode editar e enviar outra vez.',
     });
   }
@@ -267,15 +268,15 @@ function studioTasks(creator, contents, payouts) {
   if (processing.length) {
     tasks.push({
       id: 'encoding',
-      title: `${processing.length} ficheiro(s) a processar`,
+      title: processing.length === 1 ? '1 ficheiro a processar' : `${processing.length} ficheiros a processar`,
       detail: 'A equipa não publica enquanto a qualidade não estiver pronta.',
     });
   }
   if (payouts?.pending) {
     tasks.push({
       id: 'payout',
-      title: `${payouts.pending} levantamento(s) em curso`,
-      detail: 'O pedido está com a equipa financeira. Ainda não é um pagamento feito.',
+      title: payouts.pending === 1 ? '1 levantamento em curso' : `${payouts.pending} levantamentos em curso`,
+      detail: 'O pedido está com a equipa financeira.',
     });
   }
   if (creator.status === 'active' && !creator.bankIban) {
@@ -292,8 +293,13 @@ async function createContent(userId, body) {
   const creator = await requireActiveCreator(userId);
 
   if (!body.title || !body.synopsisShort || !body.posterUrl) {
-    throw createError(400, 'Título, sinopse e poster são obrigatórios', 'VALIDATION');
+    throw createError(400, 'Título, sinopse e cartaz são obrigatórios', 'VALIDATION');
   }
+  const poster = normalizePublicWebUrl(body.posterUrl, { allowUpload: true });
+  if (!poster.ok) {
+    throw createError(400, 'Indique a ligação do cartaz, por exemplo estudio.ao/cartaz.jpg', 'VALIDATION');
+  }
+  body = { ...body, posterUrl: poster.url };
 
   if (body.monetization === 'tvod') {
     assertPositiveKz(body.rentalPriceKz || 0);
@@ -350,14 +356,14 @@ async function submitContent(userId, contentId, body = {}) {
   if (!isValidBunnyVideoId(current.bunny_video_id)) {
     throw createError(
       400,
-      'Antes de enviar à equipa, crie a ficha de vídeo e carregue o ficheiro.',
+      'Antes de enviar, associe o ficheiro do filme.',
       'BUNNY_VIDEO_REQUIRED'
     );
   }
   if (!rightsConfirmed(body)) {
     throw createError(
       400,
-      'Confirme que tem autorização para distribuir este filme na MinhaTela. Esta confirmação é uma declaração, não uma prova de propriedade.',
+      'Confirme que pode distribuir este filme na MinhaTela. A confirmação fica registada com data.',
       'RIGHTS_NOT_CONFIRMED'
     );
   }

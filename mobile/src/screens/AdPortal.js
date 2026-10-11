@@ -34,6 +34,7 @@ import {
   frameMock,
   mediaFileLabel,
 } from './adPlacementFrame';
+import { destinationFieldText, normalizePublicWebUrl } from './publicWebUrl';
 
 const STEPS = [
   { id: 1, title: 'Objectivo' },
@@ -140,6 +141,14 @@ export default function AdPortal({ onCatalog, onAccount }) {
     setBusy(true);
     setError('');
     try {
+      const destination = normalizePublicWebUrl(draft.clickUrl, {
+        optional: draft.objective !== 'traffic',
+      });
+      if (!destination.ok) {
+        setError(destination.message);
+        setStep(4);
+        return;
+      }
       const res = await createCampaign({
         name: draft.name,
         objective: draft.objective,
@@ -161,7 +170,7 @@ export default function AdPortal({ onCatalog, onAccount }) {
               ? draft.cards.filter((card) => String(card.mediaUrl || '').trim())
               : undefined,
           durationSeconds: draft.mediaKind === 'image' ? Number(draft.imageSeconds) || 6 : undefined,
-          clickUrl: draft.clickUrl,
+          clickUrl: destination.url,
           ctaLabel: draft.ctaLabel,
         },
       });
@@ -255,9 +264,7 @@ export default function AdPortal({ onCatalog, onAccount }) {
           Consola de publicidade
         </Text>
         <Text style={{ color: colors.muted, marginBottom: 22, lineHeight: 22 }}>
-          Empresa ou particular: cria a campanha, paga o orçamento (IBAN ou Multicaixa Express) e a
-          MinhaTela confirma. Só então o anúncio passa antes dos filmes gratuitos. Só a visualização
-          completa gasta o saldo pago. Angola.
+          Anúncios antes dos filmes gratuitos, em Angola. O saldo desce só quando o anúncio é visto até ao fim.
         </Text>
 
         {data?.guide && !wizard ? (
@@ -288,7 +295,7 @@ export default function AdPortal({ onCatalog, onAccount }) {
         {info ? (
           <Text style={{ color: colors.gold, marginBottom: 16, lineHeight: 20 }}>{info}</Text>
         ) : null}
-        {error ? <ErrorState message={error} onRetry={load} /> : null}
+        {error && !wizard ? <ErrorState message={error} onRetry={load} /> : null}
 
         {!advertiser ? (
           <View style={panelStyle()}>
@@ -347,6 +354,7 @@ export default function AdPortal({ onCatalog, onAccount }) {
             }}
             onSubmit={submitWizard}
             measurement={measurement}
+            formError={error}
           />
         ) : (
           <>
@@ -540,7 +548,7 @@ export default function AdPortal({ onCatalog, onAccount }) {
   );
 }
 
-function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, onSubmit, measurement }) {
+function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, onSubmit, measurement, formError }) {
   const { width } = useWindowDimensions();
   const wideFormats = width >= 760;
   const [uploading, setUploading] = useState(false);
@@ -606,14 +614,25 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
             O que quer com este anúncio?
           </Text>
           {[
-            { id: 'brand', label: 'Notoriedade — ser visto até ao fim' },
-            { id: 'traffic', label: 'Tráfego — abrir a página da empresa' },
-            { id: 'awareness', label: 'Presença de marca — ser visto até ao fim' },
-          ].map((o) => (
-            <Pressable key={o.id} onPress={() => setField('objective', o.id)} style={choice(draft.objective === o.id)}>
-              <Text style={{ color: colors.text }}>{o.label}</Text>
-            </Pressable>
-          ))}
+            {
+              id: 'brand',
+              label: 'Notoriedade',
+              hint: 'O anúncio passa antes do filme. O saldo desce quando é visto até ao fim.',
+            },
+            {
+              id: 'traffic',
+              label: 'Visitas ao site',
+              hint: 'O mesmo anúncio, com um botão que abre a página da empresa.',
+            },
+          ].map((o) => {
+            const selected = draft.objective === o.id || (o.id === 'brand' && draft.objective === 'awareness');
+            return (
+              <Pressable key={o.id} onPress={() => setField('objective', o.id)} style={choice(selected)}>
+                <Text style={{ color: colors.text, fontWeight: '800' }}>{o.label}</Text>
+                <Text style={{ color: colors.muted, marginTop: 4, lineHeight: 20 }}>{o.hint}</Text>
+              </Pressable>
+            );
+          })}
         </>
       ) : null}
       {step === 2 ? (
@@ -834,22 +853,41 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
               <PlacementFrames url={previewableMedia(draft.mediaUrl)} kind={draft.mediaKind} ctaLabel={draft.ctaLabel} />
             </>
           )}
-          {stepError ? (
-            <Text style={{ color: colors.red, marginTop: 8 }}>{stepError}</Text>
-          ) : null}
         </>
       ) : null}
       {step === 4 ? (
         <>
-          <FieldLabel>Página ao tocar (HTTPS)</FieldLabel>
-          <TextInput
-            value={draft.clickUrl}
-            onChangeText={(v) => setField('clickUrl', v)}
-            style={fieldStyle()}
-            autoCapitalize="none"
-            placeholder={draft.objective === 'traffic' ? 'Obrigatório para tráfego' : 'Opcional'}
-            placeholderTextColor={colors.muted}
-          />
+          <Text style={{ color: colors.text, fontWeight: '800', marginTop: 12 }}>Site da empresa</Text>
+          <Text style={{ color: colors.muted, marginTop: 4, marginBottom: 10, lineHeight: 20 }}>
+            {draft.objective === 'traffic'
+              ? 'O botão abre esta página. Escreva o site como no browser.'
+              : 'Opcional. Se preencher, o botão abre esta página.'}
+          </Text>
+          <View style={[fieldStyle(), { flexDirection: 'row', alignItems: 'center', paddingVertical: 0 }]}>
+            <Text style={{ color: colors.muted, fontWeight: '800' }}>https://</Text>
+            <TextInput
+              value={destinationFieldText(draft.clickUrl)}
+              onChangeText={(value) => {
+                setStepError('');
+                setField('clickUrl', value.replace(/^https?:\/\//i, ''));
+              }}
+              onBlur={() => {
+                const next = normalizePublicWebUrl(draft.clickUrl, { optional: true });
+                if (next.ok && next.url) setField('clickUrl', next.url);
+              }}
+              style={{ flex: 1, color: colors.text, paddingVertical: 12, paddingLeft: 6 }}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+              placeholder="empresa.ao"
+              placeholderTextColor={colors.muted}
+            />
+          </View>
+          {normalizePublicWebUrl(draft.clickUrl, { optional: true }).url ? (
+            <Text style={{ color: colors.success, marginTop: -4, marginBottom: 12 }}>
+              Ligação segura: {normalizePublicWebUrl(draft.clickUrl, { optional: true }).url}
+            </Text>
+          ) : null}
           <FieldLabel>Texto do botão</FieldLabel>
           <TextInput
             value={draft.ctaLabel}
@@ -887,59 +925,105 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
       ) : null}
       {step === 5 ? (
         <>
-          <Text style={{ color: colors.text, marginTop: 12, fontWeight: '700' }}>Antes do filme gratuito</Text>
-          <Text style={{ color: colors.muted, marginTop: 8, lineHeight: 20 }}>
-            Angola. Sem idade, bairro ou interesses — a MinhaTela não tem esses dados de forma legítima.
+          <Text style={{ color: colors.text, fontWeight: '800', marginTop: 12, marginBottom: 8 }}>
+            Onde o anúncio passa
           </Text>
-          <FieldLabel>Categoria de conteúdo (opcional)</FieldLabel>
+          <View style={choice(true)}>
+            <Text style={{ color: colors.text, fontWeight: '800' }}>Antes do filme gratuito</Text>
+            <Text style={{ color: colors.muted, marginTop: 4, lineHeight: 20 }}>
+              Angola · telemóvel e computador · quem abre um filme grátis
+            </Text>
+          </View>
+          <FieldLabel>Tema dos filmes</FieldLabel>
           <TextInput
             value={draft.contentCategory}
             onChangeText={(v) => setField('contentCategory', v)}
             style={fieldStyle()}
-            placeholder="Ex.: Cinema Angolano"
+            placeholder="Opcional. Ex.: Cinema angolano"
             placeholderTextColor={colors.muted}
           />
-          <FieldLabel>Máximo por pessoa e por dia (0 = sem limite)</FieldLabel>
-          <TextInput
-            value={draft.frequencyCapPerDay}
-            onChangeText={(v) => setField('frequencyCapPerDay', v)}
-            style={fieldStyle()}
-            keyboardType="numeric"
-            placeholderTextColor={colors.muted}
-          />
+          <Text style={{ color: colors.text, fontWeight: '700', marginBottom: 8 }}>Vezes por pessoa, por dia</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {[
+              ['0', 'Sem limite'],
+              ['1', '1'],
+              ['2', '2'],
+              ['3', '3'],
+            ].map(([value, label]) => {
+              const selected = String(draft.frequencyCapPerDay) === value;
+              return (
+                <Pressable
+                  key={value}
+                  onPress={() => setField('frequencyCapPerDay', value)}
+                  style={{
+                    borderWidth: selected ? 2 : 1,
+                    borderColor: selected ? colors.red : colors.border,
+                    borderRadius: 20,
+                    paddingHorizontal: 14,
+                    paddingVertical: 8,
+                  }}
+                >
+                  <Text style={{ color: colors.text, fontWeight: '700' }}>{label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </>
       ) : null}
       {step === 6 ? (
         <>
-          <FieldLabel>Orçamento total (Kz)</FieldLabel>
+          <FieldLabel>Orçamento (Kz)</FieldLabel>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+            {['5000', '15000', '50000', '150000'].map((amount) => {
+              const selected = String(draft.budgetKz) === amount;
+              return (
+                <Pressable
+                  key={amount}
+                  onPress={() => setField('budgetKz', amount)}
+                  style={{
+                    borderWidth: selected ? 2 : 1,
+                    borderColor: selected ? colors.red : colors.border,
+                    borderRadius: 20,
+                    paddingHorizontal: 14,
+                    paddingVertical: 8,
+                  }}
+                >
+                  <Text style={{ color: colors.text, fontWeight: '700' }}>
+                    {Number(amount).toLocaleString('pt-AO')}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
           <TextInput
             value={draft.budgetKz}
-            onChangeText={(v) => setField('budgetKz', v)}
+            onChangeText={(v) => setField('budgetKz', v.replace(/[^\d]/g, ''))}
             style={fieldStyle()}
             keyboardType="numeric"
             placeholderTextColor={colors.muted}
           />
-          <FieldLabel>Início</FieldLabel>
-          <TextInput value={draft.startsAt} onChangeText={(v) => setField('startsAt', v)} style={fieldStyle()} />
-          <FieldLabel>Fim</FieldLabel>
-          <TextInput value={draft.endsAt} onChangeText={(v) => setField('endsAt', v)} style={fieldStyle()} />
-          <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18 }}>
-            {measurement?.note} Cada visualização completa custa {measurement?.unitKz || '—'} Kz. Sem
-            estimativa de alcance.
+          <FieldLabel>Começa</FieldLabel>
+          <DateField value={draft.startsAt} onChange={(value) => setField('startsAt', value)} />
+          <FieldLabel>Termina</FieldLabel>
+          <DateField value={draft.endsAt} onChange={(value) => setField('endsAt', value)} />
+          <Text style={{ color: colors.text, lineHeight: 22 }}>
+            {budgetSummary(draft.budgetKz, measurement?.unitKz)}
           </Text>
         </>
       ) : null}
       {step === 7 ? (
         <>
           <Text style={{ color: colors.text, marginTop: 12, lineHeight: 22 }}>
-            {draft.name || 'Sem nome'} · {draft.objective === 'traffic' ? 'Tráfego' : 'Notoriedade'}
+            {draft.name || 'Sem nome'} · {draft.objective === 'traffic' ? 'Visitas ao site' : 'Notoriedade'}
             {'\n'}
             {Number(draft.budgetKz || 0).toLocaleString('pt-AO')} Kz · {draft.startsAt} → {draft.endsAt}
             {'\n'}
             Antes do filme · Angola
             {'\n'}
             {creativeKindLabel(draft)}: {creativeSummary(draft)}
-            {draft.clickUrl ? `\nDestino: ${draft.clickUrl}` : ''}
+            {normalizePublicWebUrl(draft.clickUrl, { optional: true }).url
+              ? `\nSite: ${normalizePublicWebUrl(draft.clickUrl, { optional: true }).url}`
+              : ''}
             {draft.ctaLabel ? `\nBotão: ${draft.ctaLabel}` : ''}
           </Text>
           <PlacementFrames
@@ -948,12 +1032,14 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
             ctaLabel={draft.ctaLabel}
           />
           <Text style={{ color: colors.gold, marginTop: 12, lineHeight: 20 }}>
-            A seguir paga o orçamento (IBAN ou Multicaixa Express). Sem pagamento confirmado o
-            SuperAdmin não põe o anúncio no ar.
+            A seguir paga por IBAN ou Multicaixa Express. O anúncio só entra na fila depois do pagamento.
           </Text>
         </>
       ) : null}
 
+      {stepError || formError ? (
+        <Text style={{ color: colors.red, marginTop: 12, lineHeight: 20 }}>{stepError || formError}</Text>
+      ) : null}
       <View style={{ flexDirection: 'row', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
         <PrimaryButton label="Cancelar" variant="outline" onPress={onCancel} style={{ flexGrow: 1 }} />
         {step > 1 ? (
@@ -963,12 +1049,17 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
           <PrimaryButton
             label="Continuar"
             disabled={!ready || uploading}
-            onPress={() => setStep(step + 1)}
+            onPress={() => {
+              if (step === 4 && !acceptDestination(draft, setField, setStepError)) return;
+              if (step === 6 && !acceptBudget(draft, setStepError)) return;
+              setStepError('');
+              setStep(step + 1);
+            }}
             style={{ flexGrow: 1 }}
           />
         ) : (
           <PrimaryButton
-            label="Criar e pagar"
+            label="Continuar para o pagamento"
             variant="gold"
             loading={busy}
             onPress={onSubmit}
@@ -977,6 +1068,71 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
         )}
       </View>
     </View>
+  );
+}
+
+function acceptDestination(draft, setField, setStepError) {
+  const required = draft.objective === 'traffic';
+  const next = normalizePublicWebUrl(draft.clickUrl, { optional: !required });
+  if (!next.ok) {
+    setStepError(next.message);
+    return false;
+  }
+  if (next.url) setField('clickUrl', next.url);
+  return true;
+}
+
+function acceptBudget(draft, setStepError) {
+  const amount = Number(draft.budgetKz);
+  if (!Number.isFinite(amount) || amount < 5000) {
+    setStepError('O orçamento mínimo é 5 000 Kz.');
+    return false;
+  }
+  const start = new Date(`${draft.startsAt}T00:00:00`);
+  const end = new Date(`${draft.endsAt}T23:59:59`);
+  if (!(start < end)) {
+    setStepError('A data de fim tem de ser depois do início.');
+    return false;
+  }
+  return true;
+}
+
+function budgetSummary(budgetKz, unitKz) {
+  const budget = Number(budgetKz);
+  const unit = Number(unitKz) > 0 ? Number(unitKz) : 5;
+  if (!Number.isFinite(budget) || budget < 5000) return 'Mínimo 5 000 Kz.';
+  const views = Math.floor(budget / unit);
+  return `${budget.toLocaleString('pt-AO')} Kz chegam para cerca de ${views.toLocaleString('pt-AO')} visualizações completas, a ${unit.toLocaleString('pt-AO')} Kz cada.`;
+}
+
+function DateField({ value, onChange }) {
+  if (Platform.OS === 'web') {
+    return createElement('input', {
+      type: 'date',
+      value: value || '',
+      onChange: (event) => onChange(event.target.value),
+      style: {
+        display: 'block',
+        width: '100%',
+        boxSizing: 'border-box',
+        background: colors.surfaceSecondary,
+        color: colors.text,
+        border: `1px solid ${colors.border}`,
+        borderRadius: 4,
+        padding: 12,
+        marginBottom: 12,
+        fontSize: 16,
+      },
+    });
+  }
+  return (
+    <TextInput
+      value={value}
+      onChangeText={onChange}
+      style={fieldStyle()}
+      placeholder="AAAA-MM-DD"
+      placeholderTextColor={colors.muted}
+    />
   );
 }
 
@@ -1107,9 +1263,9 @@ function PlacementFrames({ url, kind, ctaLabel }) {
 
   return (
     <View style={{ marginTop: 16 }}>
-      <Text style={{ color: colors.text, fontWeight: '800' }}>Como fica no ecrã</Text>
+      <Text style={{ color: colors.text, fontWeight: '800' }}>Pré-visualização</Text>
       <Text style={{ color: colors.muted, marginTop: 4, marginBottom: 12, lineHeight: 20 }}>
-        O retângulo preto é o ecrã de reprodução. O anúncio fica centrado, com o tamanho real do ficheiro, sem ser esticado.
+        O anúncio fica centrado no ecrã do filme, sem ser esticado.
       </Text>
       <View style={{ flexDirection: sideBySide ? 'row' : 'column', gap: 16, alignItems: 'flex-start' }}>
         {screens.map((screen) => {
@@ -1127,8 +1283,6 @@ function PlacementFrames({ url, kind, ctaLabel }) {
                 y: Math.round(fit.y * mock.scale),
               }
             : { width: mock.width, height: mock.height, x: 0, y: 0 };
-          const heightPct = fit ? Math.round((fit.height / screen.height) * 100) : null;
-          const widthPct = fit ? Math.round((fit.width / screen.width) * 100) : null;
           return (
             <View key={screen.id} style={{ maxWidth: '100%' }}>
               <Text style={{ color: colors.text, fontWeight: '700', marginBottom: 6 }}>{screen.label}</Text>
@@ -1143,7 +1297,16 @@ function PlacementFrames({ url, kind, ctaLabel }) {
                   borderColor: colors.border,
                 }}
               >
-                <View style={{ position: 'absolute', left: box.x, top: box.y, width: box.width, height: box.height }}>
+                <View
+                  style={{
+                    position: 'absolute',
+                    left: box.x,
+                    top: box.y,
+                    width: box.width,
+                    height: box.height,
+                    overflow: 'hidden',
+                  }}
+                >
                   <FittedCreative
                     uri={uri}
                     showVideo={showVideo}
@@ -1181,9 +1344,7 @@ function PlacementFrames({ url, kind, ctaLabel }) {
                 ) : null}
               </View>
               <Text style={{ color: colors.muted, marginTop: 6, fontSize: 12, lineHeight: 18, maxWidth: mock.width }}>
-                {fit
-                  ? `Ecrã ${screen.width}×${screen.height}. O anúncio fica a ${fit.width}×${fit.height} px (${widthPct}% da largura, ${heightPct}% da altura).`
-                  : `Ecrã ${screen.width}×${screen.height}. A medir o ficheiro…`}
+                {screen.id === 'phone' ? 'Telemóvel, ecrã inteiro' : 'Computador, antes do filme'}
               </Text>
             </View>
           );
@@ -1197,13 +1358,22 @@ function FittedCreative({ uri, showVideo, width, height, onSize }) {
   if (showVideo && Platform.OS === 'web') {
     return createElement('video', {
       src: uri,
-      controls: true,
+      muted: true,
       playsInline: true,
+      preload: 'metadata',
       onLoadedMetadata: (event) => {
         const video = event.currentTarget;
         if (video?.videoWidth) onSize({ width: video.videoWidth, height: video.videoHeight });
       },
-      style: { width, height, objectFit: 'contain', background: '#000' },
+      style: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        objectFit: 'contain',
+        backgroundColor: '#000',
+      },
     });
   }
   if (showVideo) {

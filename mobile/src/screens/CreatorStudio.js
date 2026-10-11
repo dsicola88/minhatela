@@ -39,10 +39,10 @@ const EMPTY_FILM = {
   synopsisShort: '',
   synopsisFull: '',
   posterUrl: '',
-  genre: 'Cinema Angolano',
+  genre: 'Cinema angolano',
   ageRating: '12',
   releaseYear: String(new Date().getFullYear()),
-  durationSeconds: '',
+  durationMinutes: '',
   monetization: 'avod',
   rentalPriceKz: '1500',
   bunnyVideoId: '',
@@ -68,8 +68,35 @@ function maskIban(value) {
   return `•••• ${raw.slice(-4)}`;
 }
 
+function panel(extra) {
+  return cardSurface({ padding: 20, marginBottom: 16, ...extra });
+}
+
+function inputStyle(extra) {
+  return fieldSurface({
+    backgroundColor: colors.id === 'light' ? '#FFFFFF' : colors.elevated,
+    marginBottom: 0,
+    ...extra,
+  });
+}
+
 function kz(value) {
   return `${Number(value || 0).toLocaleString('pt-AO')} Kz`;
+}
+
+function payoutStatusLabel(status) {
+  if (status === 'pending') return 'Em análise';
+  if (status === 'paid') return 'Pago';
+  if (status === 'rejected') return 'Recusado';
+  return 'Em tratamento';
+}
+
+function ledgerSourceLabel(source) {
+  if (source === 'view') return 'Visualização válida';
+  if (source === 'ad_share') return 'Parte dos anúncios';
+  if (source === 'adjustment') return 'Ajuste';
+  if (source === 'reversal') return 'Correcção';
+  return 'Movimento';
 }
 
 export default function CreatorStudio({ onBack, onCompany }) {
@@ -157,7 +184,7 @@ export default function CreatorStudio({ onBack, onCompany }) {
     setError('');
     try {
       await registerCreator(registerForm);
-      setInfo('Candidatura enviada. Pode carregar filmes depois da decisão da equipa.');
+      setInfo('Candidatura enviada. Avisamos quando o estúdio estiver aberto.');
       await load();
     } catch (err) {
       setError(err.message);
@@ -175,7 +202,7 @@ export default function CreatorStudio({ onBack, onCompany }) {
       genre: film.genre.trim(),
       ageRating: film.ageRating.trim() || '12',
       releaseYear: Number(film.releaseYear) || new Date().getFullYear(),
-      durationSeconds: film.durationSeconds ? Number(film.durationSeconds) : 0,
+      durationSeconds: film.durationMinutes ? Math.round(Number(film.durationMinutes) * 60) : 0,
       monetization: film.monetization,
       rentalPriceKz: film.monetization === 'tvod' ? Number(film.rentalPriceKz) : null,
       bunnyVideoId: film.bunnyVideoId || undefined,
@@ -203,7 +230,7 @@ export default function CreatorStudio({ onBack, onCompany }) {
     setError('');
     try {
       await createCreatorContent(filmPayload());
-      setInfo('Rascunho guardado. Ainda não está na mesa da equipa.');
+      setInfo('Rascunho guardado. Ainda não foi enviado para análise.');
       setFilm(EMPTY_FILM);
       setWizardStep(0);
       setSection('films');
@@ -263,7 +290,7 @@ export default function CreatorStudio({ onBack, onCompany }) {
 
   async function handleCreateBunnySlot() {
     if (!film.title.trim()) {
-      setError('Indique o título antes de criar a ficha de vídeo.');
+      setError('Indique o título antes de enviar o filme.');
       return;
     }
     if (film.bunnyVideoId && film.uploadDashboardUrl) {
@@ -318,17 +345,29 @@ export default function CreatorStudio({ onBack, onCompany }) {
             MINHATELA
           </Text>
           <Text style={{ color: colors.red, fontWeight: '800', letterSpacing: 1, marginTop: 4 }}>ESTÚDIO</Text>
-          <Text style={{ color: colors.text, fontWeight: '800', fontSize: 18, marginBottom: 12 }}>
-            {creator?.displayName || 'MinhaTela'}
+          <Text style={{ color: colors.text, fontWeight: '800', fontSize: 18, marginTop: 16, marginBottom: 16 }}>
+            {creator?.displayName || 'Candidatura'}
           </Text>
-          <View style={{ flexDirection: isCompact ? 'row' : 'column', flexWrap: 'wrap', gap: 10 }}>
-            {nav.map((item) => (
-              <Pressable key={item.id} onPress={() => setSection(item.id)}>
-                <Text style={{ color: section === item.id ? colors.gold : colors.textSecondary, fontWeight: '700' }}>
-                  {item.label}
-                </Text>
-              </Pressable>
-            ))}
+          <View style={{ flexDirection: isCompact ? 'row' : 'column', flexWrap: 'wrap', gap: 6 }}>
+            {nav.map((item) => {
+              const selected = section === item.id;
+              return (
+                <Pressable
+                  key={item.id}
+                  onPress={() => setSection(item.id)}
+                  style={{
+                    backgroundColor: selected ? 'rgba(201,160,10,0.16)' : 'transparent',
+                    borderRadius: 8,
+                    paddingVertical: 8,
+                    paddingHorizontal: 10,
+                  }}
+                >
+                  <Text style={{ color: selected ? colors.text : colors.textSecondary, fontWeight: '700' }}>
+                    {item.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
             {onBack ? (
               <Pressable onPress={onBack} style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Ionicons name="play-outline" size={16} color={colors.muted} />
@@ -343,13 +382,16 @@ export default function CreatorStudio({ onBack, onCompany }) {
           contentContainerStyle={{
             padding: isCompact ? 16 : 32,
             width: '100%',
-            maxWidth: 760,
-            alignSelf: 'center',
+            alignItems: 'center',
             paddingBottom: 80,
           }}
         >
+          <View style={{ width: '100%', maxWidth: 720 }}>
           {info ? <Text style={{ color: colors.gold, marginBottom: 12, lineHeight: 20 }}>{info}</Text> : null}
-          {error ? <ErrorState message={error} onRetry={load} /> : null}
+          {!data && error ? <ErrorState message={error} onRetry={load} /> : null}
+          {data && error && section !== 'new' ? (
+            <Text style={{ color: colors.red, marginBottom: 12, lineHeight: 20 }}>{error}</Text>
+          ) : null}
           {section === 'home' ? (
             <Home
               data={data}
@@ -401,6 +443,7 @@ export default function CreatorStudio({ onBack, onCompany }) {
               onCreateSlot={handleCreateBunnySlot}
               onSaveDraft={handleSaveDraft}
               onSubmit={handleSubmitNew}
+              formError={error}
             />
           ) : null}
           {section === 'money' && active ? (
@@ -419,7 +462,7 @@ export default function CreatorStudio({ onBack, onCompany }) {
                 setError('');
                 try {
                   await updateCreatorBank(bankForm);
-                  setInfo('IBAN guardado. O levantamento continua a ser tratado pela equipa, não é transferência automática.');
+                  setInfo('IBAN guardado. Os levantamentos passam pela equipa financeira.');
                   await load();
                 } catch (err) {
                   setError(err.message);
@@ -432,7 +475,7 @@ export default function CreatorStudio({ onBack, onCompany }) {
                 setError('');
                 try {
                   await requestPayout({ amountKz: Number(payoutAmount) });
-                  setInfo('Pedido registado. A equipa financeira ainda tem de o processar.');
+                  setInfo('Pedido registado. A equipa financeira trata o pagamento.');
                   setPayouts(await fetchMyPayouts());
                   await load();
                 } catch (err) {
@@ -443,6 +486,7 @@ export default function CreatorStudio({ onBack, onCompany }) {
               }}
             />
           ) : null}
+          </View>
         </ScrollView>
       </View>
     </View>
@@ -452,8 +496,8 @@ export default function CreatorStudio({ onBack, onCompany }) {
 function Home({ data, creator, active, analytics, period, onPeriod, registerForm, setRegisterForm, onRegister, busy, onCompany }) {
   return (
     <View>
-      {data?.guide ? (
-        <View style={cardSurface()}>
+      {data?.guide && creator ? (
+        <View style={panel()}>
           <Text style={{ color: colors.gold, fontSize: 12, fontWeight: '800' }}>
             PASSO {data.guide.step} DE {data.guide.of}
           </Text>
@@ -462,9 +506,15 @@ function Home({ data, creator, active, analytics, period, onPeriod, registerForm
         </View>
       ) : null}
       {!creator ? (
-        <Application form={registerForm} setForm={setRegisterForm} busy={busy} onSubmit={onRegister} />
+        <Application
+          guide={data?.guide}
+          form={registerForm}
+          setForm={setRegisterForm}
+          busy={busy}
+          onSubmit={onRegister}
+        />
       ) : (
-        <View style={cardSurface()}>
+        <View style={panel()}>
           <Text style={{ color: colors.text, fontSize: 18, fontWeight: '800' }}>{creator.displayName}</Text>
           <Text style={{ color: colors.gold, marginTop: 4 }}>{creator.statusLabel} · {creator.typeLabel}</Text>
           {!active ? (
@@ -479,8 +529,10 @@ function Home({ data, creator, active, analytics, period, onPeriod, registerForm
           ) : null}
         </View>
       )}
-      {(data?.tasks || []).map((task) => (
-        <View key={task.id} style={cardSurface()}>
+      {(data?.tasks || [])
+        .filter((task) => creator || task.id !== 'apply')
+        .map((task) => (
+        <View key={task.id} style={panel()}>
           <Text style={{ color: colors.text, fontWeight: '700' }}>{task.title}</Text>
           <Text style={{ color: colors.muted, marginTop: 4 }}>{task.detail}</Text>
         </View>
@@ -495,7 +547,7 @@ function Home({ data, creator, active, analytics, period, onPeriod, registerForm
             ))}
           </View>
           <Text style={{ color: colors.muted, marginBottom: 10, lineHeight: 18 }}>
-            Os números de filmes são o estado actual. Inícios, espectadores e receita registada respeitam o período.
+            Os filmes mostram o estado actual. Reproduções, espectadores e receita seguem o período escolhido.
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
             <Metric label="Publicados" value={analytics.content?.published} />
@@ -503,7 +555,7 @@ function Home({ data, creator, active, analytics, period, onPeriod, registerForm
             <Metric label="Em análise" value={(analytics.content?.submitted || 0) + (analytics.content?.underReview || 0)} />
             <Metric label="Recusados" value={analytics.content?.rejected} />
             <Metric label="A processar" value={analytics.content?.processing} />
-            <Metric label="Inícios de reprodução" value={analytics.views} />
+            <Metric label="Reproduções iniciadas" value={analytics.views} />
             <Metric label="Visualizações válidas" value={analytics.validViews} />
             <Metric label="Espectadores" value={analytics.uniqueViewers} />
             <Metric label="Na lista" value={analytics.subscribers} />
@@ -512,20 +564,15 @@ function Home({ data, creator, active, analytics, period, onPeriod, registerForm
             <Metric label="Levantamentos em curso" value={analytics.payouts?.pending} />
           </View>
           <Text style={{ color: colors.muted, marginTop: 12, lineHeight: 18 }}>
-            Espectador é uma conta com início de reprodução. Visualização válida é o crédito aos 92%, uma vez por pessoa, filme e dia.
-            {analytics.completion?.rate != null ? ` Conclusão dos progressos gravados: ${analytics.completion.rate}%.` : ''}
+            Uma visualização válida é o filme visto quase até ao fim, uma vez por pessoa e por dia.
+            {analytics.completion?.rate != null ? ` ${analytics.completion.rate}% das reproduções gravadas chegaram ao fim.` : ''}
           </Text>
-          {(analytics.unavailable || []).map((item) => (
-            <Text key={item.id} style={{ color: colors.muted, marginTop: 6, lineHeight: 18 }}>
-              {item.label}: indisponível. {item.reason}
-            </Text>
-          ))}
           {(analytics.titles || []).length ? (
-            <View style={[cardSurface(), { marginTop: 16 }]}>
+            <View style={panel({ marginTop: 16 })}>
               <Text style={{ color: colors.text, fontWeight: '800', marginBottom: 8 }}>Por filme</Text>
               {analytics.titles.map((item) => (
                 <Text key={item.id} style={{ color: colors.textSecondary, marginTop: 6 }}>
-                  {item.title}: {item.starts} inícios · {item.validViews} válidas · {kz(item.earningsKz)}
+                  {item.title}: {item.starts} reproduções · {item.validViews} válidas · {kz(item.earningsKz)}
                 </Text>
               ))}
             </View>
@@ -536,34 +583,69 @@ function Home({ data, creator, active, analytics, period, onPeriod, registerForm
   );
 }
 
-function Application({ form, setForm, busy, onSubmit }) {
+function Application({ guide, form, setForm, busy, onSubmit }) {
   const patch = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   return (
-    <View style={cardSurface()}>
-      <Text style={{ color: colors.text, fontSize: 20, fontWeight: '800', marginBottom: 12 }}>Pedir o estúdio</Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
-        {[
-          ['filmmaker', 'Cineasta independente'],
-          ['creator', 'Criador'],
-          ['producer', 'Produtor'],
-          ['production_company', 'Produtora'],
-        ].map(([id, label]) => (
-          <Pressable key={id} onPress={() => patch('type', id)}>
-            <Text style={{ color: form.type === id ? colors.gold : colors.textSecondary, fontWeight: '700' }}>{label}</Text>
+    <View style={panel()}>
+      <Text style={{ color: colors.gold, fontSize: 12, fontWeight: '800' }}>
+        PASSO {guide?.step || 1} DE {guide?.of || 4}
+      </Text>
+      <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800', marginTop: 6 }}>Pedir o estúdio</Text>
+      <Text style={{ color: colors.muted, marginTop: 6, marginBottom: 18, lineHeight: 20 }}>
+        A MinhaTela revê a candidatura. O contacto é o email desta conta.
+      </Text>
+      <View style={{ flexDirection: 'row', gap: 10, marginBottom: 8 }}>
+      {[
+        ['filmmaker', 'Cineasta', 'Em nome próprio.'],
+        ['production_company', 'Produtora', 'Em nome da empresa.'],
+      ].map(([id, label, hint]) => {
+        const selected = form.type === id || (id === 'filmmaker' && (form.type === 'creator' || form.type === 'producer'));
+        return (
+          <Pressable
+            key={id}
+            onPress={() => patch('type', id)}
+            style={{
+              flex: 1,
+              borderWidth: selected ? 2 : 1,
+              borderColor: selected ? colors.gold : colors.border,
+              borderRadius: 8,
+              padding: 14,
+              backgroundColor: colors.id === 'light' ? '#FFFFFF' : colors.elevated,
+            }}
+          >
+            <Text style={{ color: colors.text, fontWeight: '800' }}>{label}</Text>
+            <Text style={{ color: colors.muted, marginTop: 4, lineHeight: 18 }}>{hint}</Text>
           </Pressable>
-        ))}
+        );
+      })}
       </View>
-      <FieldLabel>Nome artístico ou produtora</FieldLabel>
-      <TextInput value={form.displayName} onChangeText={(v) => patch('displayName', v)} style={fieldSurface()} placeholderTextColor={colors.muted} />
-      <FieldLabel>Biografia</FieldLabel>
-      <TextInput value={form.bio} onChangeText={(v) => patch('bio', v)} style={[fieldSurface(), { minHeight: 96 }]} multiline placeholderTextColor={colors.muted} />
-      <Text style={{ color: colors.muted, marginBottom: 10 }}>O contacto da candidatura é o email da conta.</Text>
+      <FieldLabel>Nome no catálogo</FieldLabel>
+      <TextInput
+        value={form.displayName}
+        onChangeText={(v) => patch('displayName', v)}
+        style={[inputStyle(), { marginBottom: 12 }]}
+        placeholder="Nome artístico ou nome da produtora"
+        placeholderTextColor={colors.muted}
+      />
+      <FieldLabel>Apresentação</FieldLabel>
+      <TextInput
+        value={form.bio}
+        onChangeText={(v) => patch('bio', v)}
+        style={[inputStyle(), { minHeight: 96, marginBottom: 16 }]}
+        multiline
+        placeholder="Duas ou três frases sobre o trabalho"
+        placeholderTextColor={colors.muted}
+      />
+      <Text style={{ color: colors.text, fontWeight: '800', marginBottom: 4 }}>Conta de recebimento</Text>
+      <Text style={{ color: colors.muted, marginBottom: 12, lineHeight: 20 }}>
+        Opcional agora. Sem IBAN não há levantamento.
+      </Text>
       <FieldLabel>IBAN</FieldLabel>
-      <TextInput value={form.bankIban} onChangeText={(v) => patch('bankIban', v)} style={fieldSurface()} placeholder="AO06…" placeholderTextColor={colors.muted} />
+      <TextInput value={form.bankIban} onChangeText={(v) => patch('bankIban', v)} style={[inputStyle(), { marginBottom: 12 }]} placeholder="AO06…" autoCapitalize="characters" placeholderTextColor={colors.muted} />
       <FieldLabel>Banco</FieldLabel>
-      <TextInput value={form.bankName} onChangeText={(v) => patch('bankName', v)} style={fieldSurface()} placeholderTextColor={colors.muted} />
+      <TextInput value={form.bankName} onChangeText={(v) => patch('bankName', v)} style={[inputStyle(), { marginBottom: 12 }]} placeholder="Nome do banco" placeholderTextColor={colors.muted} />
       <FieldLabel>Titular</FieldLabel>
-      <TextInput value={form.bankAccountName} onChangeText={(v) => patch('bankAccountName', v)} style={fieldSurface()} placeholderTextColor={colors.muted} />
+      <TextInput value={form.bankAccountName} onChangeText={(v) => patch('bankAccountName', v)} style={[inputStyle(), { marginBottom: 16 }]} placeholder="Nome na conta" placeholderTextColor={colors.muted} />
       <PrimaryButton label="Submeter candidatura" variant="gold" loading={busy} onPress={onSubmit} />
     </View>
   );
@@ -580,7 +662,7 @@ function Films({ films, total, query, setQuery, statusFilter, setStatusFilter, p
   ];
   return (
     <View>
-      <TextInput value={query} onChangeText={setQuery} placeholder="Procurar título" placeholderTextColor={colors.muted} style={fieldSurface()} />
+      <TextInput value={query} onChangeText={setQuery} placeholder="Procurar título" placeholderTextColor={colors.muted} style={[inputStyle(), { marginBottom: 12 }]} />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
         {statuses.map(([id, label]) => (
           <Pressable key={id} onPress={() => setStatusFilter(id)}>
@@ -592,7 +674,7 @@ function Films({ films, total, query, setQuery, statusFilter, setStatusFilter, p
         <EmptyState title="Nenhum filme neste filtro" subtitle="Os rascunhos e os envios aparecem aqui." />
       ) : (
         films.map((item) => (
-          <View key={item.id} style={[cardSurface(), { flexDirection: 'row', gap: 12 }]}>
+          <View key={item.id} style={panel({ flexDirection: 'row', gap: 12, padding: 16 })}>
             {item.posterUrl ? (
               <Image source={{ uri: item.posterUrl }} style={{ width: 72, height: 104, backgroundColor: colors.surfaceSecondary }} />
             ) : (
@@ -603,17 +685,17 @@ function Films({ films, total, query, setQuery, statusFilter, setStatusFilter, p
               <Text style={{ color: colors.gold, marginTop: 4 }}>{item.workflowLabel} · {item.monetizationLabel}</Text>
               <Text style={{ color: colors.muted, marginTop: 4 }}>{encodingLabel(item)}</Text>
               <Text style={{ color: colors.muted, marginTop: 4 }}>
-                Actualizado {item.updatedAt ? String(item.updatedAt).slice(0, 10) : '—'}
+                Actualizado {item.updatedAt ? new Date(item.updatedAt).toLocaleDateString('pt-PT') : '—'}
               </Text>
               {item.rejectionReason ? <Text style={{ color: colors.red, marginTop: 6 }}>{item.rejectionReason}</Text> : null}
               {item.workflowStatus === 'draft' || item.workflowStatus === 'rejected' ? (
                 <View style={{ marginTop: 10 }}>
                   <Pressable onPress={() => setRightsFor((current) => ({ ...current, [item.id]: !current[item.id] }))}>
-                    <Text style={{ color: rightsFor[item.id] ? colors.gold : colors.textSecondary }}>
-                      {rightsFor[item.id] ? 'Direitos confirmados' : 'Confirmar direitos para enviar'}
+                    <Text style={{ color: rightsFor[item.id] ? colors.gold : colors.text, fontWeight: '700' }}>
+                      {rightsFor[item.id] ? 'Declaração confirmada' : 'Confirmar direitos deste filme'}
                     </Text>
                   </Pressable>
-                  <PrimaryButton label="Enviar à equipa" variant="gold" loading={busy} onPress={() => onSubmit(item.id)} style={{ marginTop: 8 }} />
+                  <PrimaryButton label="Enviar para análise" variant="gold" loading={busy} onPress={() => onSubmit(item.id)} style={{ marginTop: 8 }} />
                 </View>
               ) : null}
             </View>
@@ -635,7 +717,7 @@ function Finance({ analytics, payouts, ledger, iban, bankForm, setBankForm, amou
   const rules = analytics?.rules;
   return (
     <View>
-      <View style={cardSurface()}>
+      <View style={panel()}>
         <Text style={{ color: colors.text, fontWeight: '800', fontSize: 18 }}>Livro do estúdio</Text>
         <Line label="Receita registada" value={kz(analytics?.revenueKz)} />
         <Line label="Visualizações válidas" value={kz(analytics?.earningsBySource?.view)} />
@@ -646,39 +728,54 @@ function Finance({ analytics, payouts, ledger, iban, bankForm, setBankForm, amou
         <Line label="Pagos pela equipa" value={String(analytics?.payouts?.paid || 0)} />
         <Line label="Recusados" value={String(analytics?.payouts?.rejected || 0)} />
         <Text style={{ color: colors.muted, marginTop: 10, lineHeight: 18 }}>
-          {rules?.qualifiedView} Cada visualização válida vale {rules?.viewKz ?? '—'} Kz. A parte dos anúncios é {rules?.adSharePercent ?? '—'}% do valor cobrado. Premium e aluguer controlam o acesso e não creditam este livro.
+          {rules?.qualifiedView} Cada uma vale {rules?.viewKz ?? '—'} Kz. A parte dos anúncios é {rules?.adSharePercent ?? '—'}% do valor cobrado. Premium e aluguer definem quem vê; não entram neste livro.
         </Text>
       </View>
-      <View style={cardSurface()}>
-        <Text style={{ color: colors.text, fontWeight: '800', marginBottom: 8 }}>Conta para levantamento</Text>
+      <View style={panel()}>
+        <Text style={{ color: colors.text, fontWeight: '800', marginBottom: 8 }}>Conta de recebimento</Text>
         <Text style={{ color: colors.muted, marginBottom: 8, lineHeight: 18 }}>
-          IBAN actual {maskIban(iban)}. Sem IBAN o pedido de levantamento é recusado.
+          IBAN actual {maskIban(iban)}. Sem IBAN o levantamento não entra na fila.
         </Text>
         <FieldLabel>IBAN</FieldLabel>
-        <TextInput value={bankForm?.bankIban} onChangeText={(v) => setBankForm((c) => ({ ...c, bankIban: v }))} style={fieldSurface()} placeholder="AO06…" placeholderTextColor={colors.muted} />
+        <TextInput value={bankForm?.bankIban} onChangeText={(v) => setBankForm((c) => ({ ...c, bankIban: v }))} style={[inputStyle(), { marginBottom: 12 }]} placeholder="AO06…" autoCapitalize="characters" placeholderTextColor={colors.muted} />
         <FieldLabel>Banco</FieldLabel>
-        <TextInput value={bankForm?.bankName} onChangeText={(v) => setBankForm((c) => ({ ...c, bankName: v }))} style={fieldSurface()} placeholderTextColor={colors.muted} />
+        <TextInput value={bankForm?.bankName} onChangeText={(v) => setBankForm((c) => ({ ...c, bankName: v }))} style={[inputStyle(), { marginBottom: 12 }]} placeholder="Nome do banco" placeholderTextColor={colors.muted} />
         <FieldLabel>Titular</FieldLabel>
-        <TextInput value={bankForm?.bankAccountName} onChangeText={(v) => setBankForm((c) => ({ ...c, bankAccountName: v }))} style={fieldSurface()} placeholderTextColor={colors.muted} />
+        <TextInput value={bankForm?.bankAccountName} onChangeText={(v) => setBankForm((c) => ({ ...c, bankAccountName: v }))} style={[inputStyle(), { marginBottom: 16 }]} placeholder="Nome na conta" placeholderTextColor={colors.muted} />
         <PrimaryButton label="Guardar IBAN" variant="outline" loading={busy} onPress={onSaveBank} />
       </View>
-      <View style={cardSurface()}>
+      <View style={panel()}>
         <Text style={{ color: colors.text, fontWeight: '800', marginBottom: 8 }}>Pedir levantamento</Text>
         <Text style={{ color: colors.muted, marginBottom: 8, lineHeight: 18 }}>
-          Mínimo {kz(rules?.minPayoutKz || 5000)}. IBAN {maskIban(iban)}. O pedido fica pendente até a equipa financeira o tratar — não dispara transferência.
+          Mínimo {kz(rules?.minPayoutKz || 5000)}. O pedido fica com a equipa financeira até ser pago.
         </Text>
-        <TextInput value={amount} onChangeText={setAmount} keyboardType="numeric" style={fieldSurface()} placeholderTextColor={colors.muted} />
-        <PrimaryButton label="Registar pedido" variant="gold" loading={busy} onPress={onRequest} />
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+          {['5000', '10000', '25000'].map((value) => (
+            <Pressable key={value} onPress={() => setAmount(value)}>
+              <Text style={{ color: amount === value ? colors.gold : colors.text, fontWeight: '700' }}>
+                {Number(value).toLocaleString('pt-AO')} Kz
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        <TextInput
+          value={amount}
+          onChangeText={(value) => setAmount(String(value).replace(/[^\d]/g, ''))}
+          keyboardType="numeric"
+          style={[inputStyle(), { marginBottom: 12 }]}
+          placeholderTextColor={colors.muted}
+        />
+        <PrimaryButton label="Pedir levantamento" variant="gold" loading={busy} onPress={onRequest} />
         {(payouts?.payouts || []).map((item) => (
           <Text key={item.id} style={{ color: colors.textSecondary, marginTop: 10 }}>
-            {kz(item.amountKz)} · {item.status} · {String(item.id).slice(0, 8)}
+            {kz(item.amountKz)} · {payoutStatusLabel(item.status)}
           </Text>
         ))}
       </View>
-      <View style={cardSurface()}>
+      <View style={panel()}>
         <Text style={{ color: colors.text, fontWeight: '800', marginBottom: 8 }}>Movimentos</Text>
         <Text style={{ color: colors.muted, marginBottom: 8, lineHeight: 18 }}>
-          Cada linha é um crédito ou uma reversão registada. A declaração de direitos não prova a propriedade do filme.
+          Créditos e correcções já registados neste estúdio.
         </Text>
         {(ledger || []).length === 0 ? (
           <Text style={{ color: colors.muted }}>Ainda sem movimentos.</Text>
@@ -686,7 +783,7 @@ function Finance({ analytics, payouts, ledger, iban, bankForm, setBankForm, amou
           ledger.map((item) => (
             <Text key={item.id} style={{ color: colors.textSecondary, marginTop: 8 }}>
               {item.source === 'reversal' ? '−' : '+'}
-              {kz(item.amountKz)} · {item.source}
+              {kz(item.amountKz)} · {ledgerSourceLabel(item.source)}
               {item.contentTitle ? ` · ${item.contentTitle}` : ''}
             </Text>
           ))

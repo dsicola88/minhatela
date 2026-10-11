@@ -1,4 +1,5 @@
 import { fileKind, mediaKindFromUrl, previewUsesVideo } from '../../mobile/src/screens/adCreativeKind.js';
+import { destinationFieldText, normalizePublicWebUrl } from '../../mobile/src/screens/publicWebUrl.js';
 import {
   PLACEMENT_SCREENS,
   containedRect,
@@ -32,5 +33,12 @@ assert(mock.width <= 220 && mock.height <= 460, 'mock fits the form');
 assert(mock.scale < 1, 'phone is scaled, not stretched to the page');
 assert(mediaFileLabel('/uploads/ads/t79t173332422-+s9t0pca.mp4') === 'Vídeo MP4 carregado', 'hide storage path');
 assert(mediaFileLabel('https://www.empresa.ao/spot.mp4') === 'empresa.ao', 'https host');
+
+const site = normalizePublicWebUrl('dhundotec.com');
+assert(site.ok && site.url === 'https://dhundotec.com/', site.url);
+const httpSite = normalizePublicWebUrl('http://dhundotec.com/');
+assert(httpSite.url === 'https://dhundotec.com/', httpSite.url);
+assert(destinationFieldText('https://dhundotec.com/') === 'dhundotec.com', 'field hides scheme');
+assert(normalizePublicWebUrl('http://127.0.0.1').ok === false, 'private host');
 
 console.log('ad-creative-kind: ok');

@@ -215,6 +215,41 @@ async function run() {
     assert([200, 201].includes(r.status), `reg ${r.status}`);
   });
 
+  await step('Site sem https é gravado como ligação segura', async () => {
+    const r = await req('POST', '/api/ads/campaigns', {
+      token: a.token,
+      body: {
+        name: 'Site já seguro',
+        objective: 'traffic',
+        budgetKz: 5000,
+        startsAt: new Date().toISOString(),
+        endsAt: new Date(Date.now() + 86400000).toISOString(),
+        creative: { ...creative('https://example.com/ad.mp4'), clickUrl: 'http://dhundotec.com' },
+      },
+    });
+    assert(r.status === 201, `http site ${r.status} ${r.json?.message || ''}`);
+    const bare = await req('POST', '/api/ads/campaigns', {
+      token: a.token,
+      body: {
+        name: 'Site sem esquema',
+        objective: 'traffic',
+        budgetKz: 5000,
+        startsAt: new Date().toISOString(),
+        endsAt: new Date(Date.now() + 86400000).toISOString(),
+        creative: { ...creative('https://example.com/ad.mp4'), clickUrl: 'dhundotec.com' },
+      },
+    });
+    assert(bare.status === 201, `bare site ${bare.status} ${bare.json?.message || ''}`);
+    assert(
+      bare.json?.campaign?.creative?.clickUrl === 'https://dhundotec.com/',
+      `stored ${bare.json?.campaign?.creative?.clickUrl}`
+    );
+    assert(
+      r.json?.campaign?.creative?.clickUrl === 'https://dhundotec.com/',
+      `http stored ${r.json?.campaign?.creative?.clickUrl}`
+    );
+  });
+
   await step('URL interna recusada (SSRF)', async () => {
     const r = await req('POST', '/api/ads/campaigns', {
       token: a.token,

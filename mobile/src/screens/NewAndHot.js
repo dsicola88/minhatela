@@ -81,6 +81,7 @@ export default function NewAndHot({ onBack, onSelect }) {
               paddingHorizontal: isCompact ? 16 : 40,
               paddingVertical: 14,
               gap: 10,
+              alignItems: 'center',
             }}
           >
             {tabs.map((tab, idx) => (
@@ -90,9 +91,10 @@ export default function NewAndHot({ onBack, onSelect }) {
                 onPress={() => setActive(idx)}
                 style={{
                   paddingHorizontal: 16,
-                  paddingVertical: 10,
+                  paddingVertical: 8,
                   borderRadius: 4,
                   borderWidth: 1,
+                  alignSelf: 'flex-start',
                   borderColor: idx === active ? colors.text : colors.border,
                   backgroundColor: idx === active ? colors.text : 'transparent',
                 }}

@@ -1,6 +1,5 @@
 'use strict';
 
-const net = require('net');
 const adRepository = require('../repositories/adRepository');
 const userRepository = require('../repositories/userRepository');
 const auditRepository = require('../repositories/auditRepository');
@@ -9,6 +8,7 @@ const { assertPositiveKz } = require('../utils/money');
 const { campaignStatusLabel, placementLabel } = require('../utils/opsCopy');
 const { campaignLifecycle, portalStage } = require('../utils/adsLifecycle');
 const { env } = require('../config/env');
+const { normalizePublicWebUrl } = require('../utils/publicWebUrl');
 
 const OBJECTIVES = {
   brand: 'Notoriedade — o anúncio é visto até ao fim',
@@ -20,8 +20,7 @@ const BILLING = {
   currency: 'AOA',
   billableEvent: 'completed_view',
   billableEventLabel: 'Visualização completa',
-  note:
-    'Cobra-se um valor fixo por anúncio visto até ao fim. Não há leilão, nem CPM optimizado, nem estimativa de alcance.',
+  note: 'Cada visualização até ao fim desconta um valor fixo do orçamento.',
   definitions: {
     impressions: 'Anúncio enviado ao leitor (ainda não cobrado).',
     starts: 'A reprodução do anúncio começou.',
@@ -152,59 +151,10 @@ function normalizeCreative(creative = {}) {
   return { mediaKind, mediaUrl, cards: [], durationSeconds };
 }
 
-function isPrivateHost(hostname) {
-  const host = String(hostname || '')
-    .toLowerCase()
-    .replace(/\.$/, '');
-  if (!host) return true;
-  if (
-    host === 'localhost' ||
-    host.endsWith('.localhost') ||
-    host.endsWith('.local') ||
-    host === 'metadata.google.internal' ||
-    host.endsWith('.internal')
-  ) {
-    return true;
-  }
-  const ip = net.isIP(host) ? host : null;
-  if (!ip) return false;
-  if (ip === '0.0.0.0' || ip === '::' || ip === '::1') return true;
-  const parts = ip.split('.').map(Number);
-  if (parts.length === 4) {
-    if (parts[0] === 10) return true;
-    if (parts[0] === 127) return true;
-    if (parts[0] === 169 && parts[1] === 254) return true;
-    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
-    if (parts[0] === 192 && parts[1] === 168) return true;
-  }
-  return false;
-}
-
-function assertSafeHttpsUrl(value, field, { optional = false } = {}) {
-  const raw = String(value || '').trim();
-  if (!raw) {
-    if (optional) return null;
-    throw createError(400, `${field} é obrigatório`, 'VALIDATION');
-  }
-  if (raw.startsWith('/uploads/ads/')) {
-    if (raw.includes('..') || raw.includes('\\')) {
-      throw createError(400, `${field} inválido`, 'VALIDATION');
-    }
-    return raw;
-  }
-  let parsed;
-  try {
-    parsed = new URL(raw);
-  } catch {
-    throw createError(400, `${field} tem de ser uma ligação HTTPS`, 'VALIDATION');
-  }
-  if (parsed.protocol !== 'https:') {
-    throw createError(400, `${field} tem de ser HTTPS`, 'VALIDATION');
-  }
-  if (isPrivateHost(parsed.hostname)) {
-    throw createError(400, `${field} não pode apontar para uma rede interna`, 'VALIDATION');
-  }
-  return parsed.toString();
+function assertSafeHttpsUrl(value, field, options = {}) {
+  const result = normalizePublicWebUrl(value, { allowUpload: true, ...options });
+  if (!result.ok) throw createError(400, `${field}: ${result.message}`, 'VALIDATION');
+  return result.url || null;
 }
 
 function portalGuide(advertiser, campaigns) {
@@ -385,6 +335,7 @@ async function createCampaign(userId, body) {
   const normalized = normalizeCreative(body.creative);
   const clickUrl = assertSafeHttpsUrl(body.creative.clickUrl, 'Página de destino', {
     optional: objective !== 'traffic',
+    allowUpload: false,
   });
   if (objective === 'traffic' && !clickUrl) {
     throw createError(400, 'Tráfego exige uma página HTTPS de destino', 'VALIDATION');
