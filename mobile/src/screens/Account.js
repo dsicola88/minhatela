@@ -604,7 +604,7 @@ export default function Account({
             <View style={{ flex: 1, paddingRight: 16 }}>
               <Text style={{ color: colors.text, fontWeight: '600' }}>Poupança de dados</Text>
               <Text style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
-                Arranque em 480p · ideal Unitel/Movicel
+                Quando o título tem variantes até 480p, o filme usa só essas. O gasto por hora é o bitrate da variante. Sem trailers automáticos.
               </Text>
             </View>
             <Switch

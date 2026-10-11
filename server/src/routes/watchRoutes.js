@@ -8,6 +8,18 @@ const watchController = require('../controllers/watchController');
 
 const router = express.Router();
 
+router.get(
+  '/sessions/:sessionId/ladder.m3u8',
+  rateLimit({ windowMs: 60_000, max: 60, keyFn: (req) => `${req.ip}:hls` }),
+  asyncHandler(watchController.ladder)
+);
+
+router.get(
+  '/sessions/:sessionId/media.m3u8',
+  rateLimit({ windowMs: 60_000, max: 120, keyFn: (req) => `${req.ip}:hls-media` }),
+  asyncHandler(watchController.mediaPlaylist)
+);
+
 router.post(
   '/:contentId/start',
   requireAuth,

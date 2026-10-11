@@ -29,6 +29,8 @@ async function startPlayback({
   deviceName,
   platform,
   pin,
+  dataSaver = false,
+  publicBase,
 }) {
   const featureFlagService = require('./featureFlagService');
   await featureFlagService.assertNotMaintenance();
@@ -266,13 +268,21 @@ async function startPlayback({
     scrub = null;
   }
 
+  const capped = await require('./hlsCapService').applyDataSaverHls({
+    dataSaver: dataSaver === true || dataSaver === 'true',
+    signed,
+    sessionId,
+    publicBase,
+  });
+
   return {
     sessionId,
     content: mapContentPublic(content),
     playback: {
       embedUrl: signed.embedUrl,
-      hlsUrl: signed.hlsUrl,
+      hlsUrl: capped.hlsUrl,
       expiresAt: signed.expiresAt,
+      qualityCap: capped.qualityCap,
     },
     player: {
       ...bunnyService.getPlayerDefaults(),

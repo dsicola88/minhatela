@@ -33,6 +33,8 @@ import { getActiveProfile } from '../services/auth';
 import { useI18n } from '../i18n';
 import Focusable from '../tv/Focusable';
 import { getDataSaver, applyDataSaverToEmbedUrl } from '../platform/preferences';
+import { nativePlaybackUri } from '../platform/dataSaverPolicy.mjs';
+import CappedHlsPlayer from '../platform/CappedHlsPlayer';
 import { updatePlaybackPrefs } from '../services/phase24';
 import {
   completeAdImpression,
@@ -188,9 +190,9 @@ export default function Watch({
 
         const profile = await getActiveProfile();
         profileIdRef.current = profile?.id || null;
-        const data = await startWatch(videoId, { profileId: profile?.id, pin });
-        if (!mounted) return;
         const dataSaver = await getDataSaver();
+        const data = await startWatch(videoId, { profileId: profile?.id, pin, dataSaver });
+        if (!mounted) return;
         if (data?.playback?.embedUrl) {
           data.playback.embedUrl = applyDataSaverToEmbedUrl(
             data.playback.embedUrl,
@@ -488,7 +490,8 @@ export default function Watch({
   }, [onBack, videoId, session, introSkipped]);
 
   const embedUrl = session?.playback?.embedUrl;
-  const hlsUrl = session?.playback?.hlsUrl;
+  const hlsUrl = nativePlaybackUri({ hlsUrl: session?.playback?.hlsUrl });
+  const cappedWeb = Platform.OS === 'web' && session?.playback?.qualityCap === 'max-480' && Boolean(hlsUrl);
   const useNativeHls = Platform.OS !== 'web' && Boolean(hlsUrl);
   const playerPage = embedUrl
     ? buildBunnyPlayerPage(embedUrl, { startSeconds: session?.resume?.positionSeconds || 0 })
@@ -524,8 +527,12 @@ export default function Watch({
     setPinError('');
     try {
       const profile = await getActiveProfile();
-      const data = await startWatch(videoId, { profileId: profile?.id, pin: pinValue });
       const dataSaver = await getDataSaver();
+      const data = await startWatch(videoId, {
+        profileId: profile?.id,
+        pin: pinValue,
+        dataSaver,
+      });
       if (data?.playback?.embedUrl) {
         data.playback.embedUrl = applyDataSaverToEmbedUrl(data.playback.embedUrl, dataSaver);
       }
@@ -647,8 +654,21 @@ export default function Watch({
       ) : (
         <Pressable style={{ flex: 1 }} onPress={pokeControls}>
           <View style={{ flex: 1, opacity: adPlaying ? 0 : 1 }}>
-            {useNativeHls ? (
+            {cappedWeb ? (
+              <CappedHlsPlayer
+                uri={hlsUrl}
+                paused={paused || adPlaying}
+                playerRef={videoRef}
+                onTime={({ seconds, duration }) => {
+                  positionRef.current = seconds;
+                  if (duration) durationRef.current = duration;
+                }}
+                onEnded={() => setShowNext(true)}
+                onAutoplayBlocked={() => setPaused(true)}
+              />
+            ) : useNativeHls ? (
               <Video
+                key={hlsUrl}
                 ref={videoRef}
                 source={{ uri: hlsUrl }}
                 style={{ flex: 1, backgroundColor: colors.black }}

@@ -53,12 +53,9 @@ function buildEmbedUrl(bunnyVideoId, { autoplay = true, token, expiresUnix } = {
   assertConfigured();
   const params = new URLSearchParams({
     autoplay: String(autoplay),
-    preload: 'true',
+    preload: 'false',
     responsive: 'true',
   });
-
-  // Força arranque económico de dados (Angola)
-  params.set('preload', 'true');
 
   if (token && expiresUnix) {
     params.set('token', token);
@@ -68,17 +65,18 @@ function buildEmbedUrl(bunnyVideoId, { autoplay = true, token, expiresUnix } = {
   return `${env.bunny.embedBaseUrl}/${env.bunny.libraryId}/${bunnyVideoId}?${params.toString()}`;
 }
 
-function buildHlsUrl(bunnyVideoId, { token, expiresUnix } = {}) {
-  if (!env.bunny.cdnHostname || !bunnyVideoId) return null;
-
-  const path = `/${bunnyVideoId}/playlist.m3u8`;
+function buildCdnFileUrl(bunnyVideoId, file, { token, expiresUnix } = {}) {
+  if (!env.bunny.cdnHostname || !bunnyVideoId || !file) return null;
+  const path = `/${bunnyVideoId}/${file}`;
   let url = `https://${env.bunny.cdnHostname}${path}`;
-
   if (token && expiresUnix) {
     url += `?token=${token}&expires=${expiresUnix}`;
   }
-
   return url;
+}
+
+function buildHlsUrl(bunnyVideoId, { token, expiresUnix } = {}) {
+  return buildCdnFileUrl(bunnyVideoId, 'playlist.m3u8', { token, expiresUnix });
 }
 
 function signPlayback(bunnyVideoId, { ttlSeconds, userIp } = {}) {
@@ -270,6 +268,7 @@ function createTusSession(videoId) {
 module.exports = {
   buildEmbedUrl,
   buildHlsUrl,
+  buildCdnFileUrl,
   signPlayback,
   signDownload,
   getPlayerDefaults,

@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
   View,
   Text,
@@ -12,6 +13,8 @@ import { Video, ResizeMode } from 'expo-av';
 import { colors, layout } from '../theme/tokens';
 import { useDeviceProfile } from '../platform/device';
 import Focusable from '../tv/Focusable';
+import { getDataSaver } from '../platform/preferences';
+import { allowHoverPreview } from '../platform/dataSaverPolicy.mjs';
 
 function MonetizationBadge({ model, kind, badge, rank }) {
   if (rank || (badge && String(badge).startsWith('N.º'))) {
@@ -313,7 +316,24 @@ export default function MovieRow({
 }) {
   const scrollRef = useRef(null);
   const offsetRef = useRef(0);
+  const [dataSaver, setDataSaver] = useState(true);
   const { width, isTV, isCompact } = useDeviceWithCompact();
+
+  useFocusEffect(
+    useCallback(() => {
+      let live = true;
+      getDataSaver()
+        .then((value) => {
+          if (live) setDataSaver(value);
+        })
+        .catch(() => {
+          if (live) setDataSaver(true);
+        });
+      return () => {
+        live = false;
+      };
+    }, [])
+  );
   const cardWidth = isTV
     ? Math.min(340, width * 0.28)
     : isCompact
@@ -387,7 +407,11 @@ export default function MovieRow({
             cardWidth={cardWidth}
             onPress={onSelect}
             resumeMode={resumeMode}
-            enableHoverPreview={enableHoverPreview && !isTV}
+            enableHoverPreview={allowHoverPreview({
+              dataSaver,
+              enableHoverPreview,
+              isTV,
+            })}
           />
         ))}
       </ScrollView>

@@ -34,6 +34,7 @@
     "expo-secure-store": "~14.0.1",
     "expo-status-bar": "~2.0.1",
     "expo-system-ui": "~4.0.9",
+    "hls.js": "^1.7.3",
     "nativewind": "^4.1.23",
     "qrcode": "^1.5.4",
     "query-string": "^7.1.3",

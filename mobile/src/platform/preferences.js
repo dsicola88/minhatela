@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { shapeEmbedUrl } from './dataSaverPolicy.mjs';
 
 const DATA_SAVER_KEY = 'minhatela.prefs.dataSaver';
 const THEME_KEY = 'minhatela.prefs.theme';
@@ -28,17 +29,9 @@ export async function setThemePreference(themeId) {
 }
 
 /**
- * Ajusta URL embed Bunny para qualidade económica.
+ * Embed Bunny: preload desligado (parâmetro oficial).
+ * O segundo argumento (poupança) não escolhe variante: o expo-av não trava o HLS.
  */
-export function applyDataSaverToEmbedUrl(embedUrl, dataSaver) {
-  if (!embedUrl || !dataSaver) return embedUrl;
-  try {
-    const url = new URL(embedUrl);
-    url.searchParams.set('preload', 'false');
-    url.searchParams.set('startQuality', '480p');
-    return url.toString();
-  } catch {
-    const join = embedUrl.includes('?') ? '&' : '?';
-    return `${embedUrl}${join}preload=false&startQuality=480p`;
-  }
+export function applyDataSaverToEmbedUrl(embedUrl) {
+  return shapeEmbedUrl(embedUrl);
 }

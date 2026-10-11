@@ -12,7 +12,7 @@ export async function fetchVideoDetails(videoId) {
 /**
  * Única forma autorizada de obter acesso ao player.
  */
-export async function startWatch(contentId, { profileId, pin } = {}) {
+export async function startWatch(contentId, { profileId, pin, dataSaver } = {}) {
   const device = await getDeviceIdentity();
   return api.post(`/api/watch/${contentId}/start`, {
     profileId: profileId || undefined,
@@ -20,6 +20,7 @@ export async function startWatch(contentId, { profileId, pin } = {}) {
     deviceName: device.deviceName,
     platform: device.platform,
     pin: pin || undefined,
+    dataSaver: Boolean(dataSaver),
   });
 }
 

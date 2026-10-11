@@ -112,6 +112,20 @@ async function endStaleForUser(userId) {
   );
 }
 
+async function findPlayableById(sessionId) {
+  const result = await query(
+    `SELECT id, bunny_video_id, expires_at
+     FROM playback_sessions
+     WHERE id = $1
+       AND allowed = TRUE
+       AND ended_at IS NULL
+       AND is_active = TRUE
+       AND expires_at > NOW()`,
+    [sessionId]
+  );
+  return result.rows[0] || null;
+}
+
 async function forceEndOldest(userId) {
   const active = await listActiveStreams(userId);
   if (!active.length) return null;
@@ -126,6 +140,7 @@ module.exports = {
   listActiveStreams,
   heartbeat,
   endSession,
+  findPlayableById,
   endStaleForUser,
   forceEndOldest,
 };

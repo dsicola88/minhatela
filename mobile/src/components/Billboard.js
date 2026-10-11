@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
   View,
   Text,
@@ -14,6 +15,8 @@ import { useI18n } from '../i18n';
 import { useBrandCopy } from '../context/AppConfigContext';
 import { useDeviceProfile } from '../platform/device';
 import Focusable from '../tv/Focusable';
+import { getDataSaver } from '../platform/preferences';
+import { shouldMountCatalogPreview } from '../platform/dataSaverPolicy.mjs';
 
 export default function Billboard({ item, onPlay, onMoreInfo, autoplayPreview = true }) {
   const { height, width } = useWindowDimensions();
@@ -27,13 +30,37 @@ export default function Billboard({ item, onPlay, onMoreInfo, autoplayPreview = 
   const kicker = branding.billboardKicker || t('originalBadge');
   const [showTrailer, setShowTrailer] = useState(false);
   const [muted, setMuted] = useState(true);
+  const [dataSaver, setDataSaver] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      let live = true;
+      getDataSaver()
+        .then((value) => {
+          if (live) setDataSaver(value);
+        })
+        .catch(() => {
+          if (live) setDataSaver(true);
+        });
+      return () => {
+        live = false;
+      };
+    }, [])
+  );
+
+  const mountPreview = shouldMountCatalogPreview({
+    hasTrailer: Boolean(item?.trailerUrl),
+    autoplayPreview,
+    dataSaver,
+    platform: Platform.OS,
+  });
 
   useEffect(() => {
     setShowTrailer(false);
-    if (!item?.trailerUrl || !autoplayPreview || Platform.OS === 'ios') return undefined;
+    if (!mountPreview) return undefined;
     const timer = setTimeout(() => setShowTrailer(true), 1800);
     return () => clearTimeout(timer);
-  }, [item?.id, item?.trailerUrl, autoplayPreview]);
+  }, [item?.id, mountPreview]);
 
   if (!item) {
     return (

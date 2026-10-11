@@ -14,6 +14,8 @@ async function start(req, res) {
     deviceName: req.headers['x-device-name'] || req.body?.deviceName || null,
     platform: req.headers['x-device-platform'] || req.body?.platform || null,
     pin: req.body?.pin || req.headers['x-profile-pin'] || null,
+    dataSaver: req.body?.dataSaver,
+    publicBase: require('../services/hlsCapService').publicBaseFromRequest(req),
   });
   res.json(result);
 }
@@ -41,6 +43,25 @@ async function getProgress(req, res) {
   res.json({ progress: result });
 }
 
+async function ladder(req, res) {
+  const hlsCapService = require('../services/hlsCapService');
+  const body = await hlsCapService.ladderForSession(
+    req.params.sessionId,
+    req.query,
+    hlsCapService.publicBaseFromRequest(req)
+  );
+  const headers = hlsCapService.playlistHeaders();
+  res.set(headers);
+  res.send(body);
+}
+
+async function mediaPlaylist(req, res) {
+  const hlsCapService = require('../services/hlsCapService');
+  const body = await hlsCapService.mediaForSession(req.params.sessionId, req.query);
+  res.set(hlsCapService.playlistHeaders());
+  res.send(body);
+}
+
 async function heartbeat(req, res) {
   const result = await watchService.heartbeat({
     userId: req.user.id,
@@ -66,4 +87,4 @@ async function qoe(req, res) {
   res.status(202).json(result);
 }
 
-module.exports = { start, progress, getProgress, heartbeat, end, qoe };
+module.exports = { start, progress, getProgress, heartbeat, end, qoe, ladder, mediaPlaylist };
