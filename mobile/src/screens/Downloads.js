@@ -61,7 +61,7 @@ export default function Downloads({ onBack }) {
         await Linking.openURL(url);
       }
     } catch (err) {
-      setError(err.message || 'Falha ao renovar licença');
+      setError(err.message || 'Não foi possível abrir o filme');
     } finally {
       setBusyId(null);
     }
@@ -119,11 +119,11 @@ export default function Downloads({ onBack }) {
         >
           {limits ? (
             <Text style={{ color: colors.muted, marginBottom: 20, fontSize: 13 }}>
-              {limits.active} / {limits.maxActive} activos · Plano{' '}
-              {limits.plan === 'premium' ? 'Premium' : 'Gratuito'}
+              {limits.active} de {limits.maxActive} neste plano (
+              {limits.plan === 'premium' ? 'Premium' : 'gratuito'})
               {Platform.OS === 'web'
-                ? ' · Em web o ficheiro abre no browser; no telemóvel fica disponível offline após descarregar.'
-                : ' · Licença ligada a este dispositivo.'}
+                ? ' · No telemóvel o filme fica para ver sem rede.'
+                : ' · Só neste aparelho.'}
             </Text>
           ) : null}
 
@@ -131,8 +131,8 @@ export default function Downloads({ onBack }) {
 
           {!error && items.length === 0 ? (
             <EmptyState
-              title="Sem downloads"
-              subtitle="Na ficha do título, toque em Descarregar para ver offline (ideal Unitel/Movicel)."
+              title="Nada no telemóvel"
+              subtitle="Na ficha do filme, toque em Descarregar. Ideal quando a rede da Unitel ou Movicel falha."
             />
           ) : null}
 
@@ -168,7 +168,7 @@ export default function Downloads({ onBack }) {
                 <View style={{ flexDirection: 'row', gap: 16, marginTop: 12 }}>
                   <Pressable onPress={() => openLicense(item)} disabled={busyId === item.id}>
                     <Text style={{ color: colors.gold, fontWeight: '700' }}>
-                      {busyId === item.id ? '…' : 'Abrir / renovar'}
+                      {busyId === item.id ? '…' : 'Ver agora'}
                     </Text>
                   </Pressable>
                   <Pressable onPress={() => removeLicense(item)} disabled={busyId === item.id}>

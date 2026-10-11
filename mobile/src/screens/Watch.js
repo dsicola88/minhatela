@@ -552,7 +552,7 @@ export default function Watch({
           </Text>
           {denyCode === 'SUBSCRIPTION_REQUIRED' ? (
             <Text style={{ color: colors.muted, marginBottom: 20, textAlign: 'center', lineHeight: 20 }}>
-              A assinatura acabou ou não está activa. O catálogo gratuito continua disponível.
+              Este título é Premium. Assine para ver, ou escolha um filme com anúncios.
             </Text>
           ) : null}
           {denyCode === 'SUBSCRIPTION_REQUIRED' && onSubscribe ? (

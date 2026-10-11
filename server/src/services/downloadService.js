@@ -98,7 +98,7 @@ async function requestDownload({
   }
 
   if (!row.bunny_video_id) {
-    throw createError(503, 'Asset indisponível para download', 'NO_BUNNY_ASSET');
+    throw createError(503, 'Este filme não está disponível para guardar no telemóvel', 'NO_BUNNY_ASSET');
   }
 
   const user = await userRepository.findById(userId);
@@ -111,7 +111,7 @@ async function requestDownload({
     if (active >= limits.maxActive) {
       throw createError(
         403,
-        `Limite de downloads activos (${limits.maxActive}). Remova um para continuar.`,
+        `Já tem o máximo de filmes neste telemóvel (${limits.maxActive}). Remova um para continuar.`,
         'DOWNLOAD_LIMIT',
         { maxActive: limits.maxActive, active }
       );

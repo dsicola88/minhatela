@@ -27,7 +27,7 @@ async function assertPremiumOwner(userId) {
   if (!ok && !user?.is_admin) {
     throw createError(
       403,
-      'Agregado familiar disponível para assinantes Premium',
+      'Partilhar em casa está disponível no Premium',
       'HOUSEHOLD_PREMIUM_REQUIRED'
     );
   }
@@ -37,7 +37,7 @@ async function assertPremiumOwner(userId) {
 async function getMine(userId) {
   await featureFlagService.assertEnabled(
     'household_enabled',
-    'Agregado familiar temporariamente indisponível'
+    'Partilhar em casa está temporariamente indisponível'
   );
 
   const membership = await householdRepository.getMembership(userId);
@@ -71,7 +71,7 @@ async function getMine(userId) {
       isOwner: false,
       members: [],
       canInvite: false,
-      message: 'Crie o agregado familiar para partilhar o Premium com um membro.',
+      message: 'Crie a sua casa para partilhar o Premium com a família.',
     };
   }
 
@@ -91,7 +91,7 @@ async function getMine(userId) {
 async function create(userId, meta = {}) {
   await featureFlagService.assertEnabled(
     'household_enabled',
-    'Agregado familiar temporariamente indisponível'
+    'Partilhar em casa está temporariamente indisponível'
   );
   await assertPremiumOwner(userId);
 
@@ -99,7 +99,7 @@ async function create(userId, meta = {}) {
   if (existingMembership && existingMembership.role !== 'owner') {
     throw createError(
       409,
-      'Já pertence a um agregado. Saia primeiro para criar o seu.',
+      'Já faz parte de uma casa. Saia primeiro para criar a sua.',
       'HOUSEHOLD_ALREADY_MEMBER'
     );
   }
@@ -119,7 +119,7 @@ async function create(userId, meta = {}) {
 async function invite(userId, body, meta = {}) {
   await featureFlagService.assertEnabled(
     'household_enabled',
-    'Agregado familiar temporariamente indisponível'
+    'Partilhar em casa está temporariamente indisponível'
   );
   await assertPremiumOwner(userId);
 
@@ -133,7 +133,7 @@ async function invite(userId, body, meta = {}) {
   const hh = await householdRepository.ensureHousehold(userId);
   const active = await householdRepository.countActive(hh.id);
   if (active >= hh.max_members) {
-    throw createError(409, 'Agregado cheio', 'HOUSEHOLD_FULL');
+    throw createError(409, 'Esta casa está cheia', 'HOUSEHOLD_FULL');
   }
 
   const existingUser = await householdRepository.findUserByEmail(email);
@@ -143,7 +143,7 @@ async function invite(userId, body, meta = {}) {
   if (existingUser) {
     const theirMembership = await householdRepository.getMembership(existingUser.id);
     if (theirMembership) {
-      throw createError(409, 'Utilizador já está noutro agregado', 'HOUSEHOLD_BUSY');
+      throw createError(409, 'Esta pessoa já faz parte de outra casa', 'HOUSEHOLD_BUSY');
     }
   }
 
@@ -168,8 +168,8 @@ async function invite(userId, body, meta = {}) {
       await notificationService.notify({
         userId: existingUser.id,
         type: 'system',
-        title: 'Convite para agregado familiar',
-        body: `Use o código ${row.invite_code} em Conta → Agregado familiar.`,
+        title: 'Convite para a casa MinhaTela',
+        body: `Use o código ${row.invite_code} em Conta → Casa.`,
       });
     }
   } catch {
@@ -178,19 +178,19 @@ async function invite(userId, body, meta = {}) {
 
   return {
     invite: mapMember(row),
-    shareMessage: `Junte-se ao meu agregado MinhaTela com o código ${row.invite_code}. ${env.appPublicUrl || ''}/account`,
+    shareMessage: `Junte-se à minha casa MinhaTela com o código ${row.invite_code}. ${env.appPublicUrl || ''}/account`,
   };
 }
 
 async function accept(userId, code, meta = {}) {
   await featureFlagService.assertEnabled(
     'household_enabled',
-    'Agregado familiar temporariamente indisponível'
+    'Partilhar em casa está temporariamente indisponível'
   );
 
   const myMembership = await householdRepository.getMembership(userId);
   if (myMembership) {
-    throw createError(409, 'Já pertence a um agregado', 'HOUSEHOLD_ALREADY_MEMBER');
+    throw createError(409, 'Já faz parte de uma casa', 'HOUSEHOLD_ALREADY_MEMBER');
   }
 
   const inviteRow = await householdRepository.findInviteByCode(code);
@@ -198,7 +198,7 @@ async function accept(userId, code, meta = {}) {
     throw createError(404, 'Convite inválido ou expirado', 'HOUSEHOLD_INVITE_INVALID');
   }
   if (inviteRow.household_status !== 'active') {
-    throw createError(410, 'Agregado suspenso', 'HOUSEHOLD_SUSPENDED');
+    throw createError(410, 'Esta casa está suspensa', 'HOUSEHOLD_SUSPENDED');
   }
   if (inviteRow.owner_user_id === userId) {
     throw createError(400, 'Não pode aceitar o próprio convite', 'HOUSEHOLD_SELF');
@@ -206,7 +206,7 @@ async function accept(userId, code, meta = {}) {
 
   const active = await householdRepository.countActive(inviteRow.household_id);
   if (active >= inviteRow.max_members) {
-    throw createError(409, 'Agregado cheio', 'HOUSEHOLD_FULL');
+    throw createError(409, 'Esta casa está cheia', 'HOUSEHOLD_FULL');
   }
 
   const member = await householdRepository.acceptInvite({ inviteRow, userId });
@@ -249,7 +249,7 @@ async function remove(userId, memberUserId, meta = {}) {
 
 async function leaveHousehold(userId, meta = {}) {
   const membership = await householdRepository.getMembership(userId);
-  if (!membership) throw createError(404, 'Não pertence a um agregado', 'NOT_FOUND');
+  if (!membership) throw createError(404, 'Não faz parte de uma casa', 'NOT_FOUND');
   if (membership.role === 'owner') {
     throw createError(
       400,

@@ -348,7 +348,18 @@ export default function Details({
 
                 <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
                   {isSeries ? <Badge label="SÉRIE" gold /> : null}
-                  <Badge label={(video.monetization || '').toUpperCase()} gold={!isSeries} />
+                  <Badge
+                    label={
+                      video.monetization === 'avod'
+                        ? 'Com anúncios'
+                        : video.monetization === 'svod'
+                          ? 'Premium'
+                          : video.monetization === 'tvod'
+                            ? 'Aluguer'
+                            : ''
+                    }
+                    gold={!isSeries}
+                  />
                   {video.releaseYear ? <Badge label={String(video.releaseYear)} /> : null}
                   {video.maturityRating ? <Badge label={`${video.maturityRating}+`} /> : null}
                   {isSeries && video.seasonCount ? (
@@ -837,8 +848,14 @@ export default function Details({
                       >
                         <Text style={{ color: colors.text, fontWeight: '600' }}>{item.title}</Text>
                         <Text style={{ color: colors.muted, fontSize: 12, marginTop: 2 }}>
-                          {(item.kind === 'series' ? 'SÉRIE · ' : '') +
-                            (item.monetization || '').toUpperCase()}
+                          {(item.kind === 'series' ? 'Série · ' : '') +
+                            (item.monetization === 'avod'
+                              ? 'Com anúncios'
+                              : item.monetization === 'svod'
+                                ? 'Premium'
+                                : item.monetization === 'tvod'
+                                  ? 'Aluguer'
+                                  : '')}
                           {item.releaseYear ? ` · ${item.releaseYear}` : ''}
                         </Text>
                       </Pressable>

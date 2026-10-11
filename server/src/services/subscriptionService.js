@@ -50,14 +50,14 @@ async function cancelForUser(userId, { reason } = {}) {
     [userId]
   );
   if (!result.rowCount) {
-    throw createError(409, 'Não há assinatura Premium activa para cancelar', 'NO_ACTIVE_SUBSCRIPTION');
+    throw createError(409, 'Não há Premium activo para cancelar', 'NO_ACTIVE_SUBSCRIPTION');
   }
   return {
     cancelled: true,
     reason: reason || 'user_requested',
     subscriptionStatus: 'premium_expired',
     premiumExpiresAt: result.rows[0].premium_expires_at,
-    message: 'Assinatura cancelada. O catálogo gratuito (AVOD) continua disponível.',
+    message: 'Premium cancelado. Continua a ver o catálogo gratuito, com anúncios.',
   };
 }
 

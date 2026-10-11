@@ -82,14 +82,14 @@ async function resolveCheckoutAmount({ type, videoId, packId }) {
   let resolvedPackId = null;
 
   if (type === 'pack') {
-    await featureFlagService.assertEnabled('tvod_packs_enabled', 'Packs TVOD indisponíveis');
+    await featureFlagService.assertEnabled('tvod_packs_enabled', 'Lotes de filmes indisponíveis');
     if (!packId) {
       throw createError(400, 'packId obrigatório', 'VALIDATION');
     }
     const phase26Repository = require('../repositories/phase26Repository');
     const pack = await phase26Repository.findPackById(packId);
     if (!pack || !pack.is_active) {
-      throw createError(404, 'Pack não encontrado', 'PACK_NOT_FOUND');
+      throw createError(404, 'Lote não encontrado', 'PACK_NOT_FOUND');
     }
     amountKz = assertPositiveKz(pack.price_kz);
     resolvedPackId = pack.id;
@@ -410,10 +410,12 @@ async function getReceipt(userId, transactionId) {
 
   const typeLabel =
     row.type === 'subscription'
-      ? 'Assinatura Premium'
+      ? 'Premium'
       : row.type === 'rental'
-        ? 'Aluguer TVOD'
-        : row.type;
+        ? 'Aluguer'
+        : row.type === 'pack'
+          ? 'Lote de filmes'
+          : row.type;
 
   const receipt = {
     receiptNumber: `MT-${String(row.id).slice(0, 8).toUpperCase()}`,

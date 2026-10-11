@@ -51,8 +51,8 @@ async function resolveAccess(userId, content) {
         label: 'Assistir',
         message:
           premiumSource === 'household'
-            ? 'Acesso Premium via agregado familiar.'
-            : 'Acesso Premium activo.',
+            ? 'Premium da sua casa.'
+            : 'Incluído no seu Premium.',
         denialCode: null,
         requiresAds: false,
         premiumSource,
@@ -65,7 +65,7 @@ async function resolveAccess(userId, content) {
       action: 'subscribe',
       label: `Seja Premium por ${formatKz(env.premiumPriceKz)}`,
       priceKz: env.premiumPriceKz,
-      message: 'Este conteúdo exige assinatura Premium activa.',
+      message: 'Este título faz parte do Premium. Assine para ver sem anúncios.',
       denialCode: 'SUBSCRIPTION_REQUIRED',
       requiresAds: false,
     };
@@ -73,7 +73,7 @@ async function resolveAccess(userId, content) {
 
   const rental = await rentalRepository.findActiveRental(userId, content.id);
   if (rental) {
-    let message = 'Aluguer activo (48 horas após confirmação do pagamento).';
+    let message = 'Aluguer activo — 48 horas a contar da confirmação.';
     let packId = null;
     try {
       const packHit = await require('../repositories/phase26Repository').hasActivePackForVideo(
@@ -81,7 +81,7 @@ async function resolveAccess(userId, content) {
         content.id
       );
       if (packHit) {
-        message = `Acesso via pack «${packHit.pack_title}».`;
+        message = `Incluído no lote «${packHit.pack_title}».`;
         packId = packHit.pack_id;
       }
     } catch {
@@ -110,7 +110,7 @@ async function resolveAccess(userId, content) {
       action: 'pending',
       label: 'Pagamento em análise',
       message:
-        'O comprovativo foi recebido. O acesso será libertado após confirmação administrativa.',
+        'Recebemos o pagamento. O aluguer abre quando a MinhaTela confirmar.',
       transactionId: pending.id,
       denialCode: 'PAYMENT_PENDING',
       requiresAds: false,
@@ -126,7 +126,7 @@ async function resolveAccess(userId, content) {
     label: `Alugar por ${formatKz(price)}`,
     priceKz: price,
     message:
-      'Aluguer individual com validade de 48 horas após confirmação do pagamento.',
+      'Aluguer deste título. Tem 48 horas depois da MinhaTela confirmar o pagamento.',
     denialCode: 'RENTAL_REQUIRED',
     requiresAds: false,
   };

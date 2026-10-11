@@ -130,6 +130,11 @@ async function run() {
     assert(legal.json?.documents?.length >= 2, 'legal docs');
     const plans = await req('GET', '/api/plans');
     assert(plans.status === 200, 'plans');
+    const plansBlob = JSON.stringify(plans.json || {});
+    assert(!/\bAVOD\b/.test(plansBlob), 'plans must not expose AVOD');
+    assert(!/\bSVOD\b/.test(plansBlob), 'plans must not expose SVOD');
+    assert(!/\bTVOD\b/.test(plansBlob), 'plans must not expose TVOD');
+    assert((plans.json?.plans || []).length >= 1, 'at least one plan');
   });
 
   // ─── 1. Cliente novo ───
@@ -175,6 +180,9 @@ async function run() {
   await step('Cliente · conta / dispositivos / streams', async () => {
     const acc = await req('GET', '/api/account', { token: customerToken });
     assert(acc.status === 200 && acc.json?.user, 'account');
+    assert(Number(acc.json?.limits?.screens) >= 1, 'limits.screens');
+    assert(Number(acc.json?.limits?.downloads) >= 1, 'limits.downloads');
+    assert(Number(acc.json?.limits?.profiles) >= 1, 'limits.profiles');
     const streams = await req('GET', '/api/account/streams', { token: customerToken });
     assert(streams.status === 200, 'streams');
   });
@@ -584,6 +592,7 @@ async function run() {
       body: { reason: 'e2e' },
     });
     assert(r.status === 200 && r.json?.cancelled, `cancel ${r.status} ${r.json?.code || ''}`);
+    assert(!/\bAVOD\b/.test(String(r.json?.message || '')), 'cancel copy without AVOD');
     const me = await req('GET', '/api/auth/me', { token: customerToken });
     const status = me.json?.subscriptionStatus;
     assert(status !== 'premium_active', `expected expired got ${status}`);

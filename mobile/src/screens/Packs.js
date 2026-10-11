@@ -29,7 +29,7 @@ export default function Packs({ onBack, onCheckout }) {
       const data = await listPacks();
       setPacks(data.packs || []);
     } catch (err) {
-      setError(err.message || 'Falha ao carregar packs');
+      setError(err.message || 'Falha ao carregar lotes');
     } finally {
       setLoading(false);
     }
@@ -69,10 +69,10 @@ export default function Packs({ onBack, onCheckout }) {
         </Pressable>
 
         <Text style={{ color: colors.text, fontSize: 28, fontWeight: '800', marginBottom: 6 }}>
-          Packs TVOD
+          Lotes de filmes
         </Text>
         <Text style={{ color: colors.muted, marginBottom: 24 }}>
-          Bundles com vários títulos · um comprovativo · acesso por horas após confirmação.
+          Vários títulos, um pagamento. O tempo de visionamento começa quando a MinhaTela confirmar.
         </Text>
 
         {error ? <ErrorState message={error} onRetry={load} /> : null}

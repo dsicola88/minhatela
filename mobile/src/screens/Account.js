@@ -263,13 +263,17 @@ export default function Account({
     effective?.expiresAt || account?.user?.premiumExpiresAt || null;
   const subLabel = premiumOn
     ? effective?.source === 'household'
-      ? 'Premium via agregado familiar'
+      ? 'Premium da sua casa'
       : expiresAt
         ? `Premium até ${new Date(expiresAt).toLocaleDateString('pt-AO')}`
-        : 'Premium vitalício'
+        : 'Premium sem data de fim'
     : expired
-      ? 'Premium expirado — AVOD'
-      : 'Plano gratuito (AVOD)';
+      ? 'Premium acabou — plano gratuito'
+      : 'Plano gratuito';
+
+  const limits = account?.limits || {};
+  const screensUsed = limits.screensActive ?? account?.streams?.active ?? 0;
+  const screensMax = limits.screens ?? account?.streams?.limit ?? 1;
 
   const primaryProfile = account?.profiles?.[0];
 
@@ -326,19 +330,39 @@ export default function Account({
             <Text style={{ color: colors.red, marginBottom: 16 }}>{error}</Text>
           ) : null}
 
-          <Text style={{ color: colors.gold, fontSize: 12, fontWeight: '700', letterSpacing: 1.2 }}>
-            ESPAÇOS
-          </Text>
-          {onCatalog ? <Row label="Catálogo" value="Assistir" icon="play-outline" onPress={onCatalog} /> : null}
-          {onCreatorStudio ? (
-            <Row label="Estúdio" value="Os meus filmes" icon="film-outline" onPress={onCreatorStudio} />
-          ) : null}
-          {onAds ? <Row label="Anúncios" value="Campanhas" icon="megaphone-outline" onPress={onAds} /> : null}
-          {onAdmin ? (
-            <Row label="Administração" value="Consola" icon="shield-checkmark-outline" onPress={onAdmin} />
-          ) : null}
+          <View
+            style={{
+              backgroundColor: '#111111',
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: colors.border,
+              borderTopWidth: 3,
+              borderTopColor: colors.gold,
+              padding: 18,
+              marginBottom: 8,
+            }}
+          >
+            <Text style={{ color: colors.muted, fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>
+              O SEU PLANO
+            </Text>
+            <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800', marginTop: 6 }}>
+              {account?.user?.fullName || 'Conta MinhaTela'}
+            </Text>
+            <Text style={{ color: colors.gold, marginTop: 6, fontWeight: '700' }}>{subLabel}</Text>
+            <Text style={{ color: colors.muted, marginTop: 10, lineHeight: 20 }}>
+              {screensUsed} de {screensMax} ecrãs agora · até {limits.downloads || 3} filmes no
+              telemóvel · {account?.profiles?.length || 0} de {limits.profiles || 4} perfis
+            </Text>
+            {onPlans ? (
+              <Pressable onPress={onPlans} style={{ marginTop: 14 }}>
+                <Text style={{ color: colors.gold, fontWeight: '800' }}>
+                  {premiumOn ? 'Ver planos e limites' : expired ? 'Renovar Premium' : 'Assinar Premium'}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
 
-          <Text style={{ color: colors.gold, fontSize: 12, fontWeight: '700', letterSpacing: 1.2, marginTop: 28 }}>
+          <Text style={{ color: colors.gold, fontSize: 12, fontWeight: '700', letterSpacing: 1.2, marginTop: 20 }}>
             ASSINATURA
           </Text>
           <Row
@@ -347,12 +371,30 @@ export default function Account({
             icon="diamond-outline"
             onPress={onPlans}
           />
+          <Row
+            label="Ecrãs ao mesmo tempo"
+            value={`${screensUsed} a ver agora · máximo ${screensMax}`}
+            icon="tv-outline"
+          />
+          <Row
+            label="No telemóvel"
+            value={`Até ${limits.downloads || 3} títulos${
+              limits.downloadDays ? ` · ${limits.downloadDays} dias` : ''
+            }`}
+            icon="download-outline"
+            onPress={onDownloads}
+          />
           {premiumOn && effective?.source !== 'household' ? (
             <Pressable
               onPress={async () => {
+                const ok = await confirmAction(
+                  'Cancelar Premium',
+                  'Continua a ver até ao fim do período pago. Depois volta ao plano gratuito, com anúncios. A conta não fecha.'
+                );
+                if (!ok) return;
                 try {
                   const res = await cancelSubscription();
-                  setPromoMsg(res.message || 'Assinatura cancelada');
+                  setPromoMsg(res.message || 'Premium cancelado. O plano gratuito continua.');
                   await load();
                 } catch (err) {
                   setPromoMsg(err.message || 'Não foi possível cancelar');
@@ -361,14 +403,14 @@ export default function Account({
               style={{ marginTop: 10, marginBottom: 4 }}
             >
               <Text style={{ color: colors.muted, fontWeight: '700', fontSize: 13 }}>
-                Cancelar Premium (volta a AVOD)
+                Cancelar Premium
               </Text>
             </Pressable>
           ) : null}
           {expired ? (
             <Text style={{ color: colors.gold, fontSize: 13, marginTop: 8, lineHeight: 20 }}>
-              O período acabou. Continua a ver o catálogo gratuito (com anúncios). Conteúdo Premium
-              pede nova assinatura — a app não bloqueia a conta.
+              O período acabou. Continua a ver com anúncios. Premium pede novo pagamento — a conta
+              não fecha.
             </Text>
           ) : null}
           {!account?.user?.emailVerified ? (
@@ -395,11 +437,6 @@ export default function Account({
               </Text>
             </Pressable>
           ) : null}
-          <Row
-            label="Streams simultâneos"
-            value={`${account?.streams?.active || 0} / ${account?.streams?.limit || 1}`}
-            icon="play-circle-outline"
-          />
           <Row label="Email" value={account?.user?.email || '—'} icon="mail-outline" />
 
           <Text
@@ -881,6 +918,44 @@ export default function Account({
             onPress={onPayments}
           />
 
+          {(onCatalog || onCreatorStudio || onAds || onAdmin) ? (
+            <>
+              <Text
+                style={{
+                  color: colors.gold,
+                  fontSize: 12,
+                  fontWeight: '700',
+                  letterSpacing: 1.2,
+                  marginTop: 32,
+                }}
+              >
+                TAMBÉM NA MINHATELA
+              </Text>
+              {onCatalog ? (
+                <Row label="Catálogo" value="Assistir" icon="play-outline" onPress={onCatalog} />
+              ) : null}
+              {onCreatorStudio ? (
+                <Row
+                  label="Estúdio"
+                  value="Os meus filmes"
+                  icon="film-outline"
+                  onPress={onCreatorStudio}
+                />
+              ) : null}
+              {onAds ? (
+                <Row label="Anúncios" value="Campanhas" icon="megaphone-outline" onPress={onAds} />
+              ) : null}
+              {onAdmin ? (
+                <Row
+                  label="Administração"
+                  value="Consola"
+                  icon="shield-checkmark-outline"
+                  onPress={onAdmin}
+                />
+              ) : null}
+            </>
+          ) : null}
+
           <Text
             style={{
               color: colors.gold,
@@ -915,7 +990,7 @@ export default function Account({
               marginBottom: 8,
             }}
           >
-            SESSÕES DE ACESSO
+            ONDE ESTÁ LIGADO
           </Text>
           {sessions.length === 0 ? (
             <Text style={{ color: colors.muted, marginBottom: 8 }}>
@@ -955,7 +1030,7 @@ export default function Account({
               marginTop: 32,
             }}
           >
-            AGREGADO · PRESENTES · ESTREIAS
+            CASA · PRESENTES
           </Text>
           <Row
             label="Presentes Premium"
@@ -965,7 +1040,7 @@ export default function Account({
           />
           <Row
             label="Estreias"
-            value="Countdown Angola"
+            value="O que chega a Angola"
             icon="rocket-outline"
             onPress={onPremieres}
           />
@@ -976,15 +1051,15 @@ export default function Account({
                   setHhMsg('');
                   const res = await createHousehold();
                   setHousehold(res);
-                  setHhMsg('Agregado criado');
+                  setHhMsg('Casa criada. Convide quem vive consigo.');
                 } catch (err) {
-                  setHhMsg(err.message || 'Falha ao criar agregado');
+                  setHhMsg(err.message || 'Não foi possível criar a casa');
                 }
               }}
               style={{ paddingVertical: 14 }}
             >
               <Text style={{ color: colors.gold, fontWeight: '700' }}>
-                Criar agregado familiar (Premium)
+                Partilhar Premium em casa
               </Text>
             </Pressable>
           ) : (
@@ -1005,7 +1080,9 @@ export default function Account({
                   }}
                 >
                   <Text style={{ color: colors.text, flex: 1 }}>
-                    {m.email || 'Convite'} · {m.role} · {m.status}
+                    {m.email || 'Convite'} ·{' '}
+                    {m.role === 'owner' ? 'Titular' : 'Membro'} ·{' '}
+                    {m.status === 'active' ? 'Activo' : 'À espera'}
                     {m.inviteCode ? ` · ${m.inviteCode}` : ''}
                   </Text>
                   {household.isOwner && m.role === 'member' && m.status === 'active' && m.userId ? (
@@ -1069,7 +1146,7 @@ export default function Account({
                   }}
                   style={{ marginTop: 12 }}
                 >
-                  <Text style={{ color: colors.red, fontWeight: '700' }}>Sair do agregado</Text>
+                  <Text style={{ color: colors.red, fontWeight: '700' }}>Sair desta casa</Text>
                 </Pressable>
               ) : null}
             </View>
@@ -1098,7 +1175,7 @@ export default function Account({
                   const res = await acceptHousehold(hhCode.trim());
                   setHousehold(res);
                   setHhCode('');
-                  setHhMsg('Entrou no agregado');
+                  setHhMsg('Entrou na casa');
                 } catch (err) {
                   setHhMsg(err.message || 'Convite inválido');
                 }

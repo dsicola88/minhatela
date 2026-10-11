@@ -200,11 +200,15 @@ export default function Checkout({
         </Pressable>
 
         <Text style={{ color: colors.text, fontSize: 28, fontWeight: '800', marginBottom: 8 }}>
-          Checkout Angola
+          Pagar
         </Text>
         <Text style={{ color: colors.textSecondary, marginBottom: 28, lineHeight: 22 }}>
-          Multicaixa Express neste ecrã, ou IBAN com comprovativo. (
-          {type === 'rental' ? 'aluguer 48h' : type === 'pack' ? 'pack TVOD' : 'Premium'})
+          Multicaixa Express neste ecrã, ou IBAN com comprovativo.
+          {type === 'rental'
+            ? ' Aluguer: 48 horas depois da confirmação.'
+            : type === 'pack'
+              ? ' Lote de filmes: o tempo começa na confirmação.'
+              : ' Premium: a conta não fecha no fim do mês — só volta ao plano gratuito.'}
         </Text>
 
         <View
@@ -226,8 +230,8 @@ export default function Checkout({
             {type === 'rental'
               ? `Aluguer · ${video?.title}`
               : type === 'pack'
-                ? `Pack · ${pack?.title}`
-                : 'Assinatura Premium · 30 dias'}
+                ? `Lote · ${pack?.title}`
+                : 'Premium · um mês'}
           </Text>
           <Text style={{ color: colors.text, fontSize: 28, fontWeight: '800' }}>
             {Number(amount).toLocaleString('pt-AO')} Kz
@@ -375,8 +379,8 @@ export default function Checkout({
             maxWidth: layout.maxContentWidth,
           }}
         >
-          Estado inicial: pendente. O conteúdo TVOD expira exactamente 48 horas após a confirmação
-          do pagamento (não após o envio do comprovativo).
+          O acesso abre quando a MinhaTela confirmar. No aluguer, as 48 horas contam a partir dessa
+          confirmação — não do envio do comprovativo.
         </Text>
       </ScrollView>
     </View>

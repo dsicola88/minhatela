@@ -212,7 +212,7 @@ async function ensureInvoiceFromTransaction(tx) {
       tx.user_id,
       tx.id,
       num,
-      tx.type === 'subscription' ? 'Assinatura Premium MinhaTela' : 'Aluguer TVOD',
+      tx.type === 'subscription' ? 'Premium MinhaTela' : 'Aluguer MinhaTela',
       tx.amount_kz || 0,
       tx.status === 'pago' ? 'paid' : 'pending',
       tx.paid_at || null,

@@ -89,8 +89,8 @@ export default function Plans({ onBack, onSubscribe, onPacks, currentStatus }) {
           </Text>
           <Text style={{ color: colors.muted, marginBottom: 28, lineHeight: 22 }}>
             {expired
-              ? 'A sua assinatura expirou. O catálogo gratuito continua disponível; o Premium SVOD volta após novo pagamento.'
-              : 'Feito para Angola — IBAN e Multicaixa, sem cartão internacional. No fim do período o Premium cai para AVOD — a conta não é fechada.'}
+              ? 'O Premium acabou. Continua a ver o catálogo com anúncios. Assine de novo quando quiser — a conta não fecha.'
+              : 'Escolha o plano. Pague em Kwanza (IBAN ou Multicaixa Express). A MinhaTela confirma e o acesso abre na app.'}
           </Text>
 
           {error ? <ErrorState message={error} onRetry={load} /> : null}
@@ -184,7 +184,7 @@ export default function Plans({ onBack, onSubscribe, onPacks, currentStatus }) {
 
           {onPacks ? (
             <PrimaryButton
-              label="Ver packs TVOD"
+              label="Ver lotes de filmes"
               variant="outline"
               style={{ marginTop: 24 }}
               onPress={onPacks}

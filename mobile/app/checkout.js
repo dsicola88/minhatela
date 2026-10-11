@@ -24,7 +24,7 @@ export default function CheckoutRoute() {
     type === 'pack'
       ? {
           id: params.packId,
-          title: params.packTitle || 'Pack TVOD',
+          title: params.packTitle || 'Lote de filmes',
           priceKz: params.priceKz ? Number(params.priceKz) : 2500,
         }
       : null;

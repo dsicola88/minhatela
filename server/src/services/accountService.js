@@ -63,6 +63,8 @@ async function getAccount(userId) {
     /* optional */
   }
 
+  const downloadLimits = require('./downloadService').limitsFor(user);
+
   return {
     user: {
       id: user.id,
@@ -80,6 +82,13 @@ async function getAccount(userId) {
       isAdmin: Boolean(user.is_admin) || roles.includes('admin'),
     },
     streams,
+    limits: {
+      screens: streams.limit,
+      screensActive: streams.active,
+      downloads: downloadLimits.maxActive,
+      downloadDays: downloadLimits.ttlDays,
+      profiles: 4,
+    },
     devices,
     profiles: (() => {
       const latest = profiles.find((r) => r.last_used_at)?.id || null;

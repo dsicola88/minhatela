@@ -18,6 +18,24 @@ async function listPlansFromDb() {
   }
 }
 
+function humanizeHighlight(line) {
+  return String(line || '')
+    .replace(/Catálogo AVOD com anúncios/gi, 'Filmes e séries com anúncios curtos')
+    .replace(/Catálogo SVOD completo/gi, 'Todo o catálogo, sem anúncios')
+    .replace(/Catálogo AVOD/gi, 'Filmes e séries com anúncios curtos')
+    .replace(/\bAVOD\b/g, 'com anúncios')
+    .replace(/\bSVOD\b/g, 'Premium')
+    .replace(/\bTVOD\b/g, 'aluguer')
+    .replace(/(\d+)\s*streams?\b/gi, '$1 ecrãs');
+}
+
+function presentPlan(plan) {
+  return {
+    ...plan,
+    highlights: (plan.highlights || []).map(humanizeHighlight),
+  };
+}
+
 async function listPlans() {
   const dbPlans = await listPlansFromDb();
   let payments = {
@@ -40,23 +58,25 @@ async function listPlans() {
     return {
       currency: payments.currency || 'AOA',
       market: require('../config/env').env.market.country || 'AO',
-      plans: dbPlans.map((p) => ({
-        ...p,
-        currentDefault: p.isDefault || p.id === 'free',
-        cta:
-          p.cta ||
-          (p.priceKz > 0
-            ? {
-                type: 'subscription',
-                label: `Assinar · ${Number(p.priceKz).toLocaleString('pt-AO')} Kz/mês`,
-              }
-            : null),
-      })),
+      plans: dbPlans.map((p) =>
+        presentPlan({
+          ...p,
+          currentDefault: p.isDefault || p.id === 'free',
+          cta:
+            p.cta ||
+            (p.priceKz > 0
+              ? {
+                  type: 'subscription',
+                  label: `Assinar · ${Number(p.priceKz).toLocaleString('pt-AO')} Kz/mês`,
+                }
+              : null),
+        })
+      ),
       paymentMethods: methods,
       payments,
       note:
         payments.ibanInstructions ||
-        'Pagamento por transferência IBAN ou Multicaixa. Acesso após confirmação admin (padrão Angola).',
+        'Paga por IBAN ou Multicaixa Express. A MinhaTela confirma e o Premium abre na app. No fim do período volta ao plano gratuito — a conta não fecha.',
     };
   }
 
@@ -75,9 +95,10 @@ async function listPlans() {
         ads: true,
         quality: '480p / Auto',
         highlights: [
-          'Catálogo AVOD com anúncios',
-          `${env.maxConcurrentStreamsFree} ecrã em simultâneo`,
-          'Poupança de dados (Unitel/Movicel)',
+          'Filmes e séries com anúncios curtos',
+          `${env.maxConcurrentStreamsFree} ecrã de cada vez`,
+          `${Number(process.env.DOWNLOAD_MAX_FREE || 3)} títulos para ver sem rede`,
+          'Poupança de dados (Unitel / Movicel)',
         ],
         cta: null,
         currentDefault: true,
@@ -93,10 +114,10 @@ async function listPlans() {
         quality: '720p / Auto',
         highlights: [
           'Sem anúncios',
-          'Catálogo SVOD completo',
-          `${env.maxConcurrentStreamsPremium} ecrãs em simultâneo`,
-          'Downloads offline (até 30 dias)',
-          'Prioridade em estreias',
+          'Todo o catálogo',
+          `${env.maxConcurrentStreamsPremium} ecrãs ao mesmo tempo`,
+          `Até ${Number(process.env.DOWNLOAD_MAX_PREMIUM || 10)} títulos no telemóvel (30 dias)`,
+          'Casa: partilhar Premium com a família',
         ],
         cta: {
           type: 'subscription',
@@ -107,7 +128,7 @@ async function listPlans() {
     ],
     paymentMethods: methods,
     payments,
-    note: 'Pagamento por transferência IBAN ou Multicaixa. Acesso após confirmação admin (padrão Angola).',
+    note: 'Paga por IBAN ou Multicaixa Express. A MinhaTela confirma e o Premium abre na app. No fim do período volta ao plano gratuito — a conta não fecha.',
   };
 }
 
