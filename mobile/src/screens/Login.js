@@ -67,7 +67,7 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [secure, setSecure] = useState(true);
-  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(null);
   const [error, setError] = useState('');
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [mfaTicket, setMfaTicket] = useState('');
@@ -91,7 +91,7 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
       setError('Login Google neste momento funciona no site. Na app use email e palavra-passe.');
       return;
     }
-    setLoading(true);
+    setBusy('google');
     try {
       if (!googleClientId) {
         throw new Error('Login Google ainda não está configurado neste ambiente.');
@@ -112,13 +112,13 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
     } catch (err) {
       setError(err.message || 'Falha no login Google');
     } finally {
-      setLoading(false);
+      setBusy(null);
     }
   }
 
   async function handleSubmit() {
     setError('');
-    setLoading(true);
+    setBusy('form');
     try {
       if (mode === 'login') {
         if (mfaStep === 'code') {
@@ -158,7 +158,7 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
       } else {
         if (!acceptTerms) {
           setError('Aceite os Termos e a Política de Privacidade para continuar');
-          setLoading(false);
+          setBusy(null);
           return;
         }
         await register({ email, password, fullName, acceptTerms: true });
@@ -167,7 +167,7 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
     } catch (err) {
       setError(err.message || 'Não foi possível autenticar');
     } finally {
-      setLoading(false);
+      setBusy(null);
     }
   }
 
@@ -383,7 +383,8 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
                           : 'Registar'
                   }
                   onPress={handleSubmit}
-                  loading={loading}
+                  loading={busy === 'form'}
+                  disabled={busy === 'google'}
                   palette={cinema}
                   style={{ marginTop: 20 }}
                 />
@@ -402,7 +403,8 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
                     </Text>
                     <GoogleSignInButton
                       onPress={() => handleOAuth('google')}
-                      loading={loading}
+                      loading={busy === 'google'}
+                      disabled={busy === 'form'}
                     />
                   </View>
                 ) : null}
