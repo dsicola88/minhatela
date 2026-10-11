@@ -594,7 +594,7 @@ function Application({ guide, form, setForm, busy, onSubmit }) {
       <Text style={{ color: colors.muted, marginTop: 6, marginBottom: 18, lineHeight: 20 }}>
         A MinhaTela revê a candidatura. O contacto é o email desta conta.
       </Text>
-      <View style={{ flexDirection: 'row', gap: 10, marginBottom: 8 }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
       {[
         ['filmmaker', 'Cineasta', 'Em nome próprio.'],
         ['production_company', 'Produtora', 'Em nome da empresa.'],
@@ -605,7 +605,9 @@ function Application({ guide, form, setForm, busy, onSubmit }) {
             key={id}
             onPress={() => patch('type', id)}
             style={{
-              flex: 1,
+              flexGrow: 1,
+              flexShrink: 0,
+              flexBasis: 200,
               borderWidth: selected ? 2 : 1,
               borderColor: selected ? colors.gold : colors.border,
               borderRadius: 8,
@@ -613,7 +615,7 @@ function Application({ guide, form, setForm, busy, onSubmit }) {
               backgroundColor: colors.id === 'light' ? '#FFFFFF' : colors.elevated,
             }}
           >
-            <Text style={{ color: colors.text, fontWeight: '800' }}>{label}</Text>
+            <Text style={{ color: colors.text, fontWeight: '800', lineHeight: 20 }}>{label}</Text>
             <Text style={{ color: colors.muted, marginTop: 4, lineHeight: 18 }}>{hint}</Text>
           </Pressable>
         );

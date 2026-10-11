@@ -138,14 +138,19 @@ export function cardSurface(extra) {
 
 export function fieldSurface(extra) {
   return {
-    backgroundColor: colors.surfaceSecondary,
+    backgroundColor: colors.id === 'light' ? '#FFFFFF' : colors.elevated,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 4,
+    borderRadius: 6,
     color: colors.text,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    marginBottom: 12,
+    fontSize: 15,
+    lineHeight: 22,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 12,
+    minHeight: 48,
+    marginBottom: 14,
+    alignSelf: 'stretch',
     ...extra,
   };
 }
@@ -157,9 +162,11 @@ export function FieldLabel({ children, palette }) {
       style={{
         color: p.textSecondary,
         fontSize: 13,
-        fontWeight: '600',
-        marginBottom: 8,
-        letterSpacing: 0.3,
+        fontWeight: '700',
+        lineHeight: 18,
+        marginBottom: 6,
+        marginTop: 2,
+        alignSelf: 'flex-start',
       }}
     >
       {children}

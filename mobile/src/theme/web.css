@@ -38,11 +38,15 @@ body,
   color-scheme: light;
 }
 
-/* O anel azul do browser não faz parte do tema. */
+/* O anel azul do browser não faz parte do tema.
+   O preflight do Tailwind herda a line-height e, no Firefox, o texto do campo
+   sobe e fica por cima do rótulo. */
 input,
 textarea,
 select {
   caret-color: var(--ao-text);
+  line-height: 22px;
+  box-sizing: border-box;
 }
 
 input:focus,

@@ -97,6 +97,7 @@ export default function Plans({ onBack, onSubscribe, onPacks, currentStatus }) {
           <View
             style={{
               flexDirection: isCompact ? 'column' : 'row',
+              alignItems: 'stretch',
               gap: 16,
             }}
           >
@@ -108,20 +109,23 @@ export default function Plans({ onBack, onSubscribe, onPacks, currentStatus }) {
                 <View
                   key={plan.id}
                   style={{
-                    flex: 1,
+                    flexGrow: isCompact ? 0 : 1,
+                    flexShrink: 0,
+                    flexBasis: isCompact ? 'auto' : 0,
+                    alignSelf: 'stretch',
                     borderWidth: 1,
-                    borderColor: featured ? colors.gold : colors.border,
+                    borderColor: featured ? colors.gold : '#3F3F46',
                     borderTopWidth: 4,
                     borderTopColor: featured ? colors.gold : colors.red,
                     borderRadius: 8,
                     padding: 20,
-                    backgroundColor: '#0F0F0F',
+                    backgroundColor: '#18181B',
                   }}
                 >
                   {plan.badge ? (
                     <Text
                       style={{
-                        color: colors.black,
+                        color: '#18181B',
                         backgroundColor: colors.gold,
                         alignSelf: 'flex-start',
                         paddingHorizontal: 8,
@@ -134,10 +138,10 @@ export default function Plans({ onBack, onSubscribe, onPacks, currentStatus }) {
                       {plan.badge.toUpperCase()}
                     </Text>
                   ) : null}
-                  <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800' }}>
+                  <Text style={{ color: '#F4F4F5', fontSize: 22, fontWeight: '800', lineHeight: 28 }}>
                     {plan.name}
                   </Text>
-                  <Text style={{ color: colors.gold, fontSize: 28, fontWeight: '800', marginTop: 8 }}>
+                  <Text style={{ color: colors.gold, fontSize: 28, fontWeight: '800', lineHeight: 34, marginTop: 8 }}>
                     {plan.priceKz
                       ? `${plan.priceKz.toLocaleString('pt-AO')} Kz`
                       : '0 Kz'}
@@ -156,7 +160,7 @@ export default function Plans({ onBack, onSubscribe, onPacks, currentStatus }) {
                     {(plan.highlights || []).map((h) => (
                       <View key={h} style={{ flexDirection: 'row', gap: 8 }}>
                         <Ionicons name="checkmark" size={16} color={colors.gold} />
-                        <Text style={{ color: colors.textSecondary, flex: 1, lineHeight: 20 }}>
+                        <Text style={{ color: '#D4D4D8', flex: 1, flexShrink: 1, lineHeight: 20 }}>
                           {h}
                         </Text>
                       </View>
@@ -166,7 +170,8 @@ export default function Plans({ onBack, onSubscribe, onPacks, currentStatus }) {
                     <PrimaryButton
                       label={plan.cta.label}
                       variant="light"
-                      style={{ marginTop: 24 }}
+                      palette={colors.id === 'light' ? { ...colors, id: 'dark' } : colors}
+                      style={{ marginTop: 24, alignSelf: 'stretch' }}
                       onPress={() => onSubscribe?.(plan)}
                     />
                   ) : null}
@@ -176,7 +181,7 @@ export default function Plans({ onBack, onSubscribe, onPacks, currentStatus }) {
           </View>
 
           {note ? (
-            <Text style={{ color: colors.muted, fontSize: 12, marginTop: 28, lineHeight: 18 }}>
+            <Text style={{ color: colors.muted, fontSize: 13, marginTop: 20, lineHeight: 20 }}>
               {note}
             </Text>
           ) : null}
