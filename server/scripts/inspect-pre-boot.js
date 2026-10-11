@@ -43,6 +43,7 @@ async function main() {
   const { host, local } = resolveHost();
   const client = await pool.connect();
   try {
+    await client.query('SET default_transaction_read_only = on');
     const applied = await client.query(
       `SELECT id, applied_at FROM schema_migrations WHERE id IN ('037_ads_manager.sql','038_creator_ledger_trace.sql') ORDER BY id`
     );
@@ -112,8 +113,13 @@ async function main() {
          AND trace_key IS NULL`
     ).catch(() => ({ rows: [{ n: null, kz: null, note: 'coluna trace_key ainda não existe' }] }));
     const uniq = await client.query(
-      `SELECT indexname FROM pg_indexes
+      `SELECT indexname, indexdef FROM pg_indexes
        WHERE tablename = 'creator_earnings' AND indexname = 'creator_earnings_trace_key_uidx'`
+    );
+    const traceCol = await client.query(
+      `SELECT data_type, is_nullable
+       FROM information_schema.columns
+       WHERE table_name = 'creator_earnings' AND column_name = 'trace_key'`
     );
     const clickIdx = await client.query(
       `SELECT indexname FROM pg_indexes
@@ -121,6 +127,11 @@ async function main() {
     );
 
     const extra = ledgerTotals.rows[0];
+    const sample = ledgerDupes.rows.map((row) => {
+      const copy = { ...row };
+      delete copy.trace_candidate;
+      return copy;
+    });
     console.log(
       JSON.stringify(
         {
@@ -136,12 +147,14 @@ async function main() {
             sample: clicks.rows,
           },
           ledger: {
+            traceKeyColumn: traceCol.rows[0] || null,
             uniqueIndex: Boolean(uniq.rowCount),
+            uniqueIndexDef: uniq.rows[0]?.indexdef || null,
             wouldHaveBeenDeleted: {
               extraRows: extra.extra_rows,
               extraKz: extra.extra_kz,
               creators: extra.creators,
-              sample: ledgerDupes.rows,
+              sample: sample,
             },
             viewAdShareWithoutTrace: orphans.rows[0],
           },

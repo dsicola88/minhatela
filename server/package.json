@@ -20,7 +20,8 @@
     "studio-rules": "node scripts/studio-rules.test.js",
     "studio-ledger": "node scripts/studio-ledger.test.js",
     "studio-db": "node scripts/studio-db.test.js",
-    "inspect-pre-boot": "node scripts/inspect-pre-boot.js"
+    "inspect-pre-boot": "node scripts/inspect-pre-boot.js",
+    "migrate-hold": "node scripts/migrate-hold.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
