@@ -308,6 +308,28 @@ async function addHistory({ campaignId, actorId, action, fromStatus, toStatus, r
   );
 }
 
+async function advertiserWithdraw(advertiserId, campaignId) {
+  const current = await query(
+    `SELECT id, status FROM campaigns WHERE id = $1 AND advertiser_id = $2`,
+    [campaignId, advertiserId]
+  );
+  const row = current.rows[0];
+  if (!row) return { error: 'missing' };
+  if (row.status === 'active') return { error: 'active' };
+  if (row.status === 'completed') return { error: 'completed' };
+  const result = await query(
+    `UPDATE campaigns
+     SET status = 'rejected',
+         rejection_reason = 'Retirada pelo anunciante',
+         updated_at = NOW()
+     WHERE id = $1 AND advertiser_id = $2
+       AND status IN ('draft', 'pending_review', 'paused')
+     RETURNING *`,
+    [campaignId, advertiserId]
+  );
+  return { row: result.rows[0] || null, fromStatus: row.status };
+}
+
 async function advertiserPause(advertiserId, campaignId) {
   const result = await query(
     `UPDATE campaigns
@@ -451,6 +473,7 @@ module.exports = {
   getOwnedCampaign,
   listHistory,
   addHistory,
+  advertiserWithdraw,
   advertiserPause,
   attachTransaction,
   moderateCampaign,

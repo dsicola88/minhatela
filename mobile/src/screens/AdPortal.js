@@ -22,10 +22,12 @@ import {
   fetchAdPortal,
   createCampaign,
   pauseCampaign,
+  withdrawCampaign,
   fetchAdReports,
   resolveAdMediaUrl,
   uploadAdCreative,
 } from '../services/ads';
+import { fileKind, mediaKindFromUrl, previewUsesVideo } from './adCreativeKind';
 
 const STEPS = [
   { id: 1, title: 'Objectivo' },
@@ -486,6 +488,21 @@ export default function AdPortal({ onCatalog, onAccount }) {
                   {item.rejectionReason ? (
                     <Text style={{ color: colors.red, marginTop: 6 }}>Motivo: {item.rejectionReason}</Text>
                   ) : null}
+                  {['draft', 'pending_review', 'paused'].includes(item.status) ? (
+                    <Pressable
+                      onPress={async () => {
+                        try {
+                          await withdrawCampaign(item.id);
+                          await load();
+                        } catch (err) {
+                          setError(err.message);
+                        }
+                      }}
+                      style={{ marginTop: 10 }}
+                    >
+                      <Text style={{ color: colors.red, fontWeight: '700' }}>Retirar campanha</Text>
+                    </Pressable>
+                  ) : null}
                   {item.creative?.mediaUrl ? (
                     <Text style={{ color: colors.muted, marginTop: 6 }} numberOfLines={1}>
                       {creativeKindLabel(item.creative)} · {resolveAdMediaUrl(item.creative.mediaUrl)}
@@ -526,8 +543,22 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
     setStepError('');
     setUploading(true);
     try {
-      const file = await pickAdFile(draft.mediaKind === 'video' ? 'video' : 'image');
+      const expected = draft.mediaKind === 'video' ? 'video' : 'image';
+      const file = await pickAdFile(expected);
       if (!file) return;
+      const actual = fileKind(file);
+      if (actual && actual !== expected && into === 'single') {
+        setStepError(
+          expected === 'video'
+            ? 'Este ficheiro é uma imagem. Escolha o formato Imagem, ou carregue um MP4, WEBM ou MOV.'
+            : 'Este ficheiro é um vídeo. Escolha o formato Vídeo, ou carregue um JPG, PNG ou WEBP.'
+        );
+        return;
+      }
+      if (into !== 'single' && actual === 'video') {
+        setStepError('O carrossel aceita imagens (JPG, PNG ou WEBP)');
+        return;
+      }
       const uploaded = await uploadAdCreative(file);
       if (into !== 'single' && uploaded.mediaKind === 'video') {
         setStepError('O carrossel aceita imagens (JPG, PNG ou WEBP)');
@@ -596,7 +627,12 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
           {AD_FORMATS.map((format) => (
             <Pressable
               key={format.id}
-              onPress={() => setField('mediaKind', format.id)}
+              onPress={() => {
+                setField('mediaKind', format.id);
+                if (draft.mediaUrl && mediaKindFromUrl(draft.mediaUrl) !== format.id && format.id !== 'carousel') {
+                  setField('mediaUrl', '');
+                }
+              }}
               style={choice(draft.mediaKind === format.id)}
             >
               <Text style={{ color: colors.text, fontWeight: '700' }}>{format.label}</Text>
@@ -831,13 +867,25 @@ function creativeReady(draft, step) {
 }
 
 async function pickAdFile(kind) {
-  const accept = kind === 'video' ? 'video/mp4,video/webm,video/quicktime' : 'image/jpeg,image/png,image/webp,image/gif';
+  const accept = kind === 'video' ? 'video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov' : 'image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif';
   if (Platform.OS === 'web' && typeof document !== 'undefined') {
     return new Promise((resolve) => {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = accept;
-      input.onchange = () => resolve(input.files?.[0] || null);
+      let settled = false;
+      const finish = (file) => {
+        if (settled) return;
+        settled = true;
+        window.removeEventListener('focus', onFocus);
+        resolve(file || null);
+      };
+      const onFocus = () => {
+        setTimeout(() => finish(input.files?.[0] || null), 400);
+      };
+      input.addEventListener('cancel', () => finish(null));
+      input.onchange = () => finish(input.files?.[0] || null);
+      window.addEventListener('focus', onFocus);
       input.click();
     });
   }
@@ -852,7 +900,16 @@ async function pickAdFile(kind) {
 function CreativePreview({ url, kind }) {
   if (!url) return null;
   const uri = resolveAdMediaUrl(url);
-  if (kind === 'video') {
+  const detected = mediaKindFromUrl(url);
+  const showVideo = previewUsesVideo(url, kind);
+  if (detected === 'image' && kind === 'video') {
+    return (
+      <Text style={{ color: colors.red, marginBottom: 12 }}>
+        Este ficheiro é uma imagem. Escolha o formato Imagem para o ver.
+      </Text>
+    );
+  }
+  if (showVideo) {
     if (Platform.OS === 'web') {
       return createElement('video', {
         src: uri,

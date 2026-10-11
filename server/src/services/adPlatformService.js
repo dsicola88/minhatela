@@ -448,6 +448,30 @@ async function createCampaign(userId, body) {
   };
 }
 
+async function withdrawMyCampaign(userId, campaignId) {
+  const advertiser = await requireAdvertiser(userId);
+  const result = await adRepository.advertiserWithdraw(advertiser.id, campaignId);
+  if (result.error === 'missing') {
+    throw createError(404, 'Campanha não encontrada', 'NOT_FOUND');
+  }
+  if (result.error === 'active') {
+    throw createError(409, 'Pause a campanha no ar antes de a retirar', 'CAMPAIGN_ACTIVE');
+  }
+  if (result.error === 'completed') {
+    throw createError(409, 'Uma campanha concluída não pode ser apagada', 'CAMPAIGN_CLOSED');
+  }
+  if (!result.row) throw createError(409, 'Esta campanha não pode ser retirada', 'CAMPAIGN_LOCKED');
+  await adRepository.addHistory({
+    campaignId,
+    actorId: userId,
+    action: 'withdrawn_by_advertiser',
+    fromStatus: result.fromStatus,
+    toStatus: 'rejected',
+    reason: 'Retirada pelo anunciante',
+  });
+  return { campaign: mapCampaign(result.row) };
+}
+
 async function pauseMyCampaign(userId, campaignId) {
   const advertiser = await requireAdvertiser(userId);
   const row = await adRepository.advertiserPause(advertiser.id, campaignId);
@@ -792,6 +816,7 @@ module.exports = {
   listMyCampaigns,
   getMyCampaign,
   createCampaign,
+  withdrawMyCampaign,
   pauseMyCampaign,
   getReports,
   reportsToCsv,

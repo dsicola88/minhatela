@@ -94,6 +94,10 @@ async function pauseCampaign(req, res) {
   res.json(await adPlatformService.pauseMyCampaign(req.user.id, req.params.id));
 }
 
+async function withdrawCampaign(req, res) {
+  res.json(await adPlatformService.withdrawMyCampaign(req.user.id, req.params.id));
+}
+
 async function reports(req, res) {
   const result = await adPlatformService.getReports(req.user.id, req.query);
   if (String(req.query.format || '') === 'csv') {
@@ -151,6 +155,7 @@ module.exports = {
   getCampaign,
   createCampaign,
   pauseCampaign,
+  withdrawCampaign,
   reports,
   uploadCreative,
   receiveCreative,

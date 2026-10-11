@@ -38,6 +38,10 @@ export async function pauseCampaign(id) {
   return api.post(`/api/ads/campaigns/${id}/pause`, {});
 }
 
+export async function withdrawCampaign(id) {
+  return api.post(`/api/ads/campaigns/${id}/withdraw`, {});
+}
+
 export async function fetchAdReports(params = {}) {
   const q = new URLSearchParams();
   if (params.from) q.set('from', params.from);

@@ -263,6 +263,46 @@ async function run() {
     assert(r.status === 404, `got ${r.status}`);
   });
 
+  await step('Anunciante retira a própria campanha pendente', async () => {
+    const r = await req('POST', '/api/ads/campaigns', {
+      token: a.token,
+      body: {
+        name: 'Para retirar',
+        budgetKz: 8000,
+        startsAt: new Date().toISOString(),
+        endsAt: new Date(Date.now() + 7 * 86400000).toISOString(),
+        creative: creative('https://example.com/retirar.mp4'),
+      },
+    });
+    const id = r.json?.campaign?.id;
+    assert(id, 'withdraw campaign id');
+    const foreign = await req('POST', `/api/ads/campaigns/${id}/withdraw`, { token: b.token });
+    assert(foreign.status === 404, `foreign withdraw ${foreign.status}`);
+    const customer = await registerUser('Cliente');
+    const denied = await req('POST', `/api/ads/campaigns/${id}/withdraw`, { token: customer.token });
+    assert(denied.status === 403, `customer withdraw ${denied.status}`);
+    const w = await req('POST', `/api/ads/campaigns/${id}/withdraw`, { token: a.token });
+    assert(w.status === 200 && w.json?.campaign?.status === 'rejected', `withdraw ${w.status}`);
+    assert(
+      String(w.json?.campaign?.rejectionReason || '').includes('Retirada'),
+      'reason'
+    );
+    const again = await req('POST', `/api/ads/campaigns/${id}/withdraw`, { token: a.token });
+    assert(again.status === 409, `second withdraw ${again.status}`);
+  });
+
+  await step('Upload de imagem devolve kind image', async () => {
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      'base64'
+    );
+    const form = new FormData();
+    form.append('file', new Blob([png], { type: 'image/png' }), 'criativo.png');
+    const r = await req('POST', '/api/ads/creatives/upload', { token: a.token, formData: form });
+    assert(r.status === 201 && r.json?.mediaKind === 'image', `upload ${r.status} ${r.json?.mediaKind}`);
+    assert(String(r.json?.mediaUrl || '').endsWith('.png'), 'png url');
+  });
+
   await step('Cliente sem ads.manage · admin 403', async () => {
     const r = await req('GET', '/api/admin/campaigns/pending', { token: a.token });
     assert(r.status === 403 || r.status === 401, `got ${r.status}`);
@@ -346,9 +386,16 @@ async function run() {
     return `unit=${unit}`;
   });
 
+  await step('Campanha no ar não se retira', async () => {
+    const w = await req('POST', `/api/ads/campaigns/${campaignId}/withdraw`, { token: a.token });
+    assert(w.status === 409 && w.json?.code === 'CAMPAIGN_ACTIVE', `active withdraw ${w.status} ${w.json?.code}`);
+  });
+
   await step('Pausada não é entregue de novo', async () => {
     const p = await req('POST', `/api/ads/campaigns/${campaignId}/pause`, { token: a.token });
     assert(p.status === 200 && p.json?.campaign?.status === 'paused', 'paused');
+    const w = await req('POST', `/api/ads/campaigns/${campaignId}/withdraw`, { token: a.token });
+    assert(w.status === 200 && w.json?.campaign?.status === 'rejected', `paused withdraw ${w.status}`);
     const d = await req('POST', '/api/ads/decision', {
       token: a.token,
       body: { contentId, monetization: 'avod', placement: 'pre_roll' },
