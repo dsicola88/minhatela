@@ -1,6 +1,13 @@
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { StatusBar } from 'expo-status-bar';
 import { colors } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
+
+export function ThemedStatusBar() {
+  const { statusBarStyle } = useTheme();
+  return <StatusBar style={statusBarStyle} />;
+}
 
 export function PrimaryButton({
   label,
@@ -116,6 +123,31 @@ export function GoogleSignInButton({ onPress, disabled = false, loading = false 
       )}
     </Pressable>
   );
+}
+
+/** Lido na renderização, para o tema claro e o escuro não ficarem congelados. */
+export function cardSurface(extra) {
+  return {
+    backgroundColor: colors.card,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...extra,
+  };
+}
+
+export function fieldSurface(extra) {
+  return {
+    backgroundColor: colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 4,
+    color: colors.text,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 12,
+    ...extra,
+  };
 }
 
 export function FieldLabel({ children, palette }) {

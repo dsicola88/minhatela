@@ -1,8 +1,7 @@
+import { ThemedStatusBar, PrimaryButton, FieldLabel } from '../components/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, TextInput, Pressable, useWindowDimensions } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { PrimaryButton, FieldLabel } from '../components/ui';
 import { LoadingState, EmptyState, ErrorState } from '../components/StateViews';
 import { colors, layout } from '../theme/tokens';
 import {
@@ -13,10 +12,10 @@ import {
 } from '../services/company';
 
 const ROLE_LABEL = {
-  owner: 'Owner',
-  manager: 'Manager',
+  owner: 'Dono',
+  manager: 'Gestor',
   editor: 'Editor',
-  finance: 'Finance',
+  finance: 'Finanças',
 };
 
 export default function CompanyPortal({ onBack }) {
@@ -59,7 +58,7 @@ export default function CompanyPortal({ onBack }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.black }}>
-      <StatusBar style="light" />
+      <ThemedStatusBar />
       <ScrollView
         contentContainerStyle={{
           padding: isCompact ? 16 : 32,
@@ -78,7 +77,7 @@ export default function CompanyPortal({ onBack }) {
         </Pressable>
 
         <Text style={{ color: colors.gold, fontSize: 12, fontWeight: '800', letterSpacing: 1.4 }}>
-          COMPANY PORTAL
+          PORTAL DA PRODUTORA
         </Text>
         <Text style={{ color: colors.text, fontSize: 28, fontWeight: '800', marginBottom: 8 }}>
           Produtora
@@ -92,7 +91,7 @@ export default function CompanyPortal({ onBack }) {
         {!company ? (
           <View
             style={{
-              backgroundColor: '#111',
+              backgroundColor: colors.card,
               borderRadius: 8,
               borderWidth: 1,
               borderColor: colors.border,
@@ -113,6 +112,7 @@ export default function CompanyPortal({ onBack }) {
               style={{
                 borderWidth: 1,
                 borderColor: colors.border,
+                backgroundColor: colors.surfaceSecondary,
                 color: colors.text,
                 padding: 10,
                 borderRadius: 4,
@@ -141,7 +141,7 @@ export default function CompanyPortal({ onBack }) {
           <>
             <View
               style={{
-                backgroundColor: '#111',
+                backgroundColor: colors.card,
                 borderRadius: 8,
                 borderWidth: 1,
                 borderColor: colors.border,
@@ -158,7 +158,7 @@ export default function CompanyPortal({ onBack }) {
             {canFinance && data.finance ? (
               <View
                 style={{
-                  backgroundColor: '#111',
+                  backgroundColor: colors.card,
                   borderRadius: 8,
                   borderWidth: 1,
                   borderColor: colors.border,
@@ -176,7 +176,7 @@ export default function CompanyPortal({ onBack }) {
             {canManage ? (
               <View
                 style={{
-                  backgroundColor: '#111',
+                  backgroundColor: colors.card,
                   borderRadius: 8,
                   borderWidth: 1,
                   borderColor: colors.border,
@@ -195,26 +195,34 @@ export default function CompanyPortal({ onBack }) {
                   style={{
                     borderWidth: 1,
                     borderColor: colors.border,
+                    backgroundColor: colors.surfaceSecondary,
                     color: colors.text,
                     padding: 10,
                     borderRadius: 4,
                     marginBottom: 10,
                   }}
                 />
-                <FieldLabel>Função (owner / manager / editor / finance)</FieldLabel>
-                <TextInput
-                  value={memberRole}
-                  onChangeText={setMemberRole}
-                  autoCapitalize="none"
-                  style={{
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    color: colors.text,
-                    padding: 10,
-                    borderRadius: 4,
-                    marginBottom: 10,
-                  }}
-                />
+                <FieldLabel>Função</FieldLabel>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                  {Object.entries(ROLE_LABEL).map(([id, label]) => {
+                    const selected = memberRole === id;
+                    return (
+                      <Pressable
+                        key={id}
+                        onPress={() => setMemberRole(id)}
+                        style={{
+                          borderWidth: selected ? 2 : 1,
+                          borderColor: selected ? colors.red : colors.border,
+                          borderRadius: 20,
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                        }}
+                      >
+                        <Text style={{ color: colors.text, fontWeight: '700' }}>{label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
                 <PrimaryButton
                   label="Adicionar membro"
                   loading={busy}
@@ -238,7 +246,7 @@ export default function CompanyPortal({ onBack }) {
               <View
                 key={m.userId}
                 style={{
-                  backgroundColor: '#111',
+                  backgroundColor: colors.card,
                   borderRadius: 8,
                   borderWidth: 1,
                   borderColor: colors.border,
@@ -282,7 +290,7 @@ export default function CompanyPortal({ onBack }) {
                 <View
                   key={c.id}
                   style={{
-                    backgroundColor: '#111',
+                    backgroundColor: colors.card,
                     padding: 14,
                     borderRadius: 8,
                     borderWidth: 1,

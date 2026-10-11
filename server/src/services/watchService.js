@@ -75,11 +75,6 @@ async function startPlayback({
     throw createError(400, 'Não é possível reproduzir a série directamente', 'SERIES_NOT_PLAYABLE');
   }
 
-  const { isValidBunnyVideoId } = require('../utils/bunnyAsset');
-  if (!row.bunny_video_id || !isValidBunnyVideoId(row.bunny_video_id)) {
-    throw createError(503, 'Asset de vídeo indisponível', 'NO_BUNNY_ASSET');
-  }
-
   const maturityMax = profile?.maturity_max ?? 18;
   const rating = content.maturityRating ?? row.maturity_rating ?? 12;
   if (rating > maturityMax) {
@@ -150,6 +145,11 @@ async function startPlayback({
       });
     }
     throw err;
+  }
+
+  const { isValidBunnyVideoId } = require('../utils/bunnyAsset');
+  if (!row.bunny_video_id || !isValidBunnyVideoId(row.bunny_video_id)) {
+    throw createError(503, 'Este filme ainda não tem vídeo pronto para reproduzir', 'NO_BUNNY_ASSET');
   }
 
   const { device, limit } = await deviceStreamService.acquireStreamSlot({

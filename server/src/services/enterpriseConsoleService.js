@@ -566,6 +566,27 @@ async function patchCatalogTitle(actorId, contentId, body, meta = {}) {
 
   const { videoTenantSql } = require('../utils/tenantScope');
   const tenantSql = meta.superAdmin ? 'TRUE' : videoTenantSql('v');
+  const current = await query(
+    `SELECT kind, bunny_video_id, is_published, workflow_status
+     FROM videos v WHERE v.id = $1 AND ${tenantSql}`,
+    [contentId]
+  );
+  if (!current.rowCount) throw createError(404, 'Título não encontrado', 'NOT_FOUND');
+  const cur = current.rows[0];
+  const nextBunny = bunnyVideoId !== undefined ? bunnyVideoId : cur.bunny_video_id;
+  const nextPublished = body.isPublished === undefined ? cur.is_published : Boolean(body.isPublished);
+  const nextWorkflow = body.workflowStatus || cur.workflow_status;
+  if (
+    cur.kind !== 'series' &&
+    (nextPublished || nextWorkflow === 'published') &&
+    !isValidBunnyVideoId(nextBunny)
+  ) {
+    throw createError(
+      400,
+      'Não dá para publicar sem um vídeo real na Bunny.',
+      'BUNNY_VIDEO_REQUIRED'
+    );
+  }
   const result = await query(
     `UPDATE videos v SET
        is_published = COALESCE($2, is_published),

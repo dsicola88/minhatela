@@ -12,7 +12,7 @@ import {
   Switch,
   ScrollView,
 } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
+import { ThemedStatusBar } from '../components/ui';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, brand, layout } from '../theme/tokens';
 import { useI18n } from '../i18n';
@@ -283,7 +283,7 @@ export default function Profiles({ onSelect, initialManage = false }) {
         padding: 24,
       }}
     >
-      <StatusBar style="light" />
+      <ThemedStatusBar />
       <Text
         style={{
           color: colors.red,

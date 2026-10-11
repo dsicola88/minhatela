@@ -8,7 +8,7 @@ import {
   Image,
   useWindowDimensions,
 } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
+import { ThemedStatusBar } from '../components/ui';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, layout } from '../theme/tokens';
@@ -166,7 +166,7 @@ export default function Search({ onBack, onSelect }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.black, paddingTop: insets.top }}>
-      <StatusBar style="light" />
+      <ThemedStatusBar />
       <View
         style={{
           flexDirection: 'row',
@@ -186,7 +186,7 @@ export default function Search({ onBack, onSelect }) {
             flex: 1,
             flexDirection: 'row',
             alignItems: 'center',
-            backgroundColor: '#181818',
+            backgroundColor: colors.surfaceSecondary,
             borderRadius: 4,
             borderWidth: 1,
             borderColor: colors.border,

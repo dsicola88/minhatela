@@ -21,7 +21,7 @@ async function runComingSoonReleases() {
   return withJobLock(LOCKS.comingSoon, 'coming_soon_releases', async () => {
   const started = Date.now();
   const due = await query(
-    `SELECT id, title, slug
+    `SELECT id, title, slug, kind, bunny_video_id
      FROM videos
      WHERE coming_soon_at IS NOT NULL
        AND coming_soon_at <= NOW()
@@ -29,6 +29,26 @@ async function runComingSoonReleases() {
        AND (
          is_published = FALSE
          OR workflow_status IS DISTINCT FROM 'published'
+       )
+       AND slug NOT IN ('kazukuta', 'luanda-nights', 'independencia', 'o-ultimo-cineasta', 'baia-vermelha')
+       AND (
+         (
+           kind = 'movie'
+           AND bunny_video_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+           AND bunny_video_id NOT ILIKE 'pending-%'
+           AND bunny_video_id NOT ILIKE 'demo-bunny-%'
+         )
+         OR (
+           kind = 'series'
+           AND EXISTS (
+             SELECT 1 FROM videos episode
+             WHERE episode.series_id = videos.id
+               AND episode.kind = 'episode'
+               AND episode.bunny_video_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+               AND episode.bunny_video_id NOT ILIKE 'pending-%'
+               AND episode.bunny_video_id NOT ILIKE 'demo-bunny-%'
+           )
+         )
        )
      ORDER BY coming_soon_at ASC
      LIMIT 50`

@@ -11,6 +11,7 @@ import {
   Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { ThemedStatusBar } from '../components/ui';
 import { WebView } from 'react-native-webview';
 import { Video, ResizeMode } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
@@ -573,7 +574,7 @@ export default function Watch({
           padding: 24,
         }}
       >
-        <StatusBar style="light" />
+        <ThemedStatusBar />
         <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800', marginBottom: 8 }}>
           PIN do perfil
         </Text>

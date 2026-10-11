@@ -1,3 +1,4 @@
+import { ThemedStatusBar, PrimaryButton, FieldLabel, fieldSurface } from '../components/ui';
 import { useMemo, useState } from 'react';
 import {
   View,
@@ -8,8 +9,6 @@ import {
   Platform,
   useWindowDimensions,
 } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import { PrimaryButton, FieldLabel } from '../components/ui';
 import { colors, brand, layout } from '../theme/tokens';
 import { forgotPassword } from '../services/auth';
 import { t } from '../i18n/pt';
@@ -40,7 +39,7 @@ export default function ForgotPassword({ onBack, onDevToken }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.black }}>
-      <StatusBar style="light" />
+      <ThemedStatusBar />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 16 }}
@@ -51,7 +50,7 @@ export default function ForgotPassword({ onBack, onDevToken }) {
           </Text>
           <View
             style={{
-              backgroundColor: '#111111',
+              backgroundColor: colors.card,
               borderRadius: 8,
               borderWidth: 1,
               borderColor: colors.border,
@@ -75,7 +74,7 @@ export default function ForgotPassword({ onBack, onDevToken }) {
               keyboardType="email-address"
               placeholder="nome@email.com"
               placeholderTextColor={colors.muted}
-              style={inputStyle}
+              style={fieldSurface({ marginBottom: 0, fontSize: 15, paddingHorizontal: 14, paddingVertical: 13 })}
             />
 
             {error ? <Text style={{ color: colors.red, marginTop: 12 }}>{error}</Text> : null}
@@ -101,13 +100,3 @@ export default function ForgotPassword({ onBack, onDevToken }) {
   );
 }
 
-const inputStyle = {
-  backgroundColor: '#181818',
-  borderWidth: 1,
-  borderColor: colors.border,
-  borderRadius: 4,
-  color: colors.text,
-  paddingHorizontal: 14,
-  paddingVertical: 13,
-  fontSize: 15,
-};

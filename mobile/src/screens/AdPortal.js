@@ -1,3 +1,4 @@
+import { ThemedStatusBar, PrimaryButton, FieldLabel } from '../components/ui';
 import { createElement, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
@@ -11,8 +12,6 @@ import {
 } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
 import * as DocumentPicker from 'expo-document-picker';
-import { StatusBar } from 'expo-status-bar';
-import { PrimaryButton, FieldLabel } from '../components/ui';
 import { LoadingState, EmptyState, ErrorState } from '../components/StateViews';
 import { colors, layout } from '../theme/tokens';
 import { useRouter } from 'expo-router';
@@ -219,7 +218,7 @@ export default function AdPortal({ onCatalog, onAccount }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.black }}>
-      <StatusBar style="light" />
+      <ThemedStatusBar />
       <WorkspaceBar
         product="Anúncios"
         links={[

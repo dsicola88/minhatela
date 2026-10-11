@@ -30,6 +30,31 @@ body,
   min-height: 100%;
 }
 
+[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+}
+
+/* O anel azul do browser não faz parte do tema. */
+input,
+textarea,
+select {
+  caret-color: var(--ao-text);
+}
+
+input:focus,
+textarea:focus,
+select:focus,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--ao-gold) !important;
+  outline-offset: 1px;
+}
+
 * {
   -webkit-tap-highlight-color: transparent;
 }

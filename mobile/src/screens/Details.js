@@ -389,11 +389,11 @@ export default function Details({
                 ) : null}
 
                 <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-                  <PrimaryButton
-                    label={access?.label || 'Assistir'}
-                    onPress={actionHandler || undefined}
-                    disabled={!actionHandler}
-                    variant={access?.action === 'watch' ? 'light' : 'primary'}
+                <PrimaryButton
+                  label={access?.label || 'Assistir'}
+                  onPress={actionHandler || undefined}
+                  disabled={!actionHandler}
+                  variant={access?.action === 'watch' ? 'light' : 'primary'}
                     style={{ minWidth: 180 }}
                   />
                   {video.trailerUrl ? (

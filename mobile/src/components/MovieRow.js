@@ -296,16 +296,18 @@ function useDeviceWithCompact() {
   return { ...profile, isCompact: profile.width < 768 };
 }
 
-const chevronStyle = {
-  width: 32,
-  height: 32,
-  borderRadius: 16,
-  borderWidth: 1,
-  borderColor: colors.border,
-  alignItems: 'center',
-  justifyContent: 'center',
-  backgroundColor: '#181818',
-};
+function chevronStyle() {
+  return {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceSecondary,
+  };
+}
 
 export default function MovieRow({
   title,
@@ -374,10 +376,10 @@ export default function MovieRow({
 
         {Platform.OS === 'web' && width >= 900 ? (
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Pressable onPress={() => scrollBy(-1)} accessibilityLabel="Anterior" style={chevronStyle}>
+            <Pressable onPress={() => scrollBy(-1)} accessibilityLabel="Anterior" style={chevronStyle()}>
               <Ionicons name="chevron-back" size={18} color={colors.text} />
             </Pressable>
-            <Pressable onPress={() => scrollBy(1)} accessibilityLabel="Seguinte" style={chevronStyle}>
+            <Pressable onPress={() => scrollBy(1)} accessibilityLabel="Seguinte" style={chevronStyle()}>
               <Ionicons name="chevron-forward" size={18} color={colors.text} />
             </Pressable>
           </View>

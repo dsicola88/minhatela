@@ -97,8 +97,9 @@ async function requestDownload({
     throw createError(403, access.message || 'Sem direitos para descarregar', access.denialCode || 'NO_ACCESS');
   }
 
-  if (!row.bunny_video_id) {
-    throw createError(503, 'Este filme não está disponível para guardar no telemóvel', 'NO_BUNNY_ASSET');
+  const { isValidBunnyVideoId } = require('../utils/bunnyAsset');
+  if (!row.bunny_video_id || !isValidBunnyVideoId(row.bunny_video_id)) {
+    throw createError(503, 'Este filme ainda não tem vídeo pronto para guardar', 'NO_BUNNY_ASSET');
   }
 
   const user = await userRepository.findById(userId);

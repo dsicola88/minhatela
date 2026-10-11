@@ -1,8 +1,7 @@
+import { ThemedStatusBar, PrimaryButton, cardSurface } from '../components/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, Pressable, useWindowDimensions } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { PrimaryButton } from '../components/ui';
 import { LoadingState, EmptyState, ErrorState } from '../components/StateViews';
 import { colors, layout } from '../theme/tokens';
 import {
@@ -55,7 +54,7 @@ export default function AdminContent({ onBack, onPayments }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.black }}>
-      <StatusBar style="light" />
+      <ThemedStatusBar />
       <ScrollView
         contentContainerStyle={{
           padding: isCompact ? 16 : 32,
@@ -94,7 +93,7 @@ export default function AdminContent({ onBack, onPayments }) {
           <EmptyState title="Sem criadores pendentes" />
         ) : (
           creators.map((creator) => (
-            <View key={creator.id} style={cardStyle}>
+            <View key={creator.id} style={cardSurface()}>
               <Text style={{ color: colors.text, fontWeight: '700' }}>{creator.displayName}</Text>
               <Text style={{ color: colors.muted }}>{creator.email}</Text>
               <Text style={{ color: colors.textSecondary, marginTop: 4 }}>{creator.type}</Text>
@@ -144,7 +143,7 @@ export default function AdminContent({ onBack, onPayments }) {
           <EmptyState title="Fila de conteúdo vazia" />
         ) : (
           contents.map((item) => (
-            <View key={item.id} style={cardStyle}>
+            <View key={item.id} style={cardSurface()}>
               <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>{item.title}</Text>
               <Text style={{ color: colors.muted, marginTop: 4 }}>
                 {item.creatorDisplayName || 'Criador'} · {item.creatorEmail || '—'}
@@ -200,7 +199,7 @@ export default function AdminContent({ onBack, onPayments }) {
           <EmptyState title="Sem payouts pendentes" />
         ) : (
           payouts.map((p) => (
-            <View key={p.id} style={cardStyle}>
+            <View key={p.id} style={cardSurface()}>
               <Text style={{ color: colors.text, fontWeight: '700' }}>
                 {p.displayName} · {p.amountKz.toLocaleString('pt-AO')} Kz
               </Text>
@@ -249,11 +248,3 @@ export default function AdminContent({ onBack, onPayments }) {
   );
 }
 
-const cardStyle = {
-  backgroundColor: '#111111',
-  borderRadius: 8,
-  borderWidth: 1,
-  borderColor: colors.border,
-  padding: 14,
-  marginBottom: 12,
-};

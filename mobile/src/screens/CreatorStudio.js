@@ -11,9 +11,10 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { PrimaryButton, FieldLabel } from '../components/ui';
+import { PrimaryButton, FieldLabel, cardSurface, fieldSurface } from '../components/ui';
 import { LoadingState, EmptyState, ErrorState } from '../components/StateViews';
-import { colors, layout } from '../theme/tokens';
+import { colors } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import {
   registerCreator,
   fetchCreatorStudio,
@@ -73,6 +74,7 @@ function kz(value) {
 
 export default function CreatorStudio({ onBack, onCompany }) {
   const { width } = useWindowDimensions();
+  const { statusBarStyle } = useTheme();
   const isCompact = width < 960;
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -299,15 +301,17 @@ export default function CreatorStudio({ onBack, onCompany }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.black }}>
-      <StatusBar style="light" />
+      <StatusBar style={statusBarStyle} />
       <View style={{ flex: 1, flexDirection: isCompact ? 'column' : 'row' }}>
         <View
           style={{
-            width: isCompact ? '100%' : 220,
+            width: isCompact ? '100%' : 240,
+            backgroundColor: colors.surface,
             borderRightWidth: isCompact ? 0 : 1,
             borderBottomWidth: isCompact ? 1 : 0,
             borderColor: colors.border,
-            padding: 16,
+            paddingHorizontal: 20,
+            paddingVertical: 24,
           }}
         >
           <Text style={{ color: colors.gold, fontSize: 11, fontWeight: '800', letterSpacing: 1.4 }}>
@@ -334,7 +338,16 @@ export default function CreatorStudio({ onBack, onCompany }) {
           </View>
         </View>
 
-        <ScrollView contentContainerStyle={{ padding: isCompact ? 16 : 28, width: '100%', maxWidth: layout.maxContentWidth, paddingBottom: 80 }}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            padding: isCompact ? 16 : 32,
+            width: '100%',
+            maxWidth: 760,
+            alignSelf: 'center',
+            paddingBottom: 80,
+          }}
+        >
           {info ? <Text style={{ color: colors.gold, marginBottom: 12, lineHeight: 20 }}>{info}</Text> : null}
           {error ? <ErrorState message={error} onRetry={load} /> : null}
           {section === 'home' ? (
@@ -440,7 +453,7 @@ function Home({ data, creator, active, analytics, period, onPeriod, registerForm
   return (
     <View>
       {data?.guide ? (
-        <View style={panel}>
+        <View style={cardSurface()}>
           <Text style={{ color: colors.gold, fontSize: 12, fontWeight: '800' }}>
             PASSO {data.guide.step} DE {data.guide.of}
           </Text>
@@ -451,7 +464,7 @@ function Home({ data, creator, active, analytics, period, onPeriod, registerForm
       {!creator ? (
         <Application form={registerForm} setForm={setRegisterForm} busy={busy} onSubmit={onRegister} />
       ) : (
-        <View style={panel}>
+        <View style={cardSurface()}>
           <Text style={{ color: colors.text, fontSize: 18, fontWeight: '800' }}>{creator.displayName}</Text>
           <Text style={{ color: colors.gold, marginTop: 4 }}>{creator.statusLabel} · {creator.typeLabel}</Text>
           {!active ? (
@@ -467,7 +480,7 @@ function Home({ data, creator, active, analytics, period, onPeriod, registerForm
         </View>
       )}
       {(data?.tasks || []).map((task) => (
-        <View key={task.id} style={panel}>
+        <View key={task.id} style={cardSurface()}>
           <Text style={{ color: colors.text, fontWeight: '700' }}>{task.title}</Text>
           <Text style={{ color: colors.muted, marginTop: 4 }}>{task.detail}</Text>
         </View>
@@ -508,7 +521,7 @@ function Home({ data, creator, active, analytics, period, onPeriod, registerForm
             </Text>
           ))}
           {(analytics.titles || []).length ? (
-            <View style={[panel, { marginTop: 16 }]}>
+            <View style={[cardSurface(), { marginTop: 16 }]}>
               <Text style={{ color: colors.text, fontWeight: '800', marginBottom: 8 }}>Por filme</Text>
               {analytics.titles.map((item) => (
                 <Text key={item.id} style={{ color: colors.textSecondary, marginTop: 6 }}>
@@ -526,7 +539,7 @@ function Home({ data, creator, active, analytics, period, onPeriod, registerForm
 function Application({ form, setForm, busy, onSubmit }) {
   const patch = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   return (
-    <View style={panel}>
+    <View style={cardSurface()}>
       <Text style={{ color: colors.text, fontSize: 20, fontWeight: '800', marginBottom: 12 }}>Pedir o estúdio</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
         {[
@@ -541,16 +554,16 @@ function Application({ form, setForm, busy, onSubmit }) {
         ))}
       </View>
       <FieldLabel>Nome artístico ou produtora</FieldLabel>
-      <TextInput value={form.displayName} onChangeText={(v) => patch('displayName', v)} style={inputStyle} placeholderTextColor={colors.muted} />
+      <TextInput value={form.displayName} onChangeText={(v) => patch('displayName', v)} style={fieldSurface()} placeholderTextColor={colors.muted} />
       <FieldLabel>Biografia</FieldLabel>
-      <TextInput value={form.bio} onChangeText={(v) => patch('bio', v)} style={[inputStyle, { minHeight: 80 }]} multiline placeholderTextColor={colors.muted} />
+      <TextInput value={form.bio} onChangeText={(v) => patch('bio', v)} style={[fieldSurface(), { minHeight: 96 }]} multiline placeholderTextColor={colors.muted} />
       <Text style={{ color: colors.muted, marginBottom: 10 }}>O contacto da candidatura é o email da conta.</Text>
       <FieldLabel>IBAN</FieldLabel>
-      <TextInput value={form.bankIban} onChangeText={(v) => patch('bankIban', v)} style={inputStyle} placeholder="AO06…" placeholderTextColor={colors.muted} />
+      <TextInput value={form.bankIban} onChangeText={(v) => patch('bankIban', v)} style={fieldSurface()} placeholder="AO06…" placeholderTextColor={colors.muted} />
       <FieldLabel>Banco</FieldLabel>
-      <TextInput value={form.bankName} onChangeText={(v) => patch('bankName', v)} style={inputStyle} placeholderTextColor={colors.muted} />
+      <TextInput value={form.bankName} onChangeText={(v) => patch('bankName', v)} style={fieldSurface()} placeholderTextColor={colors.muted} />
       <FieldLabel>Titular</FieldLabel>
-      <TextInput value={form.bankAccountName} onChangeText={(v) => patch('bankAccountName', v)} style={inputStyle} placeholderTextColor={colors.muted} />
+      <TextInput value={form.bankAccountName} onChangeText={(v) => patch('bankAccountName', v)} style={fieldSurface()} placeholderTextColor={colors.muted} />
       <PrimaryButton label="Submeter candidatura" variant="gold" loading={busy} onPress={onSubmit} />
     </View>
   );
@@ -567,7 +580,7 @@ function Films({ films, total, query, setQuery, statusFilter, setStatusFilter, p
   ];
   return (
     <View>
-      <TextInput value={query} onChangeText={setQuery} placeholder="Procurar título" placeholderTextColor={colors.muted} style={inputStyle} />
+      <TextInput value={query} onChangeText={setQuery} placeholder="Procurar título" placeholderTextColor={colors.muted} style={fieldSurface()} />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
         {statuses.map(([id, label]) => (
           <Pressable key={id} onPress={() => setStatusFilter(id)}>
@@ -579,11 +592,11 @@ function Films({ films, total, query, setQuery, statusFilter, setStatusFilter, p
         <EmptyState title="Nenhum filme neste filtro" subtitle="Os rascunhos e os envios aparecem aqui." />
       ) : (
         films.map((item) => (
-          <View key={item.id} style={[panel, { flexDirection: 'row', gap: 12 }]}>
+          <View key={item.id} style={[cardSurface(), { flexDirection: 'row', gap: 12 }]}>
             {item.posterUrl ? (
-              <Image source={{ uri: item.posterUrl }} style={{ width: 72, height: 104, backgroundColor: '#181818' }} />
+              <Image source={{ uri: item.posterUrl }} style={{ width: 72, height: 104, backgroundColor: colors.surfaceSecondary }} />
             ) : (
-              <View style={{ width: 72, height: 104, backgroundColor: '#181818' }} />
+              <View style={{ width: 72, height: 104, backgroundColor: colors.surfaceSecondary }} />
             )}
             <View style={{ flex: 1 }}>
               <Text style={{ color: colors.text, fontWeight: '800', fontSize: 16 }}>{item.title}</Text>
@@ -622,7 +635,7 @@ function Finance({ analytics, payouts, ledger, iban, bankForm, setBankForm, amou
   const rules = analytics?.rules;
   return (
     <View>
-      <View style={panel}>
+      <View style={cardSurface()}>
         <Text style={{ color: colors.text, fontWeight: '800', fontSize: 18 }}>Livro do estúdio</Text>
         <Line label="Receita registada" value={kz(analytics?.revenueKz)} />
         <Line label="Visualizações válidas" value={kz(analytics?.earningsBySource?.view)} />
@@ -636,25 +649,25 @@ function Finance({ analytics, payouts, ledger, iban, bankForm, setBankForm, amou
           {rules?.qualifiedView} Cada visualização válida vale {rules?.viewKz ?? '—'} Kz. A parte dos anúncios é {rules?.adSharePercent ?? '—'}% do valor cobrado. Premium e aluguer controlam o acesso e não creditam este livro.
         </Text>
       </View>
-      <View style={panel}>
+      <View style={cardSurface()}>
         <Text style={{ color: colors.text, fontWeight: '800', marginBottom: 8 }}>Conta para levantamento</Text>
         <Text style={{ color: colors.muted, marginBottom: 8, lineHeight: 18 }}>
           IBAN actual {maskIban(iban)}. Sem IBAN o pedido de levantamento é recusado.
         </Text>
         <FieldLabel>IBAN</FieldLabel>
-        <TextInput value={bankForm?.bankIban} onChangeText={(v) => setBankForm((c) => ({ ...c, bankIban: v }))} style={inputStyle} placeholder="AO06…" placeholderTextColor={colors.muted} />
+        <TextInput value={bankForm?.bankIban} onChangeText={(v) => setBankForm((c) => ({ ...c, bankIban: v }))} style={fieldSurface()} placeholder="AO06…" placeholderTextColor={colors.muted} />
         <FieldLabel>Banco</FieldLabel>
-        <TextInput value={bankForm?.bankName} onChangeText={(v) => setBankForm((c) => ({ ...c, bankName: v }))} style={inputStyle} placeholderTextColor={colors.muted} />
+        <TextInput value={bankForm?.bankName} onChangeText={(v) => setBankForm((c) => ({ ...c, bankName: v }))} style={fieldSurface()} placeholderTextColor={colors.muted} />
         <FieldLabel>Titular</FieldLabel>
-        <TextInput value={bankForm?.bankAccountName} onChangeText={(v) => setBankForm((c) => ({ ...c, bankAccountName: v }))} style={inputStyle} placeholderTextColor={colors.muted} />
+        <TextInput value={bankForm?.bankAccountName} onChangeText={(v) => setBankForm((c) => ({ ...c, bankAccountName: v }))} style={fieldSurface()} placeholderTextColor={colors.muted} />
         <PrimaryButton label="Guardar IBAN" variant="outline" loading={busy} onPress={onSaveBank} />
       </View>
-      <View style={panel}>
+      <View style={cardSurface()}>
         <Text style={{ color: colors.text, fontWeight: '800', marginBottom: 8 }}>Pedir levantamento</Text>
         <Text style={{ color: colors.muted, marginBottom: 8, lineHeight: 18 }}>
           Mínimo {kz(rules?.minPayoutKz || 5000)}. IBAN {maskIban(iban)}. O pedido fica pendente até a equipa financeira o tratar — não dispara transferência.
         </Text>
-        <TextInput value={amount} onChangeText={setAmount} keyboardType="numeric" style={inputStyle} placeholderTextColor={colors.muted} />
+        <TextInput value={amount} onChangeText={setAmount} keyboardType="numeric" style={fieldSurface()} placeholderTextColor={colors.muted} />
         <PrimaryButton label="Registar pedido" variant="gold" loading={busy} onPress={onRequest} />
         {(payouts?.payouts || []).map((item) => (
           <Text key={item.id} style={{ color: colors.textSecondary, marginTop: 10 }}>
@@ -662,7 +675,7 @@ function Finance({ analytics, payouts, ledger, iban, bankForm, setBankForm, amou
           </Text>
         ))}
       </View>
-      <View style={panel}>
+      <View style={cardSurface()}>
         <Text style={{ color: colors.text, fontWeight: '800', marginBottom: 8 }}>Movimentos</Text>
         <Text style={{ color: colors.muted, marginBottom: 8, lineHeight: 18 }}>
           Cada linha é um crédito ou uma reversão registada. A declaração de direitos não prova a propriedade do filme.
@@ -685,7 +698,7 @@ function Finance({ analytics, payouts, ledger, iban, bankForm, setBankForm, amou
 
 function Metric({ label, value }) {
   return (
-    <View style={{ minWidth: 140, flexGrow: 1, backgroundColor: '#111', borderWidth: 1, borderColor: colors.border, borderRadius: 6, padding: 12 }}>
+    <View style={cardSurface({ minWidth: 140, flexGrow: 1, borderRadius: 6, padding: 12, marginBottom: 0 })}>
       <Text style={{ color: colors.muted, fontSize: 12 }}>{label}</Text>
       <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800', marginTop: 6 }}>{value ?? '—'}</Text>
     </View>
@@ -700,22 +713,3 @@ function Line({ label, value }) {
   );
 }
 
-const panel = {
-  backgroundColor: '#111111',
-  borderRadius: 8,
-  borderWidth: 1,
-  borderColor: colors.border,
-  padding: 16,
-  marginBottom: 12,
-};
-
-const inputStyle = {
-  backgroundColor: '#181818',
-  borderWidth: 1,
-  borderColor: colors.border,
-  borderRadius: 4,
-  color: colors.text,
-  paddingHorizontal: 12,
-  paddingVertical: 12,
-  marginBottom: 12,
-};

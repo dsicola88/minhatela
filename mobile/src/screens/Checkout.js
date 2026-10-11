@@ -1,3 +1,4 @@
+import { ThemedStatusBar, PrimaryButton, FieldLabel } from '../components/ui';
 import { useEffect, useState } from 'react';
 import {
   View,
@@ -11,10 +12,8 @@ import {
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
-import { PrimaryButton, FieldLabel } from '../components/ui';
 import { colors, layout } from '../theme/tokens';
 import {
   fetchPaymentMethods,
@@ -198,7 +197,7 @@ export default function Checkout({
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.black }}>
-      <StatusBar style="light" />
+      <ThemedStatusBar />
       <ScrollView
         contentContainerStyle={{
           padding: isCompact ? 16 : 40,

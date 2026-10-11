@@ -1,9 +1,8 @@
+import { ThemedStatusBar, PrimaryButton } from '../src/components/ui';
 import { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors } from '../src/theme/tokens';
-import { PrimaryButton } from '../src/components/ui';
 import { verifyEmail } from '../src/services/plans';
 
 export default function VerifyEmailRoute() {
@@ -48,7 +47,7 @@ export default function VerifyEmailRoute() {
         padding: 24,
       }}
     >
-      <StatusBar style="light" />
+      <ThemedStatusBar />
       {loading ? (
         <ActivityIndicator color={colors.red} size="large" />
       ) : (

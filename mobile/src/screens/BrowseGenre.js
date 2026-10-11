@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
+import { ThemedStatusBar } from '../components/ui';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, brand, layout } from '../theme/tokens';
@@ -84,7 +84,7 @@ export default function BrowseGenre({ genre: initialGenre, onBack, onSelect }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.black, paddingTop: insets.top }}>
-      <StatusBar style="light" />
+      <ThemedStatusBar />
       <View
         style={{
           flexDirection: 'row',

@@ -8,7 +8,7 @@ import {
   RefreshControl,
   useWindowDimensions,
 } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
+import { ThemedStatusBar } from '../components/ui';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, layout } from '../theme/tokens';
@@ -49,7 +49,7 @@ export default function Packs({ onBack, onCheckout }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.black, paddingTop: insets.top }}>
-      <StatusBar style="light" />
+      <ThemedStatusBar />
       <ScrollView
         refreshControl={<RefreshControl refreshing={false} onRefresh={load} tintColor={colors.red} />}
         contentContainerStyle={{
@@ -89,7 +89,7 @@ export default function Packs({ onBack, onCheckout }) {
                 borderRadius: 8,
                 padding: 16,
                 marginBottom: 16,
-                backgroundColor: '#111',
+                backgroundColor: colors.card,
               }}
             >
               <Text style={{ color: colors.gold, fontSize: 12, fontWeight: '800', marginBottom: 6 }}>

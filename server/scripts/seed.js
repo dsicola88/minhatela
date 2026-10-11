@@ -19,7 +19,7 @@ async function seed() {
     throw new Error('BLOCKED: seed recusa host remoto sem ALLOW_REMOTE_SEED=1');
   }
 
-  const includeDemo = process.env.SEED_DEMO === '1';
+  const includeDemo = process.env.SEED_DEMO === '1' && process.env.NODE_ENV !== 'production';
   const files = fs
     .readdirSync(seedDir)
     .filter((f) => f.endsWith('.sql') || f.endsWith('.js'))

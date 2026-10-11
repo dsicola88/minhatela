@@ -11,7 +11,7 @@ import {
   Switch,
   TextInput,
 } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
+import { ThemedStatusBar } from '../components/ui';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, layout } from '../theme/tokens';
@@ -281,7 +281,7 @@ export default function Account({
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.black, paddingTop: insets.top }}>
-      <StatusBar style="light" />
+      <ThemedStatusBar />
       <View
         style={{
           flexDirection: 'row',
@@ -334,7 +334,7 @@ export default function Account({
 
           <View
             style={{
-              backgroundColor: '#111111',
+              backgroundColor: colors.card,
               borderRadius: 8,
               borderWidth: 1,
               borderColor: colors.border,

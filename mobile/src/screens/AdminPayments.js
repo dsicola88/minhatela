@@ -1,3 +1,4 @@
+import { ThemedStatusBar, PrimaryButton } from '../components/ui';
 import { useCallback, useEffect, useState } from 'react';
 import {
   View,
@@ -10,9 +11,7 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { PrimaryButton } from '../components/ui';
 import { LoadingState, EmptyState, ErrorState } from '../components/StateViews';
 import { colors, layout } from '../theme/tokens';
 import {
@@ -30,7 +29,7 @@ function StatCard({ label, value, accent }) {
       style={{
         flex: 1,
         minWidth: 140,
-        backgroundColor: '#111111',
+        backgroundColor: colors.card,
         borderWidth: 1,
         borderColor: colors.border,
         borderTopWidth: 2,
@@ -122,7 +121,7 @@ export default function AdminPayments({ onBack }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.black }}>
-      <StatusBar style="light" />
+      <ThemedStatusBar />
       <ScrollView
         contentContainerStyle={{
           padding: isCompact ? 16 : 32,
@@ -179,7 +178,7 @@ export default function AdminPayments({ onBack }) {
               <View
                 key={tx.id}
                 style={{
-                  backgroundColor: '#111111',
+                  backgroundColor: colors.card,
                   borderWidth: 1,
                   borderColor: colors.border,
                   borderRadius: 8,
@@ -216,7 +215,7 @@ export default function AdminPayments({ onBack }) {
                     {isImage ? (
                       <Image
                         source={{ uri: proof }}
-                        style={{ width: '100%', height: 120, borderRadius: 4, backgroundColor: '#181818' }}
+                        style={{ width: '100%', height: 120, borderRadius: 4, backgroundColor: colors.surfaceSecondary }}
                         resizeMode="cover"
                       />
                     ) : (
@@ -225,7 +224,7 @@ export default function AdminPayments({ onBack }) {
                           width: '100%',
                           height: 120,
                           borderRadius: 4,
-                          backgroundColor: '#181818',
+                          backgroundColor: colors.surfaceSecondary,
                           alignItems: 'center',
                           justifyContent: 'center',
                           borderWidth: 1,
@@ -276,7 +275,7 @@ export default function AdminPayments({ onBack }) {
                   borderRadius: 8,
                   padding: 14,
                   marginBottom: 10,
-                  backgroundColor: '#111111',
+                  backgroundColor: colors.card,
                 }}
               >
                 <Text style={{ color: colors.gold, fontWeight: '800' }}>
@@ -309,7 +308,7 @@ export default function AdminPayments({ onBack }) {
                   borderRadius: 8,
                   padding: 14,
                   marginBottom: 10,
-                  backgroundColor: '#111111',
+                  backgroundColor: colors.card,
                 }}
               >
                 <Text style={{ color: colors.text, fontWeight: '700' }}>{item.title}</Text>
@@ -363,7 +362,7 @@ export default function AdminPayments({ onBack }) {
         >
           <View
             style={{
-              backgroundColor: '#111111',
+              backgroundColor: colors.card,
               borderRadius: 8,
               borderWidth: 1,
               borderColor: colors.border,
@@ -389,7 +388,7 @@ export default function AdminPayments({ onBack }) {
                 borderRadius: 4,
                 color: colors.text,
                 padding: 12,
-                backgroundColor: '#181818',
+                backgroundColor: colors.surfaceSecondary,
                 textAlignVertical: 'top',
               }}
             />

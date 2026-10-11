@@ -1,5 +1,5 @@
 import { View, Text, TextInput, Pressable } from 'react-native';
-import { PrimaryButton, FieldLabel } from '../../components/ui';
+import { PrimaryButton, FieldLabel, cardSurface, fieldSurface } from '../../components/ui';
 import { colors } from '../../theme/tokens';
 
 const STEPS = ['Informação', 'Vídeo', 'Direitos', 'Monetização', 'Revisão'];
@@ -35,7 +35,7 @@ export default function FilmWizard({
   const patch = (key, value) => setForm((current) => ({ ...current, [key]: value }));
 
   return (
-    <View style={card}>
+    <View style={cardSurface()}>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
         {STEPS.map((label, index) => (
           <Text
@@ -54,12 +54,12 @@ export default function FilmWizard({
       {step === 0 ? (
         <>
           <FieldLabel>Título</FieldLabel>
-          <TextInput value={form.title} onChangeText={(v) => patch('title', v)} style={inputStyle} placeholderTextColor={colors.muted} />
+          <TextInput value={form.title} onChangeText={(v) => patch('title', v)} style={fieldSurface()} placeholderTextColor={colors.muted} />
           <FieldLabel>Sinopse curta</FieldLabel>
           <TextInput
             value={form.synopsisShort}
             onChangeText={(v) => patch('synopsisShort', v)}
-            style={[inputStyle, { minHeight: 72 }]}
+            style={[fieldSurface(), { minHeight: 72 }]}
             multiline
             placeholderTextColor={colors.muted}
           />
@@ -67,24 +67,24 @@ export default function FilmWizard({
           <TextInput
             value={form.synopsisFull}
             onChangeText={(v) => patch('synopsisFull', v)}
-            style={[inputStyle, { minHeight: 88 }]}
+            style={[fieldSurface(), { minHeight: 88 }]}
             multiline
             placeholderTextColor={colors.muted}
           />
           <FieldLabel>Género</FieldLabel>
-          <TextInput value={form.genre} onChangeText={(v) => patch('genre', v)} style={inputStyle} placeholderTextColor={colors.muted} />
+          <TextInput value={form.genre} onChangeText={(v) => patch('genre', v)} style={fieldSurface()} placeholderTextColor={colors.muted} />
           <FieldLabel>Classificação etária</FieldLabel>
-          <TextInput value={form.ageRating} onChangeText={(v) => patch('ageRating', v)} style={inputStyle} placeholder="12" placeholderTextColor={colors.muted} />
+          <TextInput value={form.ageRating} onChangeText={(v) => patch('ageRating', v)} style={fieldSurface()} placeholder="12" placeholderTextColor={colors.muted} />
           <FieldLabel>Ano</FieldLabel>
-          <TextInput value={form.releaseYear} onChangeText={(v) => patch('releaseYear', v)} keyboardType="numeric" style={inputStyle} placeholderTextColor={colors.muted} />
+          <TextInput value={form.releaseYear} onChangeText={(v) => patch('releaseYear', v)} keyboardType="numeric" style={fieldSurface()} placeholderTextColor={colors.muted} />
           <FieldLabel>Duração em segundos, se já souber</FieldLabel>
-          <TextInput value={form.durationSeconds} onChangeText={(v) => patch('durationSeconds', v)} keyboardType="numeric" style={inputStyle} placeholderTextColor={colors.muted} />
+          <TextInput value={form.durationSeconds} onChangeText={(v) => patch('durationSeconds', v)} keyboardType="numeric" style={fieldSurface()} placeholderTextColor={colors.muted} />
           <FieldLabel>Ligação do cartaz</FieldLabel>
           <TextInput
             value={form.posterUrl}
             onChangeText={(v) => patch('posterUrl', v)}
             autoCapitalize="none"
-            style={inputStyle}
+            style={fieldSurface()}
             placeholder="https://…"
             placeholderTextColor={colors.muted}
           />
@@ -93,7 +93,7 @@ export default function FilmWizard({
 
       {step === 1 ? (
         <>
-          <Text style={help}>
+          <Text style={helpStyle()}>
             {form.bunnyVideoId
               ? 'A ficha de vídeo existe. Envie o ficheiro na janela do fornecedor e volte para guardar.'
               : 'Crie a ficha e envie o ficheiro. Sem vídeo associado a equipa não recebe o filme.'}
@@ -114,7 +114,7 @@ export default function FilmWizard({
 
       {step === 2 ? (
         <>
-          <Text style={help}>
+          <Text style={helpStyle()}>
             A MinhaTela distribui em Angola. Ao confirmar, fica registada uma declaração com data. Isto não prova a propriedade do filme. Uma reclamação pode retirar o título do catálogo.
           </Text>
           <Pressable onPress={() => patch('rightsConfirmed', !form.rightsConfirmed)} style={{ flexDirection: 'row', gap: 10 }}>
@@ -159,7 +159,7 @@ export default function FilmWizard({
                 value={form.rentalPriceKz}
                 onChangeText={(v) => patch('rentalPriceKz', v)}
                 keyboardType="numeric"
-                style={inputStyle}
+                style={fieldSurface()}
                 placeholderTextColor={colors.muted}
               />
             </>
@@ -215,23 +215,6 @@ function Summary({ label, value }) {
   );
 }
 
-const card = {
-  backgroundColor: '#111111',
-  borderRadius: 8,
-  borderWidth: 1,
-  borderColor: colors.border,
-  padding: 16,
-};
-
-const help = { color: colors.textSecondary, lineHeight: 20, marginBottom: 12 };
-
-const inputStyle = {
-  backgroundColor: '#181818',
-  borderWidth: 1,
-  borderColor: colors.border,
-  borderRadius: 4,
-  color: colors.text,
-  paddingHorizontal: 12,
-  paddingVertical: 12,
-  marginBottom: 12,
-};
+function helpStyle() {
+  return { color: colors.textSecondary, lineHeight: 20, marginBottom: 12 };
+}

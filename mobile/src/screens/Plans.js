@@ -1,3 +1,4 @@
+import { ThemedStatusBar, PrimaryButton } from '../components/ui';
 import { useCallback, useEffect, useState } from 'react';
 import {
   View,
@@ -6,12 +7,10 @@ import {
   ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, layout } from '../theme/tokens';
 import { useBrandCopy } from '../context/AppConfigContext';
-import { PrimaryButton } from '../components/ui';
 import { fetchPlans } from '../services/plans';
 import Focusable from '../tv/Focusable';
 import { ErrorState } from '../components/StateViews';
@@ -48,7 +47,7 @@ export default function Plans({ onBack, onSubscribe, onPacks, currentStatus }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.black, paddingTop: insets.top }}>
-      <StatusBar style="light" />
+      <ThemedStatusBar />
       <View
         style={{
           flexDirection: 'row',

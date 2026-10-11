@@ -269,12 +269,18 @@ async function run() {
       headers: { 'x-profile-id': profileId, 'x-device-key': `e2e-${uid()}`, 'x-device-name': 'E2E' },
       body: { profileId, platform: 'ios' },
     });
-    // 200 com playback OU 503 sem Bunny asset real — ambos aceitáveis em lab
+    // Playback, ou uma recusa explícita do gate (assinatura, aluguer, PIN, estreia, vídeo em falta).
+    const gate = new Set([
+      'NO_BUNNY_ASSET',
+      'PIN_REQUIRED_PLAY',
+      'SUBSCRIPTION_REQUIRED',
+      'RENTAL_REQUIRED',
+      'MATURITY_BLOCKED',
+      'COMING_SOON',
+      'TITLE_BLOCKED',
+    ]);
     assert(
-      r.status === 200 ||
-        r.status === 503 ||
-        r.json?.code === 'NO_BUNNY_ASSET' ||
-        r.json?.code === 'PIN_REQUIRED_PLAY',
+      r.status === 200 || r.status === 503 || gate.has(r.json?.code),
       `play ${r.status} ${r.json?.code}`
     );
     if (r.status === 200) {

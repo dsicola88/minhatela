@@ -1,3 +1,4 @@
+import { ThemedStatusBar, PrimaryButton, FieldLabel, fieldSurface } from '../components/ui';
 import { useMemo, useState } from 'react';
 import {
   View,
@@ -8,8 +9,6 @@ import {
   Platform,
   useWindowDimensions,
 } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import { PrimaryButton, FieldLabel } from '../components/ui';
 import { colors, brand, layout } from '../theme/tokens';
 import { resetPassword } from '../services/auth';
 import { t } from '../i18n/pt';
@@ -45,7 +44,7 @@ export default function ResetPassword({ token, onSuccess, onBack }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.black }}>
-      <StatusBar style="light" />
+      <ThemedStatusBar />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 16 }}
@@ -56,7 +55,7 @@ export default function ResetPassword({ token, onSuccess, onBack }) {
           </Text>
           <View
             style={{
-              backgroundColor: '#111111',
+              backgroundColor: colors.card,
               borderRadius: 8,
               borderWidth: 1,
               borderColor: colors.border,
@@ -79,7 +78,7 @@ export default function ResetPassword({ token, onSuccess, onBack }) {
               secureTextEntry
               placeholder="••••••••"
               placeholderTextColor={colors.muted}
-              style={[inputStyle, { marginBottom: 14 }]}
+              style={[fieldSurface(), { marginBottom: 14 }]}
             />
 
             <FieldLabel>Confirmar</FieldLabel>
@@ -89,7 +88,7 @@ export default function ResetPassword({ token, onSuccess, onBack }) {
               secureTextEntry
               placeholder="••••••••"
               placeholderTextColor={colors.muted}
-              style={inputStyle}
+              style={fieldSurface()}
             />
 
             {error ? <Text style={{ color: colors.red, marginTop: 12 }}>{error}</Text> : null}
@@ -114,13 +113,3 @@ export default function ResetPassword({ token, onSuccess, onBack }) {
   );
 }
 
-const inputStyle = {
-  backgroundColor: '#181818',
-  borderWidth: 1,
-  borderColor: colors.border,
-  borderRadius: 4,
-  color: colors.text,
-  paddingHorizontal: 14,
-  paddingVertical: 13,
-  fontSize: 15,
-};

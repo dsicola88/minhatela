@@ -1,3 +1,4 @@
+import { ThemedStatusBar, PrimaryButton } from '../components/ui';
 import { useEffect, useState } from 'react';
 import {
   View,
@@ -7,12 +8,10 @@ import {
   useWindowDimensions,
   Platform,
 } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors } from '../theme/tokens';
-import { PrimaryButton } from '../components/ui';
 import { getApiBaseUrl } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import Focusable from '../tv/Focusable';
@@ -56,7 +55,7 @@ export default function TitleShareScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.black }}>
-      <StatusBar style="light" />
+      <ThemedStatusBar />
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={colors.red} size="large" />
