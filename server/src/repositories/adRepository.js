@@ -69,7 +69,10 @@ async function recordImpression({
 
 async function findOwnedImpression(impressionId, userId) {
   const result = await query(
-    `SELECT * FROM ad_impressions WHERE id = $1 AND user_id = $2`,
+    `SELECT ai.*, cr.duration_seconds AS creative_duration_seconds
+     FROM ad_impressions ai
+     LEFT JOIN ad_creatives cr ON cr.id = ai.creative_id
+     WHERE ai.id = $1 AND ai.user_id = $2`,
     [impressionId, userId]
   );
   return result.rows[0] || null;
@@ -88,21 +91,23 @@ async function startImpression({ impressionId, userId }) {
   return result.rows[0] || null;
 }
 
-async function completeImpression({ impressionId, userId, unitKz }) {
+async function completeImpression({ impressionId, userId, unitKz, minWatchSeconds = 2 }) {
   const unit = Math.max(1, Number(unitKz) || 1);
+  const minSecs = Math.max(1, Number(minWatchSeconds) || 2);
   return withTransaction(async (client) => {
     const billed = await client.query(
       `UPDATE ad_impressions
        SET completed = TRUE,
-           started = TRUE,
-           completed_at = COALESCE(completed_at, NOW()),
-           started_at = COALESCE(started_at, NOW())
+           completed_at = COALESCE(completed_at, NOW())
        WHERE id = $1
          AND completed = FALSE
          AND billed = FALSE
          AND user_id = $2
+         AND started = TRUE
+         AND started_at IS NOT NULL
+         AND started_at <= NOW() - ($3::text || ' seconds')::interval
        RETURNING id, campaign_id, content_id, user_id`,
-      [impressionId, userId]
+      [impressionId, userId, String(minSecs)]
     );
     const row = billed.rows[0];
     if (!row) return null;

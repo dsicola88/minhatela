@@ -1,6 +1,6 @@
 'use strict';
 
-const { query } = require('../config/database');
+const { query, withTransaction } = require('../config/database');
 const crypto = require('crypto');
 
 function generateCode() {
@@ -46,21 +46,53 @@ async function findByCode(code) {
 }
 
 async function redeem({ code, inviteeUserId, inviteeEmail }) {
-  const row = await findByCode(code);
-  if (!row) return { error: 'INVALID' };
-  if (row.referrer_user_id === inviteeUserId) return { error: 'SELF' };
+  return withTransaction(async (client) => {
+    const found = await client.query(
+      `SELECT * FROM referrals
+       WHERE upper(code) = upper($1)
+         AND status = 'active'
+         AND expires_at > NOW()
+         AND invitee_user_id IS NULL
+       FOR UPDATE`,
+      [code]
+    );
+    const row = found.rows[0];
+    if (!row) return { error: 'INVALID' };
+    if (row.referrer_user_id === inviteeUserId) return { error: 'SELF' };
 
-  const updated = await query(
-    `UPDATE referrals SET
-       invitee_user_id = $2,
-       invitee_email = $3,
-       status = 'redeemed',
-       redeemed_at = NOW()
-     WHERE id = $1 AND status = 'active'
-     RETURNING *`,
-    [row.id, inviteeUserId, inviteeEmail || null]
-  );
-  return { referral: updated.rows[0] };
+    const updated = await client.query(
+      `UPDATE referrals SET
+         invitee_user_id = $2,
+         invitee_email = $3,
+         status = 'redeemed',
+         redeemed_at = NOW()
+       WHERE id = $1 AND status = 'active' AND invitee_user_id IS NULL
+       RETURNING *`,
+      [row.id, inviteeUserId, inviteeEmail || null]
+    );
+    const referral = updated.rows[0];
+    if (!referral) return { error: 'INVALID' };
+
+    const days = String(referral.reward_days || 7);
+    const ids = [inviteeUserId, referral.referrer_user_id];
+    const locked = await client.query(
+      `SELECT id FROM users WHERE id = ANY($1::uuid[]) FOR UPDATE`,
+      [ids]
+    );
+    if (locked.rowCount < 2) return { error: 'INVALID' };
+
+    await client.query(
+      `UPDATE users SET
+         subscription_status = 'premium_active',
+         premium_expires_at = GREATEST(COALESCE(premium_expires_at, NOW()), NOW())
+           + ($2 || ' days')::interval,
+         updated_at = NOW()
+       WHERE id = ANY($1::uuid[])`,
+      [ids, days]
+    );
+
+    return { referral };
+  });
 }
 
 async function stats(userId) {

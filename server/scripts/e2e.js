@@ -364,6 +364,37 @@ async function run() {
     return `n=${r.json.transactions.length}`;
   });
 
+  await step('Assinante · pendente não liberta SVOD/TVOD', async () => {
+    const me = await req('GET', '/api/auth/me', { token: customerToken });
+    const status = me.json?.subscriptionStatus || me.json?.user?.subscriptionStatus;
+    assert(status !== 'premium_active', `pending unlocked premium (${status})`);
+    if (contentSvod?.id) {
+      const d = await req('GET', `/api/catalog/content/${contentSvod.id}`, {
+        token: customerToken,
+        headers: { 'x-profile-id': profileId },
+      });
+      const access = d.json?.access;
+      assert(access?.canWatch === false, `svod pending canWatch ${JSON.stringify(access).slice(0, 160)}`);
+      assert(
+        access?.denialCode === 'SUBSCRIPTION_REQUIRED' || access?.action === 'subscribe',
+        `svod denial ${access?.denialCode || access?.action}`
+      );
+    }
+    if (contentTvod?.id && rentalTxId) {
+      const d = await req('GET', `/api/catalog/content/${contentTvod.id}`, {
+        token: customerToken,
+        headers: { 'x-profile-id': profileId },
+      });
+      const access = d.json?.access;
+      assert(access?.canWatch === false, `tvod pending canWatch ${JSON.stringify(access).slice(0, 160)}`);
+      assert(
+        access?.denialCode === 'PAYMENT_PENDING' || access?.action === 'pending',
+        `tvod denial ${access?.denialCode || access?.action}`
+      );
+    }
+    return `sub=${status || 'none'}`;
+  });
+
   // ─── 4. Superadmin / empresa ───
   let adminToken = null;
 

@@ -4,7 +4,6 @@ const referralRepository = require('../repositories/referralRepository');
 const userRepository = require('../repositories/userRepository');
 const featureFlagService = require('./featureFlagService');
 const auditRepository = require('../repositories/auditRepository');
-const { query } = require('../config/database');
 const { env } = require('../config/env');
 const { createError } = require('../utils/errors');
 
@@ -47,18 +46,10 @@ async function redeemReferral(userId, code, meta = {}) {
   }
 
   const referral = result.referral;
+  if (!referral) {
+    throw createError(409, 'Código já utilizado', 'REFERRAL_INVALID');
+  }
   const days = referral.reward_days || 7;
-
-  // Premium para convidado + referrer
-  await query(
-    `UPDATE users SET
-       subscription_status = 'premium_active',
-       premium_expires_at = GREATEST(COALESCE(premium_expires_at, NOW()), NOW())
-         + ($2 || ' days')::interval,
-       updated_at = NOW()
-     WHERE id = ANY($1::uuid[])`,
-    [[userId, referral.referrer_user_id], String(days)]
-  );
 
   await auditRepository.write({
     actorId: userId,

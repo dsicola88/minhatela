@@ -35,6 +35,13 @@ function unitKz() {
   return Math.max(1, Math.round(Number(env.adCpmKz || 5000) / 1000));
 }
 
+function requiredWatchSeconds(durationSeconds) {
+  const minFloor = Math.max(1, Number(process.env.AD_COMPLETE_MIN_SECONDS || 2));
+  const duration = Math.max(0, Number(durationSeconds) || 0);
+  if (duration <= 0) return minFloor;
+  return Math.max(minFloor, Math.ceil(duration * 0.8));
+}
+
 function mapCampaign(row) {
   const budget = Number(row.budget_kz || 0);
   const spent = Number(row.spent_kz || 0);
@@ -539,13 +546,50 @@ async function startImpression(userId, impressionId) {
 async function completeImpression(userId, impressionId) {
   const owned = await adRepository.findOwnedImpression(impressionId, userId);
   if (!owned) throw createError(404, 'Impressão não encontrada', 'NOT_FOUND');
+  if (owned.completed) {
+    return { impressionId, billedKz: 0, completed: true, alreadyCompleted: true };
+  }
+  if (!owned.started || !owned.started_at) {
+    return {
+      impressionId,
+      billedKz: 0,
+      billed: false,
+      completed: false,
+      reason: 'not_started',
+    };
+  }
+
+  const requiredSeconds = requiredWatchSeconds(owned.creative_duration_seconds);
+  const elapsed = (Date.now() - new Date(owned.started_at).getTime()) / 1000;
+  if (elapsed < requiredSeconds) {
+    return {
+      impressionId,
+      billedKz: 0,
+      billed: false,
+      completed: false,
+      reason: 'too_early',
+      retryAfterSeconds: Math.ceil(requiredSeconds - elapsed),
+    };
+  }
+
   const row = await adRepository.completeImpression({
     impressionId,
     userId,
     unitKz: unitKz(),
+    minWatchSeconds: requiredSeconds,
   });
   if (!row) {
-    return { impressionId, billedKz: 0, completed: true, alreadyCompleted: true };
+    const again = await adRepository.findOwnedImpression(impressionId, userId);
+    if (again?.completed) {
+      return { impressionId, billedKz: 0, completed: true, alreadyCompleted: true };
+    }
+    return {
+      impressionId,
+      billedKz: 0,
+      billed: false,
+      completed: false,
+      reason: 'too_early',
+    };
   }
   if (row.billedKz > 0) {
     try {
@@ -682,4 +726,5 @@ module.exports = {
   assertSafeHttpsUrl,
   BILLING,
   unitKz,
+  requiredWatchSeconds,
 };

@@ -38,6 +38,18 @@ function uid() {
   return `ads_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function creative(url) {
+  return {
+    mediaUrl: url,
+    clickUrl: 'https://example.com',
+    durationSeconds: 2,
+  };
+}
+
 async function req(method, urlPath, { body, token, retries = 0 } = {}) {
   const h = {
     Accept: 'application/json',
@@ -168,10 +180,7 @@ async function run() {
         budgetKz: 5000,
         startsAt: new Date().toISOString(),
         endsAt: new Date(Date.now() + 7 * 86400000).toISOString(),
-        creative: {
-          mediaUrl: 'https://example.com/ad.mp4',
-          clickUrl: 'https://example.com',
-        },
+        creative: creative('https://example.com/ad.mp4'),
       },
     });
     assert(r.status === 201 && r.json?.campaign?.status === 'pending_review', `st ${r.json?.campaign?.status}`);
@@ -221,7 +230,7 @@ async function run() {
         budgetKz: 8000,
         startsAt: new Date().toISOString(),
         endsAt: new Date(Date.now() + 7 * 86400000).toISOString(),
-        creative: { mediaUrl: 'https://example.com/rejected.mp4' },
+        creative: creative('https://example.com/rejected.mp4'),
       },
     });
     const id = r.json?.campaign?.id;
@@ -261,10 +270,15 @@ async function run() {
     });
     assert(d1.json?.decision?.enabled && d1.json.decision.decisionId, 'enabled');
     const id = d1.json.decision.decisionId;
+    const tooSoon = await req('POST', `/api/ads/impressions/${id}/complete`, { token: a.token });
+    assert(tooSoon.json?.reason === 'not_started' && !tooSoon.json?.billed, 'complete before start');
     const start = await req('POST', `/api/ads/impressions/${id}/start`, { token: a.token });
     assert(start.status === 200 && start.json?.started, 'start');
+    const early = await req('POST', `/api/ads/impressions/${id}/complete`, { token: a.token });
+    assert(early.json?.reason === 'too_early' && !early.json?.billed, 'complete too early');
+    await sleep(2200);
     const c1 = await req('POST', `/api/ads/impressions/${id}/complete`, { token: a.token });
-    assert(c1.status === 200 && c1.json?.billedKz > 0, `bill ${c1.json?.billedKz}`);
+    assert(c1.status === 200 && c1.json?.billedKz > 0, `bill ${c1.json?.billedKz} ${c1.json?.reason || ''}`);
     unit = c1.json.billedKz;
     const c2 = await req('POST', `/api/ads/impressions/${id}/complete`, { token: a.token });
     assert(c2.json?.alreadyCompleted || c2.json?.billedKz === 0, 'no double bill');
@@ -295,7 +309,7 @@ async function run() {
         budgetKz: 8000,
         startsAt: new Date(Date.now() - 10 * 86400000).toISOString(),
         endsAt: new Date(Date.now() - 5 * 86400000).toISOString(),
-        creative: { mediaUrl: 'https://example.com/old.mp4' },
+        creative: creative('https://example.com/old.mp4'),
       },
     });
     const id = r.json?.campaign?.id;
@@ -319,7 +333,7 @@ async function run() {
         budgetKz: unit,
         startsAt: new Date().toISOString(),
         endsAt: new Date(Date.now() + 86400000).toISOString(),
-        creative: { mediaUrl: 'https://example.com/short.mp4' },
+        creative: creative('https://example.com/short.mp4'),
       },
     });
     const id = r.json?.campaign?.id;
@@ -339,6 +353,10 @@ async function run() {
     const i1 = d1.json?.decision?.decisionId;
     const i2 = d2.json?.decision?.decisionId;
     assert(i1 && i2, 'two impressions');
+    const s1 = await req('POST', `/api/ads/impressions/${i1}/start`, { token: a.token });
+    const s2 = await req('POST', `/api/ads/impressions/${i2}/start`, { token: a.token });
+    assert(s1.status === 200 && s2.status === 200, 'start both');
+    await sleep(2200);
     const [c1, c2] = await Promise.all([
       req('POST', `/api/ads/impressions/${i1}/complete`, { token: a.token }),
       req('POST', `/api/ads/impressions/${i2}/complete`, { token: a.token }),

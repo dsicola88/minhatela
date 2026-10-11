@@ -245,6 +245,7 @@ async function renderFromQuery(req, res) {
 }
 
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+const AOA_CURRENCIES = new Set(['aoa', 'kz', 'akz', 'kwanza']);
 
 function looksPaid(body) {
   const s = String(
@@ -253,41 +254,126 @@ function looksPaid(body) {
   return ['paid', 'pago', 'success', 'accepted', 'approved', '00'].includes(s);
 }
 
+function nestedObjects(body) {
+  return [
+    body,
+    body.data && typeof body.data === 'object' ? body.data : null,
+    body.metadata && typeof body.metadata === 'object' ? body.metadata : null,
+    body.payment && typeof body.payment === 'object' ? body.payment : null,
+  ].filter(Boolean);
+}
+
 function extractReference(body) {
-  const nested = body.data && typeof body.data === 'object' ? body.data : {};
-  const meta = body.metadata && typeof body.metadata === 'object' ? body.metadata : {};
-  const candidates = [
-    body.merchant_reference,
-    body.merchantReference,
-    body.referencia,
-    body.reference,
-    nested.merchant_reference,
-    nested.reference,
-    meta.reference,
-    body.orderId,
-    body.order_id,
-    body.transactionId,
+  const keys = [
+    'merchant_reference',
+    'merchantReference',
+    'referencia',
+    'reference',
+    'orderId',
+    'order_id',
+    'transactionId',
+    'transaction_id',
   ];
-  for (const c of candidates) {
-    const m = String(c || '').match(UUID_RE);
-    if (m) return m[0];
+  for (const obj of nestedObjects(body)) {
+    for (const key of keys) {
+      const m = String(obj[key] || '').match(UUID_RE);
+      if (m) return m[0];
+    }
   }
   return null;
 }
 
+function parseAmountKz(value) {
+  if (value == null || value === '') return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return Math.round(value);
+  const raw = String(value).trim().replace(/\s/g, '');
+  if (!raw) return null;
+  const normalized = raw.includes(',') && !raw.includes('.')
+    ? raw.replace(',', '.')
+    : raw.replace(/,/g, '');
+  const n = Number(normalized);
+  return Number.isFinite(n) ? Math.round(n) : null;
+}
+
+function extractAmountKz(body) {
+  const keys = ['amountKz', 'amount_kz', 'amount', 'valor', 'value', 'total'];
+  for (const obj of nestedObjects(body)) {
+    for (const key of keys) {
+      const n = parseAmountKz(obj[key]);
+      if (n != null) return n;
+    }
+  }
+  return null;
+}
+
+function extractCurrency(body) {
+  const keys = ['currency', 'moeda', 'currencyCode', 'currency_code'];
+  for (const obj of nestedObjects(body)) {
+    for (const key of keys) {
+      const raw = String(obj[key] || '').trim();
+      if (raw) return raw.toLowerCase();
+    }
+  }
+  return null;
+}
+
+function extractUserId(body) {
+  const keys = ['userId', 'user_id', 'customerId', 'customer_id', 'uid'];
+  for (const obj of nestedObjects(body)) {
+    for (const key of keys) {
+      const m = String(obj[key] || '').match(UUID_RE);
+      if (m) return m[0];
+    }
+  }
+  return null;
+}
+
+function matchPaidEvent(tx, body) {
+  if (!looksPaid(body || {})) return { ok: false, reason: 'not_paid_event' };
+  if (!tx) return { ok: false, reason: 'tx_missing' };
+  if (tx.payment_method !== 'weframe') {
+    return { ok: false, reason: 'not_weframe', transactionId: tx.id };
+  }
+  if (tx.status === STATUS.PAID) {
+    return { ok: false, reason: 'already_paid', transactionId: tx.id };
+  }
+  if (tx.status !== STATUS.PENDING) {
+    return { ok: false, reason: 'not_pending', transactionId: tx.id };
+  }
+
+  const amount = extractAmountKz(body);
+  if (amount == null) {
+    return { ok: false, reason: 'amount_missing', transactionId: tx.id };
+  }
+  if (amount !== Math.round(Number(tx.amount_kz))) {
+    return { ok: false, reason: 'amount_mismatch', transactionId: tx.id };
+  }
+
+  const currency = extractCurrency(body);
+  if (currency && !AOA_CURRENCIES.has(currency)) {
+    return { ok: false, reason: 'currency_mismatch', transactionId: tx.id };
+  }
+
+  const userId = extractUserId(body);
+  if (userId && String(userId).toLowerCase() !== String(tx.user_id).toLowerCase()) {
+    return { ok: false, reason: 'user_mismatch', transactionId: tx.id };
+  }
+
+  return { ok: true, transactionId: tx.id };
+}
+
 async function tryApplyPaid(body) {
-  if (!looksPaid(body || {})) return { applied: false, reason: 'not_paid_event' };
-  const ref = extractReference(body);
+  const payload = body || {};
+  if (!looksPaid(payload)) return { applied: false, reason: 'not_paid_event' };
+  const ref = extractReference(payload);
   if (!ref) {
     return { applied: false, reason: 'no_minhatela_reference' };
   }
   const tx = await transactionRepository.findById(ref);
-  if (!tx) return { applied: false, reason: 'tx_missing' };
-  if (tx.payment_method !== 'weframe') {
-    return { applied: false, reason: 'not_weframe', transactionId: tx.id };
+  const matched = matchPaidEvent(tx, payload);
+  if (!matched.ok) {
+    return { applied: false, reason: matched.reason, transactionId: matched.transactionId || tx?.id || null };
   }
-  if (tx.status === STATUS.PAID) return { applied: false, reason: 'already_paid', transactionId: tx.id };
-  if (tx.status !== STATUS.PENDING) return { applied: false, reason: 'not_pending', transactionId: tx.id };
 
   const updated = await transactionRepository.updateStatus(tx.id, STATUS.PAID, 'WeFrame / GPO EMIS', {
     fromStatus: STATUS.PENDING,
@@ -338,4 +424,9 @@ module.exports = {
   renderFromQuery,
   tryApplyPaid,
   applyWeframeHeaders,
+  looksPaid,
+  extractReference,
+  extractAmountKz,
+  extractCurrency,
+  matchPaidEvent,
 };

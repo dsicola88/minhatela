@@ -20,6 +20,8 @@
     "studio-rules": "node scripts/studio-rules.test.js",
     "studio-ledger": "node scripts/studio-ledger.test.js",
     "studio-db": "node scripts/studio-db.test.js",
+    "access-control": "node scripts/access-control.test.js",
+    "weframe-apply": "node scripts/weframe-apply.test.js",
     "inspect-pre-boot": "node scripts/inspect-pre-boot.js",
     "migrate-hold": "node scripts/migrate-hold.test.js"
   },

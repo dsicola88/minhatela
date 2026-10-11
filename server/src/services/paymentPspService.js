@@ -76,7 +76,7 @@ async function handleWebhook(req) {
     type: body.event || body.type,
   });
 
-  let applied = { applied: false };
+  let applied = { applied: false, reason: inserted.duplicate ? 'duplicate_event' : null };
   try {
     applied = await require('./emisWeframeService').tryApplyPaid(body);
   } catch (err) {
