@@ -78,12 +78,78 @@ function mapCampaign(row) {
       ? {
           title: row.creative_title || row.name,
           mediaUrl: row.media_url,
+          mediaKind: row.media_kind || kindFromUrl(row.media_url) || 'video',
+          cards: readCards(row.cards),
           clickUrl: row.click_url || null,
           ctaLabel: row.cta_label || 'Saber mais',
           durationSeconds: row.duration_seconds || 15,
         }
       : null,
   };
+}
+
+function kindFromUrl(url) {
+  const path = String(url || '').split('?')[0].toLowerCase();
+  if (/\.(jpe?g|png|webp|gif)$/.test(path)) return 'image';
+  if (/\.(mp4|webm|mov)$/.test(path)) return 'video';
+  return null;
+}
+
+function readCards(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function normalizeCreative(creative = {}) {
+  const requested = ['image', 'video', 'carousel'].includes(creative.mediaKind)
+    ? creative.mediaKind
+    : null;
+
+  if (requested === 'carousel') {
+    const source = Array.isArray(creative.cards) ? creative.cards : [];
+    const cards = source.map((item) => {
+      const raw = typeof item === 'string' ? item : item?.mediaUrl;
+      const mediaUrl = assertSafeHttpsUrl(raw, 'Cartão do carrossel');
+      if (kindFromUrl(mediaUrl) === 'video') {
+        throw createError(400, 'O carrossel aceita imagens (JPG, PNG ou WEBP)', 'VALIDATION');
+      }
+      return { mediaUrl, mediaKind: 'image' };
+    });
+    if (cards.length < 2 || cards.length > 10) {
+      throw createError(400, 'O carrossel precisa de 2 a 10 imagens', 'VALIDATION');
+    }
+    return {
+      mediaKind: 'carousel',
+      mediaUrl: cards[0].mediaUrl,
+      cards,
+      durationSeconds: cards.length * 5,
+    };
+  }
+
+  const mediaUrl = assertSafeHttpsUrl(
+    creative.mediaUrl,
+    requested === 'image' ? 'Imagem do anúncio' : 'Criativo do anúncio'
+  );
+  const detected = kindFromUrl(mediaUrl);
+  const mediaKind = requested || detected || 'video';
+  if (mediaKind === 'image' && detected === 'video') {
+    throw createError(400, 'Este ficheiro é um vídeo. Escolha o formato Vídeo.', 'VALIDATION');
+  }
+  if (mediaKind === 'video' && detected === 'image') {
+    throw createError(400, 'Este ficheiro é uma imagem. Escolha o formato Imagem.', 'VALIDATION');
+  }
+  let durationSeconds = Number(creative.durationSeconds) || (mediaKind === 'image' ? 6 : 15);
+  if (mediaKind === 'image') durationSeconds = Math.min(15, Math.max(5, Math.round(durationSeconds)));
+  else durationSeconds = Math.min(60, Math.max(2, Math.round(durationSeconds)));
+  return { mediaKind, mediaUrl, cards: [], durationSeconds };
 }
 
 function isPrivateHost(hostname) {
@@ -252,6 +318,11 @@ async function getPortal(userId, query = {}) {
       placements: [{ id: 'pre_roll', label: 'Antes do filme gratuito' }],
       territories: [{ id: 'AO', label: 'Angola' }],
       ctas: ['Saber mais', 'Visitar', 'Ver oferta'],
+      formats: [
+        { id: 'image', label: 'Imagem' },
+        { id: 'video', label: 'Vídeo' },
+        { id: 'carousel', label: 'Carrossel' },
+      ],
     },
   };
 }
@@ -300,12 +371,8 @@ async function createCampaign(userId, body) {
     );
   }
 
-  if (!body.name || !body.startsAt || !body.endsAt || !body.creative?.mediaUrl) {
-    throw createError(
-      400,
-      'Nome, datas e o vídeo do anúncio são obrigatórios',
-      'VALIDATION'
-    );
+  if (!body.name || !body.startsAt || !body.endsAt || !body.creative) {
+    throw createError(400, 'Nome, datas e o criativo são obrigatórios', 'VALIDATION');
   }
 
   const startsAt = new Date(body.startsAt);
@@ -315,7 +382,7 @@ async function createCampaign(userId, body) {
   }
 
   const objective = OBJECTIVES[body.objective] ? body.objective : 'brand';
-  const mediaUrl = assertSafeHttpsUrl(body.creative.mediaUrl, 'Vídeo do anúncio');
+  const normalized = normalizeCreative(body.creative);
   const clickUrl = assertSafeHttpsUrl(body.creative.clickUrl, 'Página de destino', {
     optional: objective !== 'traffic',
   });
@@ -347,10 +414,12 @@ async function createCampaign(userId, body) {
   const creative = await adRepository.addCreative({
     campaignId: campaign.id,
     title: body.creative.title || body.name,
-    mediaUrl,
+    mediaUrl: normalized.mediaUrl,
     clickUrl,
-    durationSeconds: body.creative.durationSeconds || 15,
+    durationSeconds: normalized.durationSeconds,
     ctaLabel: body.creative.ctaLabel || 'Saber mais',
+    mediaKind: normalized.mediaKind,
+    cards: normalized.cards,
   });
 
   await adRepository.addHistory({
@@ -370,6 +439,8 @@ async function createCampaign(userId, body) {
       creative_title: creative.title,
       cta_label: creative.cta_label,
       duration_seconds: creative.duration_seconds,
+      media_kind: creative.media_kind,
+      cards: creative.cards,
     }),
     creative,
     message:
@@ -518,6 +589,8 @@ async function decideAd({
       id: active.creative_id,
       title: active.title,
       mediaUrl: active.media_url,
+      mediaKind: active.media_kind || kindFromUrl(active.media_url) || 'video',
+      cards: readCards(active.cards),
       clickUrl: active.click_url,
       ctaLabel: active.cta_label || 'Saber mais',
       durationSeconds: active.duration_seconds,

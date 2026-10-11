@@ -12,7 +12,7 @@ async function findActiveDecision({
   const result = await query(
     `SELECT c.id AS campaign_id, c.name, c.placement, c.budget_kz, c.spent_kz,
             c.targeting, cr.id AS creative_id, cr.title, cr.media_url, cr.click_url,
-            cr.duration_seconds, cr.cta_label
+            cr.duration_seconds, cr.cta_label, cr.media_kind, cr.cards
      FROM campaigns c
      JOIN ad_creatives cr ON cr.campaign_id = c.id AND cr.is_active = TRUE
      WHERE c.status = 'active'
@@ -200,11 +200,20 @@ async function createCampaign(payload) {
   return result.rows[0];
 }
 
-async function addCreative({ campaignId, title, mediaUrl, clickUrl, durationSeconds, ctaLabel }) {
+async function addCreative({
+  campaignId,
+  title,
+  mediaUrl,
+  clickUrl,
+  durationSeconds,
+  ctaLabel,
+  mediaKind,
+  cards,
+}) {
   const result = await query(
     `INSERT INTO ad_creatives
-      (campaign_id, title, media_url, click_url, duration_seconds, cta_label)
-     VALUES ($1,$2,$3,$4,$5,$6)
+      (campaign_id, title, media_url, click_url, duration_seconds, cta_label, media_kind, cards)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)
      RETURNING *`,
     [
       campaignId,
@@ -213,6 +222,8 @@ async function addCreative({ campaignId, title, mediaUrl, clickUrl, durationSeco
       clickUrl || null,
       durationSeconds || 15,
       ctaLabel || 'Saber mais',
+      mediaKind || 'video',
+      JSON.stringify(cards || []),
     ]
   );
   return result.rows[0];
@@ -223,7 +234,7 @@ async function listCampaigns(advertiserId, { status, q, limit = 80 } = {}) {
   const result = await query(
     `SELECT c.*,
             cr.media_url, cr.click_url, cr.title AS creative_title, cr.cta_label,
-            cr.duration_seconds,
+            cr.duration_seconds, cr.media_kind, cr.cards,
             tx.status AS payment_status
      FROM campaigns c
      LEFT JOIN LATERAL (
@@ -249,7 +260,7 @@ async function getOwnedCampaign(advertiserId, campaignId) {
   const result = await query(
     `SELECT c.*,
             cr.id AS creative_id, cr.media_url, cr.click_url, cr.title AS creative_title,
-            cr.cta_label, cr.duration_seconds,
+            cr.cta_label, cr.duration_seconds, cr.media_kind, cr.cards,
             tx.status AS payment_status
      FROM campaigns c
      LEFT JOIN LATERAL (
@@ -337,7 +348,8 @@ async function moderateCampaign(id, status, { reason, reviewerId } = {}) {
 async function findCampaignWithAdvertiser(id) {
   const result = await query(
     `SELECT c.*, a.user_id AS advertiser_user_id, a.contact_email, a.company_name,
-            cr.media_url, cr.click_url, cr.cta_label, cr.title AS creative_title
+            cr.media_url, cr.click_url, cr.cta_label, cr.title AS creative_title,
+            cr.media_kind, cr.cards
      FROM campaigns c
      JOIN advertisers a ON a.id = c.advertiser_id
      LEFT JOIN LATERAL (

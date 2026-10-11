@@ -10,25 +10,62 @@ const { createError } = require('../utils/errors');
 const adsDir = path.join(env.uploadsDir, 'ads');
 fs.mkdirSync(adsDir, { recursive: true });
 
+const CREATIVE_TYPES = {
+  'video/mp4': { ext: '.mp4', kind: 'video' },
+  'video/webm': { ext: '.webm', kind: 'video' },
+  'video/quicktime': { ext: '.mov', kind: 'video' },
+  'image/jpeg': { ext: '.jpg', kind: 'image' },
+  'image/png': { ext: '.png', kind: 'image' },
+  'image/webp': { ext: '.webp', kind: 'image' },
+  'image/gif': { ext: '.gif', kind: 'image' },
+};
+
+const CREATIVE_EXT = {
+  '.mp4': CREATIVE_TYPES['video/mp4'],
+  '.webm': CREATIVE_TYPES['video/webm'],
+  '.mov': CREATIVE_TYPES['video/quicktime'],
+  '.jpg': CREATIVE_TYPES['image/jpeg'],
+  '.jpeg': CREATIVE_TYPES['image/jpeg'],
+  '.png': CREATIVE_TYPES['image/png'],
+  '.webp': CREATIVE_TYPES['image/webp'],
+  '.gif': CREATIVE_TYPES['image/gif'],
+};
+
+function creativeFileMeta(file) {
+  const byMime = CREATIVE_TYPES[String(file.mimetype || '').toLowerCase()];
+  if (byMime) return byMime;
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  return CREATIVE_EXT[ext] || null;
+}
+
 const adUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, adsDir),
     filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname || '').toLowerCase() === '.mp4' ? '.mp4' : '';
-      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext || '.mp4'}`);
+      const meta = creativeFileMeta(file);
+      const ext = meta?.ext || '.bin';
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`);
     },
   }),
   limits: { fileSize: 30 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    const ok =
-      file.mimetype === 'video/mp4' ||
-      String(file.originalname || '')
-        .toLowerCase()
-        .endsWith('.mp4');
-    if (!ok) return cb(new Error('Apenas vídeo MP4'));
+    if (!creativeFileMeta(file)) {
+      return cb(new Error('Use uma imagem (JPG, PNG, WEBP) ou um vídeo (MP4, WEBM, MOV)'));
+    }
     cb(null, true);
   },
 });
+
+function receiveCreative(req, res, next) {
+  adUpload.single('file')(req, res, (err) => {
+    if (!err) return next();
+    const message =
+      err.code === 'LIMIT_FILE_SIZE'
+        ? 'O ficheiro passa de 30 MB'
+        : err.message || 'Ficheiro não aceite';
+    next(createError(400, message, 'VALIDATION'));
+  });
+}
 
 async function register(req, res) {
   const result = await adPlatformService.registerAdvertiser(req.user.id, req.body);
@@ -71,8 +108,14 @@ async function reports(req, res) {
 async function uploadCreative(req, res) {
   await adPlatformService.requireAdvertiser(req.user.id);
   if (!req.file) throw createError(400, 'Ficheiro obrigatório', 'VALIDATION');
+  const meta = creativeFileMeta(req.file);
   const mediaUrl = `/uploads/ads/${req.file.filename}`;
-  res.status(201).json({ mediaUrl, mimeType: req.file.mimetype, sizeBytes: req.file.size });
+  res.status(201).json({
+    mediaUrl,
+    mediaKind: meta?.kind || 'video',
+    mimeType: req.file.mimetype,
+    sizeBytes: req.file.size,
+  });
 }
 
 async function decision(req, res) {
@@ -110,6 +153,7 @@ module.exports = {
   pauseCampaign,
   reports,
   uploadCreative,
+  receiveCreative,
   adUpload,
   decision,
   start,

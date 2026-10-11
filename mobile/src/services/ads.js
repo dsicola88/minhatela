@@ -20,6 +20,20 @@ export async function createCampaign(payload) {
   return api.post('/api/ads/campaigns', payload);
 }
 
+export async function uploadAdCreative(file) {
+  const form = new FormData();
+  if (typeof File !== 'undefined' && file instanceof File) {
+    form.append('file', file);
+  } else {
+    form.append('file', {
+      uri: file.uri,
+      name: file.name || 'anuncio',
+      type: file.mimeType || file.type || 'application/octet-stream',
+    });
+  }
+  return api.post('/api/ads/creatives/upload', form);
+}
+
 export async function pauseCampaign(id) {
   return api.post(`/api/ads/campaigns/${id}/pause`, {});
 }
@@ -64,6 +78,7 @@ export default {
   fetchAdPortal,
   fetchAdCampaign,
   createCampaign,
+  uploadAdCreative,
   pauseCampaign,
   fetchAdReports,
   startAdImpression,

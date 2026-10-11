@@ -198,7 +198,8 @@ async function listPendingCampaigns() {
             c.created_at, c.objective, c.rejection_reason, c.funded, c.transaction_id,
             tx.status AS payment_status,
             a.company_name, a.contact_email,
-            cr.media_url, cr.click_url, cr.cta_label, cr.title AS creative_title
+            cr.media_url, cr.click_url, cr.cta_label, cr.title AS creative_title,
+            cr.media_kind, cr.cards
      FROM campaigns c
      JOIN advertisers a ON a.id = c.advertiser_id
      LEFT JOIN LATERAL (
@@ -243,6 +244,7 @@ async function listPendingCampaigns() {
         ? {
             title: row.creative_title,
             mediaUrl: row.media_url,
+            mediaKind: row.media_kind || 'video',
             clickUrl: row.click_url,
             ctaLabel: row.cta_label,
           }

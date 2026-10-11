@@ -23,7 +23,7 @@ router.get('/reports', requireAuth, asyncHandler(adController.reports));
 router.post(
   '/creatives/upload',
   requireAuth,
-  adController.adUpload.single('file'),
+  adController.receiveCreative,
   asyncHandler(adController.uploadCreative)
 );
 

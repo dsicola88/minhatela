@@ -8,6 +8,7 @@ import {
   useWindowDimensions,
   TextInput,
   Linking,
+  Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { WebView } from 'react-native-webview';
@@ -46,6 +47,77 @@ const STILL_WATCHING_AFTER_MS = 45 * 60 * 1000;
 
 function reportQoeSafe(payload) {
   reportWatchQoe(payload).catch(() => {});
+}
+
+function inferAdKind(url) {
+  const path = String(url || '').split('?')[0].toLowerCase();
+  if (/\.(jpe?g|png|webp|gif)$/.test(path)) return 'image';
+  return 'video';
+}
+
+function AdMedia({ creative, onFinished }) {
+  const kind = creative.mediaKind || inferAdKind(creative.mediaUrl);
+  const cards =
+    kind === 'carousel' && Array.isArray(creative.cards) && creative.cards.length
+      ? creative.cards
+      : [{ mediaUrl: creative.mediaUrl, mediaKind: kind === 'image' ? 'image' : 'video' }];
+  const [index, setIndex] = useState(0);
+  const onFinishedRef = useRef(onFinished);
+  const doneRef = useRef(false);
+  onFinishedRef.current = onFinished;
+  const card = cards[index] || cards[0];
+  const cardKind = card?.mediaKind || inferAdKind(card?.mediaUrl);
+  const uri = resolveAdMediaUrl(card?.mediaUrl);
+
+  function finishOrAdvance() {
+    if (doneRef.current) return;
+    setIndex((current) => {
+      if (doneRef.current) return current;
+      if (current >= cards.length - 1) {
+        doneRef.current = true;
+        onFinishedRef.current({ billed: true });
+        return current;
+      }
+      return current + 1;
+    });
+  }
+
+  useEffect(() => {
+    if (cardKind !== 'image') return undefined;
+    const seconds =
+      kind === 'carousel' ? 5 : Math.max(5, Number(creative.durationSeconds) || 6);
+    const timer = setTimeout(finishOrAdvance, seconds * 1000);
+    return () => clearTimeout(timer);
+  }, [index, cardKind, uri, kind, creative.durationSeconds]);
+
+  if (!uri) return null;
+  if (cardKind === 'image') {
+    return <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />;
+  }
+  if (Platform.OS === 'web') {
+    return createElement('video', {
+      key: uri,
+      src: uri,
+      autoPlay: true,
+      playsInline: true,
+      style: { width: '100%', height: '100%', objectFit: 'contain', background: '#000' },
+      onEnded: finishOrAdvance,
+      onError: () => onFinishedRef.current({ billed: false }),
+    });
+  }
+  return (
+    <Video
+      key={uri}
+      source={{ uri }}
+      style={{ flex: 1 }}
+      resizeMode={ResizeMode.CONTAIN}
+      shouldPlay
+      onPlaybackStatusUpdate={(status) => {
+        if (status?.didJustFinish) finishOrAdvance();
+        if (status?.error) onFinishedRef.current({ billed: false });
+      }}
+    />
+  );
 }
 
 export default function Watch({
@@ -640,32 +712,7 @@ export default function Watch({
                 backgroundColor: colors.black,
               }}
             >
-              {Platform.OS === 'web'
-                ? createElement('video', {
-                    src: resolveAdMediaUrl(session.ads.creative.mediaUrl),
-                    autoPlay: true,
-                    playsInline: true,
-                    style: {
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'contain',
-                      background: '#000',
-                    },
-                    onEnded: () => finishAd({ billed: true }),
-                    onError: () => finishAd({ billed: false }),
-                  })
-                : (
-                    <Video
-                      source={{ uri: resolveAdMediaUrl(session.ads.creative.mediaUrl) }}
-                      style={{ flex: 1 }}
-                      resizeMode={ResizeMode.CONTAIN}
-                      shouldPlay
-                      onPlaybackStatusUpdate={(status) => {
-                        if (status?.didJustFinish) finishAd({ billed: true });
-                        if (status?.error) finishAd({ billed: false });
-                      }}
-                    />
-                  )}
+              <AdMedia creative={session.ads.creative} onFinished={finishAd} />
               <Text
                 style={{
                   position: 'absolute',

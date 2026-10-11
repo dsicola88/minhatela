@@ -794,7 +794,12 @@ export function AdsTab({ campaigns, run }) {
             </Text>
             {c.creative?.mediaUrl ? (
               <Text style={{ color: colors.gold, marginTop: 8 }} numberOfLines={2}>
-                Vídeo · {c.creative.mediaUrl}
+                {c.creative.mediaKind === 'image'
+                  ? 'Imagem'
+                  : c.creative.mediaKind === 'carousel'
+                    ? 'Carrossel'
+                    : 'Vídeo'}{' '}
+                · {c.creative.mediaUrl}
               </Text>
             ) : null}
             {c.creative?.clickUrl ? (

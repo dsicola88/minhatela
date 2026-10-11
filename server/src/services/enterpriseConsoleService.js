@@ -462,7 +462,8 @@ async function listAllCampaigns({ status, limit = 50 } = {}) {
     `SELECT c.id, c.name, c.placement, c.budget_kz, c.spent_kz, c.status, c.created_at,
             c.objective, c.rejection_reason, c.starts_at, c.ends_at,
             a.company_name, a.contact_email,
-            cr.media_url, cr.click_url, cr.cta_label, cr.title AS creative_title
+            cr.media_url, cr.click_url, cr.cta_label, cr.title AS creative_title,
+            cr.media_kind, cr.cards
      FROM campaigns c
      JOIN advertisers a ON a.id = c.advertiser_id
      LEFT JOIN LATERAL (
@@ -495,6 +496,7 @@ async function listAllCampaigns({ status, limit = 50 } = {}) {
         ? {
             title: r.creative_title,
             mediaUrl: r.media_url,
+            mediaKind: r.media_kind || 'video',
             clickUrl: r.click_url,
             ctaLabel: r.cta_label,
           }

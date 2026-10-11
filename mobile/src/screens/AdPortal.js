@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createElement, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,9 @@ import {
   Pressable,
   useWindowDimensions,
   Platform,
+  Image,
 } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
 import { StatusBar } from 'expo-status-bar';
 import { PrimaryButton, FieldLabel } from '../components/ui';
 import { LoadingState, EmptyState, ErrorState } from '../components/StateViews';
@@ -22,16 +24,23 @@ import {
   pauseCampaign,
   fetchAdReports,
   resolveAdMediaUrl,
+  uploadAdCreative,
 } from '../services/ads';
 
 const STEPS = [
   { id: 1, title: 'Objectivo' },
   { id: 2, title: 'Empresa' },
-  { id: 3, title: 'Vídeo' },
+  { id: 3, title: 'Criativo' },
   { id: 4, title: 'Destino' },
   { id: 5, title: 'Onde passa' },
   { id: 6, title: 'Orçamento' },
   { id: 7, title: 'Rever' },
+];
+
+const AD_FORMATS = [
+  { id: 'image', label: 'Imagem', hint: 'Uma imagem no ecrã, como um anúncio de display.' },
+  { id: 'video', label: 'Vídeo', hint: 'Um vídeo curto antes do filme.' },
+  { id: 'carousel', label: 'Carrossel', hint: '2 a 10 imagens, como no Meta.' },
 ];
 
 const emptyDraft = () => ({
@@ -41,7 +50,13 @@ const emptyDraft = () => ({
   placement: 'pre_roll',
   startsAt: new Date().toISOString().slice(0, 10),
   endsAt: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+  mediaKind: 'image',
   mediaUrl: '',
+  imageSeconds: '6',
+  cards: [
+    { mediaUrl: '', mediaKind: 'image' },
+    { mediaUrl: '', mediaKind: 'image' },
+  ],
   clickUrl: '',
   ctaLabel: 'Saber mais',
   contentCategory: '',
@@ -131,7 +146,13 @@ export default function AdPortal({ onCatalog, onAccount }) {
         },
         creative: {
           title: draft.name,
-          mediaUrl: draft.mediaUrl,
+          mediaKind: draft.mediaKind,
+          mediaUrl: draft.mediaKind === 'carousel' ? undefined : draft.mediaUrl,
+          cards:
+            draft.mediaKind === 'carousel'
+              ? draft.cards.filter((card) => String(card.mediaUrl || '').trim())
+              : undefined,
+          durationSeconds: draft.mediaKind === 'image' ? Number(draft.imageSeconds) || 6 : undefined,
           clickUrl: draft.clickUrl,
           ctaLabel: draft.ctaLabel,
         },
@@ -467,7 +488,7 @@ export default function AdPortal({ onCatalog, onAccount }) {
                   ) : null}
                   {item.creative?.mediaUrl ? (
                     <Text style={{ color: colors.muted, marginTop: 6 }} numberOfLines={1}>
-                      Vídeo · {resolveAdMediaUrl(item.creative.mediaUrl)}
+                      {creativeKindLabel(item.creative)} · {resolveAdMediaUrl(item.creative.mediaUrl)}
                     </Text>
                   ) : null}
                   {item.status === 'active' ? (
@@ -497,6 +518,40 @@ export default function AdPortal({ onCatalog, onAccount }) {
 }
 
 function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, onSubmit, measurement }) {
+  const [uploading, setUploading] = useState(false);
+  const [stepError, setStepError] = useState('');
+  const ready = creativeReady(draft, step);
+
+  async function loadFile(into) {
+    setStepError('');
+    setUploading(true);
+    try {
+      const file = await pickAdFile(draft.mediaKind === 'video' ? 'video' : 'image');
+      if (!file) return;
+      const uploaded = await uploadAdCreative(file);
+      if (into !== 'single' && uploaded.mediaKind === 'video') {
+        setStepError('O carrossel aceita imagens (JPG, PNG ou WEBP)');
+        return;
+      }
+      if (into === 'single') {
+        setField('mediaUrl', uploaded.mediaUrl);
+        if (uploaded.mediaKind === 'video') setField('mediaKind', 'video');
+        if (uploaded.mediaKind === 'image' && draft.mediaKind === 'video') setField('mediaKind', 'image');
+      } else {
+        setField(
+          'cards',
+          draft.cards.map((card, index) =>
+            index === into ? { ...card, mediaUrl: uploaded.mediaUrl, mediaKind: 'image' } : card
+          )
+        );
+      }
+    } catch (err) {
+      setStepError(err.message || 'Não foi possível carregar o ficheiro');
+    } finally {
+      setUploading(false);
+    }
+  }
+
   return (
     <View style={panelStyle()}>
       <Text style={{ color: colors.gold, fontSize: 12, fontWeight: '800' }}>
@@ -535,20 +590,112 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
       ) : null}
       {step === 3 ? (
         <>
-          <Text style={{ color: colors.muted, marginTop: 12, marginBottom: 8, lineHeight: 20 }}>
-            Ligação HTTPS para um ficheiro MP4, ou um vídeo já carregado na MinhaTela (/uploads/ads/…).
+          <Text style={{ color: colors.text, fontWeight: '700', marginTop: 12, marginBottom: 8 }}>
+            Formato do anúncio
           </Text>
-          <FieldLabel>Vídeo do anúncio</FieldLabel>
-          <TextInput
-            value={draft.mediaUrl}
-            onChangeText={(v) => setField('mediaUrl', v)}
-            style={fieldStyle()}
-            autoCapitalize="none"
-            placeholder="https://…"
-            placeholderTextColor={colors.muted}
-          />
-          {draft.mediaUrl ? (
-            <Text style={{ color: colors.gold, fontSize: 12 }}>Pré-visualização: {draft.mediaUrl}</Text>
+          {AD_FORMATS.map((format) => (
+            <Pressable
+              key={format.id}
+              onPress={() => setField('mediaKind', format.id)}
+              style={choice(draft.mediaKind === format.id)}
+            >
+              <Text style={{ color: colors.text, fontWeight: '700' }}>{format.label}</Text>
+              <Text style={{ color: colors.muted, marginTop: 4 }}>{format.hint}</Text>
+            </Pressable>
+          ))}
+          {draft.mediaKind === 'carousel' ? (
+            <>
+              <Text style={{ color: colors.muted, marginTop: 8, marginBottom: 8, lineHeight: 20 }}>
+                Cada cartão é uma imagem. Carregue o ficheiro ou cole uma ligação HTTPS.
+              </Text>
+              {draft.cards.map((card, index) => (
+                <View key={`card-${index}`} style={{ marginBottom: 8 }}>
+                  <FieldLabel>Cartão {index + 1}</FieldLabel>
+                  <PrimaryButton
+                    label={uploading ? 'A carregar…' : 'Carregar imagem'}
+                    variant="outline"
+                    disabled={uploading}
+                    onPress={() => loadFile(index)}
+                    style={{ marginBottom: 8 }}
+                  />
+                  <TextInput
+                    value={card.mediaUrl}
+                    onChangeText={(value) =>
+                      setField(
+                        'cards',
+                        draft.cards.map((item, itemIndex) =>
+                          itemIndex === index ? { ...item, mediaUrl: value } : item
+                        )
+                      )
+                    }
+                    style={fieldStyle()}
+                    autoCapitalize="none"
+                    placeholder="https://… ou ficheiro carregado"
+                    placeholderTextColor={colors.muted}
+                  />
+                  <CreativePreview url={card.mediaUrl} kind="image" />
+                </View>
+              ))}
+              <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                {draft.cards.length < 10 ? (
+                  <PrimaryButton
+                    label="Adicionar cartão"
+                    variant="outline"
+                    onPress={() =>
+                      setField('cards', [...draft.cards, { mediaUrl: '', mediaKind: 'image' }])
+                    }
+                  />
+                ) : null}
+                {draft.cards.length > 2 ? (
+                  <PrimaryButton
+                    label="Remover último"
+                    variant="outline"
+                    onPress={() => setField('cards', draft.cards.slice(0, -1))}
+                  />
+                ) : null}
+              </View>
+            </>
+          ) : (
+            <>
+              <Text style={{ color: colors.muted, marginTop: 8, marginBottom: 8, lineHeight: 20 }}>
+                {draft.mediaKind === 'video'
+                  ? 'Carregue um MP4, WEBM ou MOV, ou cole uma ligação HTTPS.'
+                  : 'Carregue um JPG, PNG ou WEBP, ou cole uma ligação HTTPS.'}
+              </Text>
+              <PrimaryButton
+                label={uploading ? 'A carregar…' : draft.mediaKind === 'video' ? 'Carregar vídeo' : 'Carregar imagem'}
+                variant="outline"
+                disabled={uploading}
+                onPress={() => loadFile('single')}
+                style={{ marginBottom: 8 }}
+              />
+              <TextInput
+                value={draft.mediaUrl}
+                onChangeText={(value) => setField('mediaUrl', value)}
+                style={fieldStyle()}
+                autoCapitalize="none"
+                placeholder="https://…"
+                placeholderTextColor={colors.muted}
+              />
+              {draft.mediaKind === 'image' ? (
+                <>
+                  <FieldLabel>Tempo no ecrã</FieldLabel>
+                  {['5', '6', '10', '15'].map((seconds) => (
+                    <Pressable
+                      key={seconds}
+                      onPress={() => setField('imageSeconds', seconds)}
+                      style={choice(String(draft.imageSeconds) === seconds)}
+                    >
+                      <Text style={{ color: colors.text }}>{seconds} segundos</Text>
+                    </Pressable>
+                  ))}
+                </>
+              ) : null}
+              <CreativePreview url={draft.mediaUrl} kind={draft.mediaKind} />
+            </>
+          )}
+          {stepError ? (
+            <Text style={{ color: colors.red, marginTop: 8 }}>{stepError}</Text>
           ) : null}
         </>
       ) : null}
@@ -624,7 +771,7 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
             {'\n'}
             Antes do filme · Angola
             {'\n'}
-            Vídeo: {draft.mediaUrl || '—'}
+            {creativeKindLabel(draft)}: {creativeSummary(draft)}
             {draft.clickUrl ? `\nDestino: ${draft.clickUrl}` : ''}
           </Text>
           <Text style={{ color: colors.gold, marginTop: 12, lineHeight: 20 }}>
@@ -640,7 +787,12 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
           <PrimaryButton label="Anterior" variant="outline" onPress={() => setStep(step - 1)} style={{ flexGrow: 1 }} />
         ) : null}
         {step < 7 ? (
-          <PrimaryButton label="Continuar" onPress={() => setStep(step + 1)} style={{ flexGrow: 1 }} />
+          <PrimaryButton
+            label="Continuar"
+            disabled={!ready || uploading}
+            onPress={() => setStep(step + 1)}
+            style={{ flexGrow: 1 }}
+          />
         ) : (
           <PrimaryButton
             label="Criar e pagar"
@@ -652,6 +804,70 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
         )}
       </View>
     </View>
+  );
+}
+
+function creativeKindLabel(creative) {
+  if (creative?.mediaKind === 'image') return 'Imagem';
+  if (creative?.mediaKind === 'carousel') return 'Carrossel';
+  return 'Vídeo';
+}
+
+function creativeSummary(draft) {
+  if (draft.mediaKind === 'carousel') {
+    const count = (draft.cards || []).filter((card) => String(card.mediaUrl || '').trim()).length;
+    return `${count} imagens`;
+  }
+  return draft.mediaUrl || '—';
+}
+
+function creativeReady(draft, step) {
+  if (step === 2) return Boolean(String(draft.name || '').trim());
+  if (step !== 3) return true;
+  if (draft.mediaKind === 'carousel') {
+    return (draft.cards || []).filter((card) => String(card.mediaUrl || '').trim()).length >= 2;
+  }
+  return Boolean(String(draft.mediaUrl || '').trim());
+}
+
+async function pickAdFile(kind) {
+  const accept = kind === 'video' ? 'video/mp4,video/webm,video/quicktime' : 'image/jpeg,image/png,image/webp,image/gif';
+  if (Platform.OS === 'web' && typeof document !== 'undefined') {
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = accept;
+      input.onchange = () => resolve(input.files?.[0] || null);
+      input.click();
+    });
+  }
+  const result = await DocumentPicker.getDocumentAsync({
+    type: kind === 'video' ? ['video/mp4', 'video/webm', 'video/quicktime'] : ['image/*'],
+    copyToCacheDirectory: true,
+  });
+  if (result.canceled) return null;
+  return result.assets?.[0] || null;
+}
+
+function CreativePreview({ url, kind }) {
+  if (!url) return null;
+  const uri = resolveAdMediaUrl(url);
+  if (kind === 'video') {
+    if (Platform.OS === 'web') {
+      return createElement('video', {
+        src: uri,
+        controls: true,
+        style: { width: '100%', maxHeight: 220, background: '#000', marginBottom: 12 },
+      });
+    }
+    return <Text style={{ color: colors.muted, marginBottom: 12 }}>Vídeo carregado</Text>;
+  }
+  return (
+    <Image
+      source={{ uri }}
+      resizeMode="contain"
+      style={{ width: '100%', height: 180, marginBottom: 12, backgroundColor: colors.surfaceSecondary }}
+    />
   );
 }
 
