@@ -2,6 +2,7 @@
 
 const appConfigRepository = require('../repositories/appConfigRepository');
 const auditRepository = require('../repositories/auditRepository');
+const { env } = require('../config/env');
 const { createError } = require('../utils/errors');
 
 const PUBLIC_KEYS = new Set(['onboarding', 'branding', 'support', 'landing', 'payments']);
@@ -109,6 +110,7 @@ async function publicBootstrap() {
     return {
       market: 'AO',
       currency: 'Kz',
+      googleClientId: env.oauth.googleClientId || '',
       config: mergePublicConfig(out),
     };
   } catch (err) {
@@ -116,6 +118,7 @@ async function publicBootstrap() {
     return {
       market: 'AO',
       currency: 'Kz',
+      googleClientId: env.oauth.googleClientId || '',
       config: mergePublicConfig({
         onboarding: {
           enabled: true,

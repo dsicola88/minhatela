@@ -25,17 +25,41 @@ import {
   mfaVerifyLogin,
 } from '../services/auth';
 import { oauthLogin, preloadGoogleIdentity, requestGoogleAccessToken } from '../services/phase25';
+import { fetchPublicAppConfig } from '../services/admin';
 import Constants from 'expo-constants';
 import { getDeviceIdentity } from '../platform/deviceIdentity';
+
+function readBakedGoogleClientId() {
+  const extra =
+    Constants.expoConfig?.extra?.googleClientId ||
+    Constants.manifest?.extra?.googleClientId ||
+    '';
+  const fromEnv =
+    typeof process !== 'undefined' && process.env
+      ? process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || ''
+      : '';
+  return String(extra || fromEnv).trim();
+}
 
 export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
   const { width, height } = useWindowDimensions();
   const isCompact = width < 768;
   const branding = useBrandCopy();
-  const googleClientId = Constants.expoConfig?.extra?.googleClientId;
+  const [googleClientId, setGoogleClientId] = useState(readBakedGoogleClientId);
 
   useEffect(() => {
     preloadGoogleIdentity();
+    if (readBakedGoogleClientId()) return undefined;
+    let cancelled = false;
+    fetchPublicAppConfig()
+      .then((data) => {
+        const id = String(data?.googleClientId || '').trim();
+        if (!cancelled && id) setGoogleClientId(id);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const [mode, setMode] = useState('login');
@@ -364,11 +388,11 @@ export default function Login({ onSuccess, onForgotPassword, onOpenLegal }) {
                   style={{ marginTop: 20 }}
                 />
 
-                {googleClientId ? (
+                {Platform.OS === 'web' ? (
                   <View style={{ marginTop: 22, gap: 12 }}>
                     <Text
                       style={{
-                        color: cinema.muted,
+                        color: '#E5E5E5',
                         textAlign: 'center',
                         fontSize: 12,
                         letterSpacing: 1,

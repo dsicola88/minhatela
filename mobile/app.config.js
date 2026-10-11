@@ -39,7 +39,10 @@ module.exports = () => {
         ...expo.extra,
         apiBaseUrl,
         appPublicUrl,
-        googleClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '',
+        googleClientId:
+          process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ||
+          process.env.GOOGLE_CLIENT_ID ||
+          '',
         eas: {
           ...(expo.extra && expo.extra.eas ? expo.extra.eas : {}),
           projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID || undefined,
