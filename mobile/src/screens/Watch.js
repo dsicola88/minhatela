@@ -33,7 +33,12 @@ import { useI18n } from '../i18n';
 import Focusable from '../tv/Focusable';
 import { getDataSaver, applyDataSaverToEmbedUrl } from '../platform/preferences';
 import { updatePlaybackPrefs } from '../services/phase24';
-import { completeAdImpression, clickAdImpression } from '../services/ads';
+import {
+  completeAdImpression,
+  clickAdImpression,
+  startAdImpression,
+  resolveAdMediaUrl,
+} from '../services/ads';
 
 const PROGRESS_INTERVAL_MS = 15000;
 const HEARTBEAT_INTERVAL_MS = 30000;
@@ -135,6 +140,9 @@ export default function Watch({
         const hasPreroll = Boolean(data?.ads?.enabled && data?.ads?.creative?.mediaUrl);
         setAdPlaying(hasPreroll);
         setPaused(hasPreroll);
+        if (hasPreroll && data?.ads?.decisionId) {
+          startAdImpression(data.ads.decisionId).catch(() => {});
+        }
 
         reportQoeSafe({
           eventType: 'startup',
@@ -632,16 +640,32 @@ export default function Watch({
                 backgroundColor: colors.black,
               }}
             >
-              <Video
-                source={{ uri: session.ads.creative.mediaUrl }}
-                style={{ flex: 1 }}
-                resizeMode={ResizeMode.CONTAIN}
-                shouldPlay
-                onPlaybackStatusUpdate={(status) => {
-                  if (status?.didJustFinish) finishAd({ billed: true });
-                  if (status?.error) finishAd({ billed: false });
-                }}
-              />
+              {Platform.OS === 'web'
+                ? createElement('video', {
+                    src: resolveAdMediaUrl(session.ads.creative.mediaUrl),
+                    autoPlay: true,
+                    playsInline: true,
+                    style: {
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'contain',
+                      background: '#000',
+                    },
+                    onEnded: () => finishAd({ billed: true }),
+                    onError: () => finishAd({ billed: false }),
+                  })
+                : (
+                    <Video
+                      source={{ uri: resolveAdMediaUrl(session.ads.creative.mediaUrl) }}
+                      style={{ flex: 1 }}
+                      resizeMode={ResizeMode.CONTAIN}
+                      shouldPlay
+                      onPlaybackStatusUpdate={(status) => {
+                        if (status?.didJustFinish) finishAd({ billed: true });
+                        if (status?.error) finishAd({ billed: false });
+                      }}
+                    />
+                  )}
               <Text
                 style={{
                   position: 'absolute',
@@ -654,6 +678,29 @@ export default function Watch({
               >
                 {t('adLabel') || 'Publicidade'} · {session.ads.creative.title}
               </Text>
+              {session.ads.creative.clickUrl ? (
+                <Pressable
+                  onPress={() => {
+                    if (session.ads.decisionId) {
+                      clickAdImpression(session.ads.decisionId).catch(() => {});
+                    }
+                    Linking.openURL(session.ads.creative.clickUrl).catch(() => {});
+                  }}
+                  style={{
+                    position: 'absolute',
+                    right: 20,
+                    bottom: 28,
+                    backgroundColor: colors.gold,
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    borderRadius: 4,
+                  }}
+                >
+                  <Text style={{ color: colors.black, fontWeight: '800' }}>
+                    {session.ads.creative.ctaLabel || 'Saber mais'}
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
           ) : null}
 

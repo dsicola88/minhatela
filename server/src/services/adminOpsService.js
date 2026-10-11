@@ -195,9 +195,13 @@ async function listAudit(queryParams = {}) {
 async function listPendingCampaigns() {
   const result = await query(
     `SELECT c.id, c.name, c.placement, c.budget_kz, c.status, c.starts_at, c.ends_at,
-            c.created_at, a.company_name, a.contact_email
+            c.created_at, c.objective, c.rejection_reason, a.company_name, a.contact_email,
+            cr.media_url, cr.click_url, cr.cta_label, cr.title AS creative_title
      FROM campaigns c
      JOIN advertisers a ON a.id = c.advertiser_id
+     LEFT JOIN LATERAL (
+       SELECT * FROM ad_creatives x WHERE x.campaign_id = c.id ORDER BY x.created_at DESC LIMIT 1
+     ) cr ON TRUE
      WHERE c.status = 'pending_review'
        AND ${opsVideoSql('c')}
      ORDER BY c.created_at ASC
@@ -208,13 +212,24 @@ async function listPendingCampaigns() {
       id: row.id,
       name: row.name,
       placement: row.placement,
+      placementLabel: require('../utils/opsCopy').placementLabel(row.placement),
       budgetKz: row.budget_kz,
       status: row.status,
+      statusLabel: require('../utils/opsCopy').campaignStatusLabel(row.status),
       startsAt: row.starts_at,
       endsAt: row.ends_at,
       createdAt: row.created_at,
       companyName: row.company_name,
       contactEmail: row.contact_email,
+      objective: row.objective,
+      creative: row.media_url
+        ? {
+            title: row.creative_title,
+            mediaUrl: row.media_url,
+            clickUrl: row.click_url,
+            ctaLabel: row.cta_label,
+          }
+        : null,
     })),
   };
 }

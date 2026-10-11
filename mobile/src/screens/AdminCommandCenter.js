@@ -952,25 +952,30 @@ export default function AdminCommandCenter({ onBack }) {
               ))
             )}
 
-            <SectionTitle>Campanhas ads</SectionTitle>
+            <SectionTitle>Anúncios à espera</SectionTitle>
             {campaigns.length === 0 ? (
-              <EmptyState title="Sem campanhas em review" />
+              <EmptyState title="Nenhum anúncio à espera" />
             ) : (
               campaigns.map((c) => (
                 <View key={c.id} style={getCardStyle()}>
                   <Text style={{ color: colors.text, fontWeight: '700' }}>{c.name}</Text>
                   <Text style={{ color: colors.muted }}>
-                    {c.companyName} · {c.placement} · {c.budgetKz?.toLocaleString('pt-AO')} Kz
+                    {c.companyName} · {c.placementLabel || 'Antes do filme'} ·{' '}
+                    {c.budgetKz?.toLocaleString('pt-AO')} Kz
                   </Text>
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
                     <AdminButton
-                      label="Activar"
+                      label="Pôr no ar"
                       onPress={() => run(c.id, () => reviewCampaign(c.id, 'active'))}
                     />
                     <AdminButton
-                      label="Rejeitar"
+                      label="Recusar"
                       variant="outline"
-                      onPress={() => run(c.id, () => reviewCampaign(c.id, 'rejected'))}
+                      onPress={() =>
+                        run(c.id, () =>
+                          reviewCampaign(c.id, 'rejected', 'Não cumpre as regras de publicidade MinhaTela')
+                        )
+                      }
                     />
                   </View>
                 </View>

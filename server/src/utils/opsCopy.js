@@ -59,6 +59,23 @@ const MONETIZATION_LABELS = {
   tvod: 'Aluguer',
 };
 
+const CAMPAIGN_STATUS_LABELS = {
+  draft: 'Rascunho',
+  pending_review: 'À espera da MinhaTela',
+  active: 'No ar',
+  paused: 'Pausada',
+  completed: 'Orçamento esgotado',
+  rejected: 'Recusada',
+};
+
+const PLACEMENT_LABELS = {
+  pre_roll: 'Antes do filme',
+  mid_roll: 'A meio do filme',
+  post_roll: 'Depois do filme',
+  banner: 'Faixa',
+  sponsored: 'Patrocínio',
+};
+
 const AUDIT_LABELS = {
   PAYMENT_APPROVED: 'Pagamento confirmado',
   PAYMENT_REJECTED: 'Pagamento recusado',
@@ -72,7 +89,9 @@ const AUDIT_LABELS = {
   CREATOR_PAYOUT_PAID: 'Levantamento pago',
   CREATOR_PAYOUT_REJECTED: 'Levantamento recusado',
   BUNNY_VIDEO_CREATED: 'Ficha de vídeo criada',
-  CAMPAIGN_APPROVED: 'Campanha aprovada',
+  CAMPAIGN_APPROVED: 'Anúncio no ar',
+  CAMPAIGN_REJECTED: 'Anúncio recusado',
+  CAMPAIGN_PAUSED: 'Anúncio pausado',
   'mfa.enabled': 'Protecção extra activada',
   title_not_interested: 'Marcou «não me interessa»',
   USER_PROMOTED: 'Operador promovido',
@@ -116,6 +135,14 @@ function monetizationLabel(code) {
   return MONETIZATION_LABELS[code] || String(code || '').toUpperCase();
 }
 
+function campaignStatusLabel(status) {
+  return CAMPAIGN_STATUS_LABELS[status] || status || '';
+}
+
+function placementLabel(code) {
+  return PLACEMENT_LABELS[code] || code || '';
+}
+
 function isLabEmail(email) {
   const e = String(email || '').toLowerCase();
   return (
@@ -133,6 +160,8 @@ module.exports = {
   CREATOR_TYPE_LABELS,
   WORKFLOW_LABELS,
   MONETIZATION_LABELS,
+  CAMPAIGN_STATUS_LABELS,
+  PLACEMENT_LABELS,
   roleLabel,
   subscriptionLabel,
   auditTitle,
@@ -140,5 +169,7 @@ module.exports = {
   creatorTypeLabel,
   workflowLabel,
   monetizationLabel,
+  campaignStatusLabel,
+  placementLabel,
   isLabEmail,
 };

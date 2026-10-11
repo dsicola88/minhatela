@@ -6,12 +6,14 @@
  */
 const adPlatformService = require('./adPlatformService');
 
-async function decide({ contentId, monetization, userId, placement }) {
+async function decide({ contentId, monetization, userId, placement, contentGenre, device }) {
   return adPlatformService.decideAd({
     contentId,
     monetization,
     userId,
     placement: placement || 'pre_roll',
+    contentGenre,
+    device,
   });
 }
 

@@ -89,7 +89,8 @@ router.patch(
     const result = await adPlatformService.adminModerateCampaign(
       req.user.id,
       req.params.id,
-      req.body.status
+      req.body.status,
+      { reason: req.body.reason }
     );
     res.json(result);
   })

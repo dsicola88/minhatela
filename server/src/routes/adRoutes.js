@@ -13,14 +13,30 @@ router.post('/advertisers/register', requireAuth, asyncHandler(adController.regi
 
 router.get('/portal', requireAuth, asyncHandler(adController.portal));
 
+router.get('/campaigns', requireAuth, asyncHandler(adController.listCampaigns));
+router.get('/campaigns/:id', requireAuth, asyncHandler(adController.getCampaign));
 router.post('/campaigns', requireAuth, asyncHandler(adController.createCampaign));
+router.post('/campaigns/:id/pause', requireAuth, asyncHandler(adController.pauseCampaign));
 
+router.get('/reports', requireAuth, asyncHandler(adController.reports));
+
+router.post(
+  '/creatives/upload',
+  requireAuth,
+  adController.adUpload.single('file'),
+  asyncHandler(adController.uploadCreative)
+);
+
+router.post(
+  '/impressions/:impressionId/start',
+  requireAuth,
+  asyncHandler(adController.start)
+);
 router.post(
   '/impressions/:impressionId/complete',
   requireAuth,
   asyncHandler(adController.complete)
 );
-
 router.post(
   '/impressions/:impressionId/click',
   requireAuth,

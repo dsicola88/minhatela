@@ -1,15 +1,44 @@
-import api from './api';
+import api, { getApiBaseUrl } from './api';
 
 export async function registerAdvertiser(payload) {
   return api.post('/api/ads/advertisers/register', payload);
 }
 
-export async function fetchAdPortal() {
-  return api.get('/api/ads/portal');
+export async function fetchAdPortal(params = {}) {
+  const q = new URLSearchParams();
+  if (params.status) q.set('status', params.status);
+  if (params.q) q.set('q', params.q);
+  const qs = q.toString();
+  return api.get(`/api/ads/portal${qs ? `?${qs}` : ''}`);
+}
+
+export async function fetchAdCampaign(id) {
+  return api.get(`/api/ads/campaigns/${id}`);
 }
 
 export async function createCampaign(payload) {
   return api.post('/api/ads/campaigns', payload);
+}
+
+export async function pauseCampaign(id) {
+  return api.post(`/api/ads/campaigns/${id}/pause`, {});
+}
+
+export async function fetchAdReports(params = {}) {
+  const q = new URLSearchParams();
+  if (params.from) q.set('from', params.from);
+  if (params.to) q.set('to', params.to);
+  if (params.format) q.set('format', params.format);
+  const qs = q.toString();
+  return api.get(`/api/ads/reports${qs ? `?${qs}` : ''}`);
+}
+
+export function adReportsCsvUrl() {
+  return `${getApiBaseUrl()}/api/ads/reports?format=csv`;
+}
+
+export async function startAdImpression(impressionId) {
+  return api.post(`/api/ads/impressions/${impressionId}/start`);
 }
 
 export async function completeAdImpression(impressionId) {
@@ -24,11 +53,22 @@ export async function trackAnalyticsEvent(payload) {
   return api.post('/api/analytics/events', payload);
 }
 
+export function resolveAdMediaUrl(url) {
+  if (!url) return '';
+  if (/^https?:\/\//i.test(url)) return url;
+  return `${getApiBaseUrl()}${url.startsWith('/') ? url : `/${url}`}`;
+}
+
 export default {
   registerAdvertiser,
   fetchAdPortal,
+  fetchAdCampaign,
   createCampaign,
+  pauseCampaign,
+  fetchAdReports,
+  startAdImpression,
   completeAdImpression,
   clickAdImpression,
   trackAnalyticsEvent,
+  resolveAdMediaUrl,
 };

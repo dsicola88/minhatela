@@ -943,7 +943,12 @@ export default function Account({
                 />
               ) : null}
               {onAds ? (
-                <Row label="Anúncios" value="Campanhas" icon="megaphone-outline" onPress={onAds} />
+                <Row
+                  label="Anúncios"
+                  value="A sua publicidade"
+                  icon="megaphone-outline"
+                  onPress={onAds}
+                />
               ) : null}
               {onAdmin ? (
                 <Row

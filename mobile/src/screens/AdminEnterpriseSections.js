@@ -763,36 +763,88 @@ export function UploadsTab({ uploads, proofs, onPickUpload, busy }) {
 }
 
 export function AdsTab({ campaigns, run }) {
+  const [rejectId, setRejectId] = useState(null);
+  const [reason, setReason] = useState('');
+  const [filter, setFilter] = useState('');
+  const shown = campaigns.filter((c) => {
+    if (!filter) return true;
+    const blob = `${c.name} ${c.companyName} ${c.status}`.toLowerCase();
+    return blob.includes(filter.toLowerCase());
+  });
   return (
     <View>
-      <PageHeader compact subtitle="Campanhas AVOD — aprovação, pausa e revisão." />
-      {campaigns.length === 0 ? (
-        <EmptyState title="Sem campanhas" />
+      <PageHeader compact subtitle="Anúncios antes dos filmes gratuitos. Confirme para ir ao ar, pause ou recuse com motivo." />
+      <TextInput
+        value={filter}
+        onChangeText={setFilter}
+        placeholder="Pesquisar empresa ou campanha"
+        placeholderTextColor={colors.muted}
+        style={inputStyle({ marginBottom: 16 })}
+      />
+      {shown.length === 0 ? (
+        <EmptyState title="Nenhum anúncio nesta lista" />
       ) : (
-        campaigns.map((c) => (
+        shown.map((c) => (
           <View key={c.id} style={getCardStyle()}>
             <Text style={{ color: colors.text, fontWeight: '700' }}>{c.name}</Text>
             <Text style={{ color: colors.muted }}>
-              {c.companyName} · {c.placement} · orçamento{' '}
+              {c.companyName} · {c.placementLabel || 'Antes do filme'} · orçamento{' '}
               {c.budgetKz?.toLocaleString('pt-AO')} Kz · gasto {c.spentKz?.toLocaleString('pt-AO')}{' '}
-              Kz · {c.status}
+              Kz · {c.statusLabel || c.status}
             </Text>
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+            {c.creative?.mediaUrl ? (
+              <Text style={{ color: colors.gold, marginTop: 8 }} numberOfLines={2}>
+                Vídeo · {c.creative.mediaUrl}
+              </Text>
+            ) : null}
+            {c.creative?.clickUrl ? (
               <AdminButton
-                label="Activar"
-                onPress={() => run(`ad-a-${c.id}`, () => reviewCampaign(c.id, 'active'))}
-              />
-              <AdminButton
-                label="Pausar"
+                label="Abrir destino"
                 variant="outline"
-                onPress={() => run(`ad-p-${c.id}`, () => reviewCampaign(c.id, 'paused'))}
+                onPress={() => Linking.openURL(c.creative.clickUrl)}
               />
-              <AdminButton
-                label="Rejeitar"
-                variant="outline"
-                onPress={() => run(`ad-r-${c.id}`, () => reviewCampaign(c.id, 'rejected'))}
-              />
-            </View>
+            ) : null}
+            {rejectId === c.id ? (
+              <View style={{ marginTop: 12 }}>
+                <TextInput
+                  value={reason}
+                  onChangeText={setReason}
+                  placeholder="Motivo da recusa (obrigatório)"
+                  placeholderTextColor={colors.muted}
+                  style={inputStyle()}
+                />
+                <AdminButton
+                  label="Confirmar recusa"
+                  onPress={() =>
+                    run(`ad-r-${c.id}`, async () => {
+                      await reviewCampaign(c.id, 'rejected', reason);
+                      setRejectId(null);
+                      setReason('');
+                    })
+                  }
+                />
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+                <AdminButton
+                  label="Pôr no ar"
+                  onPress={() => run(`ad-a-${c.id}`, () => reviewCampaign(c.id, 'active'))}
+                />
+                <AdminButton
+                  label="Pausar"
+                  variant="outline"
+                  onPress={() => run(`ad-p-${c.id}`, () => reviewCampaign(c.id, 'paused'))}
+                />
+                <AdminButton
+                  label="Recusar"
+                  variant="outline"
+                  onPress={() => {
+                    setRejectId(c.id);
+                    setReason('');
+                  }}
+                />
+              </View>
+            )}
           </View>
         ))
       )}

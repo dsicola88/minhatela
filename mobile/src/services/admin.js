@@ -25,8 +25,8 @@ export async function fetchPendingCampaigns() {
   return api.get('/api/admin/campaigns/pending');
 }
 
-export async function reviewCampaign(campaignId, status) {
-  return api.patch(`/api/admin/campaigns/${campaignId}/status`, { status });
+export async function reviewCampaign(campaignId, status, reason) {
+  return api.patch(`/api/admin/campaigns/${campaignId}/status`, { status, reason });
 }
 
 export async function fetchPendingPayments() {

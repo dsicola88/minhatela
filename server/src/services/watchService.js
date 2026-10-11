@@ -159,10 +159,21 @@ async function startPlayback({
     userAgent,
   });
 
+  const deviceNorm = String(platform || '')
+    .toLowerCase()
+    .includes('web')
+    ? 'web'
+    : String(platform || '').toLowerCase().includes('ios')
+      ? 'ios'
+      : String(platform || '').toLowerCase().includes('android')
+        ? 'android'
+        : null;
   const ads = await adDecisionService.decide({
     contentId: content.id,
     monetization: content.monetization,
     userId,
+    contentGenre: content.genre || row.genre || null,
+    device: deviceNorm,
   });
 
   const signed = bunnyService.signPlayback(content.bunnyVideoId, {

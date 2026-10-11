@@ -460,9 +460,14 @@ async function listProofUploads(limit = 40) {
 async function listAllCampaigns({ status, limit = 50 } = {}) {
   const result = await query(
     `SELECT c.id, c.name, c.placement, c.budget_kz, c.spent_kz, c.status, c.created_at,
-            a.company_name, a.contact_email
+            c.objective, c.rejection_reason, c.starts_at, c.ends_at,
+            a.company_name, a.contact_email,
+            cr.media_url, cr.click_url, cr.cta_label, cr.title AS creative_title
      FROM campaigns c
      JOIN advertisers a ON a.id = c.advertiser_id
+     LEFT JOIN LATERAL (
+       SELECT * FROM ad_creatives x WHERE x.campaign_id = c.id ORDER BY x.created_at DESC LIMIT 1
+     ) cr ON TRUE
      WHERE ($1::text IS NULL OR c.status::text = $1)
        AND ${require('../utils/tenantScope').opsVideoSql('c')}
      ORDER BY c.created_at DESC
@@ -474,12 +479,26 @@ async function listAllCampaigns({ status, limit = 50 } = {}) {
       id: r.id,
       name: r.name,
       placement: r.placement,
+      placementLabel: require('../utils/opsCopy').placementLabel(r.placement),
       budgetKz: r.budget_kz,
       spentKz: r.spent_kz,
       status: r.status,
+      statusLabel: require('../utils/opsCopy').campaignStatusLabel(r.status),
       companyName: r.company_name,
       contactEmail: r.contact_email,
       createdAt: r.created_at,
+      startsAt: r.starts_at,
+      endsAt: r.ends_at,
+      objective: r.objective,
+      rejectionReason: r.rejection_reason,
+      creative: r.media_url
+        ? {
+            title: r.creative_title,
+            mediaUrl: r.media_url,
+            clickUrl: r.click_url,
+            ctaLabel: r.cta_label,
+          }
+        : null,
     })),
   };
 }
