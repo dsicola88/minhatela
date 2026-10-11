@@ -234,7 +234,7 @@ export default function AdPortal({ onCatalog, onAccount }) {
         {data?.guide && !wizard ? (
           <View
             style={{
-              backgroundColor: '#111111',
+              backgroundColor: colors.card,
               borderRadius: 8,
               borderWidth: 1,
               borderColor: colors.border,
@@ -262,7 +262,7 @@ export default function AdPortal({ onCatalog, onAccount }) {
         {error ? <ErrorState message={error} onRetry={load} /> : null}
 
         {!advertiser ? (
-          <View style={panelStyle}>
+          <View style={panelStyle()}>
             <Text style={{ color: colors.text, fontSize: 18, fontWeight: '700', marginBottom: 12 }}>
               Identificar empresa ou particular
             </Text>
@@ -270,7 +270,7 @@ export default function AdPortal({ onCatalog, onAccount }) {
             <TextInput
               value={companyName}
               onChangeText={setCompanyName}
-              style={inputStyle}
+              style={fieldStyle()}
               placeholder="Empresa ou o seu nome"
               placeholderTextColor={colors.muted}
             />
@@ -278,7 +278,7 @@ export default function AdPortal({ onCatalog, onAccount }) {
             <TextInput
               value={contactEmail}
               onChangeText={setContactEmail}
-              style={inputStyle}
+              style={fieldStyle()}
               autoCapitalize="none"
               keyboardType="email-address"
               placeholder="financeiro@empresa.ao"
@@ -321,7 +321,7 @@ export default function AdPortal({ onCatalog, onAccount }) {
           />
         ) : (
           <>
-            <View style={panelStyle}>
+            <View style={panelStyle()}>
               <Text style={{ color: colors.text, fontWeight: '700', fontSize: 18 }}>
                 {advertiser.companyName}
               </Text>
@@ -380,7 +380,7 @@ export default function AdPortal({ onCatalog, onAccount }) {
                 onChangeText={setQuery}
                 placeholder="Pesquisar campanha"
                 placeholderTextColor={colors.muted}
-                style={{ ...inputStyle, flex: 1, minWidth: 180, marginBottom: 0 }}
+                style={{ ...fieldStyle(), flex: 1, minWidth: 180, marginBottom: 0 }}
               />
               {['', 'pending_review', 'active', 'paused', 'rejected', 'completed'].map((s) => (
                 <Pressable
@@ -425,7 +425,7 @@ export default function AdPortal({ onCatalog, onAccount }) {
               />
             ) : (
               filtered.map((item) => (
-                <View key={item.id} style={panelStyle}>
+                <View key={item.id} style={panelStyle()}>
                   <Text style={{ color: colors.text, fontWeight: '700' }}>{item.name}</Text>
                   <Text style={{ color: colors.gold, marginTop: 4 }}>
                     {item.lifecycle?.label || item.statusLabel} · {item.placementLabel}
@@ -498,7 +498,7 @@ export default function AdPortal({ onCatalog, onAccount }) {
 
 function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, onSubmit, measurement }) {
   return (
-    <View style={panelStyle}>
+    <View style={panelStyle()}>
       <Text style={{ color: colors.gold, fontSize: 12, fontWeight: '800' }}>
         CAMPANHA · {step} DE 7 · {STEPS[step - 1].title}
       </Text>
@@ -527,7 +527,7 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
           <TextInput
             value={draft.name}
             onChangeText={(v) => setField('name', v)}
-            style={inputStyle}
+            style={fieldStyle()}
             placeholder="Ex.: Unitel · cinema em casa"
             placeholderTextColor={colors.muted}
           />
@@ -542,7 +542,7 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
           <TextInput
             value={draft.mediaUrl}
             onChangeText={(v) => setField('mediaUrl', v)}
-            style={inputStyle}
+            style={fieldStyle()}
             autoCapitalize="none"
             placeholder="https://…"
             placeholderTextColor={colors.muted}
@@ -558,7 +558,7 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
           <TextInput
             value={draft.clickUrl}
             onChangeText={(v) => setField('clickUrl', v)}
-            style={inputStyle}
+            style={fieldStyle()}
             autoCapitalize="none"
             placeholder={draft.objective === 'traffic' ? 'Obrigatório para tráfego' : 'Opcional'}
             placeholderTextColor={colors.muted}
@@ -581,7 +581,7 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
           <TextInput
             value={draft.contentCategory}
             onChangeText={(v) => setField('contentCategory', v)}
-            style={inputStyle}
+            style={fieldStyle()}
             placeholder="Ex.: Cinema Angolano"
             placeholderTextColor={colors.muted}
           />
@@ -589,7 +589,7 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
           <TextInput
             value={draft.frequencyCapPerDay}
             onChangeText={(v) => setField('frequencyCapPerDay', v)}
-            style={inputStyle}
+            style={fieldStyle()}
             keyboardType="numeric"
             placeholderTextColor={colors.muted}
           />
@@ -601,14 +601,14 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
           <TextInput
             value={draft.budgetKz}
             onChangeText={(v) => setField('budgetKz', v)}
-            style={inputStyle}
+            style={fieldStyle()}
             keyboardType="numeric"
             placeholderTextColor={colors.muted}
           />
           <FieldLabel>Início</FieldLabel>
-          <TextInput value={draft.startsAt} onChangeText={(v) => setField('startsAt', v)} style={inputStyle} />
+          <TextInput value={draft.startsAt} onChangeText={(v) => setField('startsAt', v)} style={fieldStyle()} />
           <FieldLabel>Fim</FieldLabel>
-          <TextInput value={draft.endsAt} onChangeText={(v) => setField('endsAt', v)} style={inputStyle} />
+          <TextInput value={draft.endsAt} onChangeText={(v) => setField('endsAt', v)} style={fieldStyle()} />
           <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18 }}>
             {measurement?.note} Cada visualização completa custa {measurement?.unitKz || '—'} Kz. Sem
             estimativa de alcance.
@@ -662,7 +662,7 @@ function choice(active) {
     padding: 12,
     borderRadius: 6,
     marginBottom: 8,
-    backgroundColor: active ? 'rgba(247,212,23,0.08)' : '#181818',
+    backgroundColor: active ? 'rgba(247,212,23,0.12)' : colors.surfaceSecondary,
   };
 }
 
@@ -672,7 +672,7 @@ function MiniStat({ label, value, gold }) {
       style={{
         flexGrow: 1,
         minWidth: 120,
-        backgroundColor: '#111111',
+        backgroundColor: colors.card,
         borderRadius: 6,
         borderWidth: 1,
         borderColor: colors.border,
@@ -687,22 +687,26 @@ function MiniStat({ label, value, gold }) {
   );
 }
 
-const panelStyle = {
-  backgroundColor: '#111111',
-  borderRadius: 8,
-  borderWidth: 1,
-  borderColor: colors.border,
-  padding: 16,
-  marginBottom: 14,
-};
+function panelStyle() {
+  return {
+    backgroundColor: colors.card,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 16,
+    marginBottom: 14,
+  };
+}
 
-const inputStyle = {
-  backgroundColor: '#181818',
-  borderWidth: 1,
-  borderColor: colors.border,
-  borderRadius: 4,
-  color: colors.text,
-  paddingHorizontal: 12,
-  paddingVertical: 12,
-  marginBottom: 12,
-};
+function fieldStyle() {
+  return {
+    backgroundColor: colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 4,
+    color: colors.text,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 12,
+  };
+}

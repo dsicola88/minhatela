@@ -19,7 +19,7 @@ export default function WorkspaceBar({
       style={{
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
-        backgroundColor: '#0b0b0b',
+        backgroundColor: colors.navbar,
         paddingHorizontal: compact ? 16 : 28,
         paddingVertical: 14,
       }}
