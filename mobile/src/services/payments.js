@@ -28,6 +28,18 @@ export async function submitCheckout({ type, paymentMethod, videoId, packId, pro
   });
 }
 
+export async function startWeframeSession({ type, videoId, packId }) {
+  return api.post(
+    '/api/payments/weframe/session',
+    { type, videoId, packId },
+    { headers: { 'Idempotency-Key': makeIdempotencyKey() } }
+  );
+}
+
+export async function fetchWeframeSession(id) {
+  return api.get(`/api/payments/weframe/session/${id}`);
+}
+
 export async function fetchMyTransactions() {
   return api.get('/api/payments/transactions');
 }
@@ -41,6 +53,8 @@ export function resolveProofUrl(path) {
 export default {
   fetchPaymentMethods,
   submitCheckout,
+  startWeframeSession,
+  fetchWeframeSession,
   fetchMyTransactions,
   resolveProofUrl,
 };

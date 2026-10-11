@@ -110,6 +110,14 @@ const env = Object.freeze({
     pspApiBaseUrl: process.env.PSP_API_BASE_URL || '',
     pspApiKey: process.env.PSP_API_KEY || '',
     pspWebhookSecret: process.env.PSP_WEBHOOK_SECRET || '',
+    weframe: Object.freeze({
+      enabled: process.env.EMIS_WEFRAME_ENABLED !== 'false',
+      token: process.env.EMIS_WEFRAME_TOKEN || '',
+      src: process.env.EMIS_WEFRAME_SRC || '',
+      snippet: process.env.EMIS_WEFRAME_SNIPPET || '',
+      merchantId: process.env.EMIS_WEFRAME_MERCHANT_ID || '',
+      webhookSecret: process.env.EMIS_WEFRAME_WEBHOOK_SECRET || '',
+    }),
   }),
   uploadsDir: path.resolve(__dirname, '../../uploads'),
   oauth: Object.freeze({

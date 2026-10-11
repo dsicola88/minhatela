@@ -98,7 +98,7 @@ railway run --service api npm --prefix server run seed
 4. DNS nos registos  
 5. SMTP + Bunny + IBAN  
 6. Login superadmin  
-7. Ligações a terceiros: ver `docs/integracoes.md` (webhook PSP, Google, Apple, EAS, DRM)  
+7. Ligações a terceiros: ver `docs/integracoes.md` (WeFrame EMIS `/pay/weframe`, Google, Apple, EAS, DRM)  
 
 ## 5. Checklist pós-deploy
 

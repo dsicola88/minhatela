@@ -13,6 +13,16 @@ router.get('/packs/:id', requireAuth, asyncHandler(require('../controllers/phase
 
 router.get('/methods', requireAuth, asyncHandler(paymentController.methods));
 router.post(
+  '/weframe/session',
+  requireAuth,
+  asyncHandler(paymentController.weframeSession)
+);
+router.get(
+  '/weframe/session/:id',
+  requireAuth,
+  asyncHandler(paymentController.weframeStatus)
+);
+router.post(
   '/checkout',
   requireAuth,
   paymentService.upload.single('proof'),

@@ -43,11 +43,39 @@ O botão só aparece com esta variável no build web.
 4. DRM (quando o plano Bunny tiver Widevine/FairPlay): no painel Bunny + `BUNNY_DRM_ENABLED=true`.
 5. Criadores: a API devolve sessão TUS (`upload.tus`) + link da biblioteca. O ficheiro sobe no Bunny.
 
-## 5. Pagamento instantâneo (PSP)
+## 5. Multicaixa Express · WeFrame (iFrame) — caminho rápido
+
+No formulário GPO do banco escolha **iFrame / WeFrame**, não API.
+
+Página que a EMIS certifica (já no ar depois do deploy):
+
+`GET https://api.minhatela.net/pay/weframe`
+
+Checkout na app: método **Multicaixa Express**. O cliente confirma no MCX Express (telemóvel ou QR) dentro deste ecrã.
+
+Quando o banco/EMIS entregar as tags, cola no Railway o HTML **ou** o URL do iFrame (o token sozinho não abre o terminal):
+
+```
+EMIS_WEFRAME_SNIPPET=
+# ou
+EMIS_WEFRAME_SRC=https://…{{token}}&amount={{amount}}&ref={{reference}}
+EMIS_WEFRAME_TOKEN=
+EMIS_WEFRAME_WEBHOOK_SECRET=
+```
+
+Placeholders no SRC/SNIPPET: `{{token}}` `{{amount}}` `{{reference}}` `{{callback}}` `{{returnUrl}}` `{{merchant}}` `{{currency}}`.
+
+Notificação (indicar à EMIS):
+
+`POST https://api.minhatela.net/webhooks/payments/emis?token={EMIS_WEFRAME_WEBHOOK_SECRET}`
+
+O corpo deve trazer a referência = id da transacção MinhaTela e estado pago. Aí o Premium/aluguer libertam-se sozinhos. Até lá o SuperAdmin confirma na fila se for preciso.
+
+## 6. Pagamento instantâneo por API (opcional, mais lento de certificar)
 
 O checkout **já funciona** com IBAN + comprovativo na consola.
 
-Quando o prestador (AppyPay / EMIS / ProxyPay / Multicaixa Express) entregar a API:
+Quando o prestador (AppyPay / EMIS API / ProxyPay) entregar a API:
 
 ```
 PSP_PROVIDER=appy
@@ -63,7 +91,7 @@ Cabeçalho: `x-webhook-token: {PSP_WEBHOOK_SECRET}`
 
 Os eventos ficam gravados. O mapeamento “pago → Premium” liga-se neste ficheiro: `server/src/services/paymentPspService.js` (`handleWebhook`).
 
-## 6. Lojas (EAS)
+## 7. Lojas (EAS)
 
 ```
 cd mobile

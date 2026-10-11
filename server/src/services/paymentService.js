@@ -38,19 +38,32 @@ const upload = multer({
 });
 
 function getMethods() {
+  const weframe = require('./emisWeframeService').publicStatus();
+  const methods = [];
+  if (weframe.enabled) {
+    methods.push({
+      id: 'weframe',
+      label: 'Multicaixa Express',
+      description: weframe.live
+        ? 'Confirme no telemóvel ou com o QR, neste ecrã.'
+        : 'Checkout embutido (WeFrame). Liga-se quando o banco entregar as tags da EMIS.',
+      live: weframe.live,
+    });
+  }
+  methods.push(
+    {
+      id: 'iban',
+      label: 'Pagamento via IBAN',
+      description: 'Transferência bancária nacional',
+    },
+    {
+      id: 'multicaixa',
+      label: 'Pagamento via Multicaixa',
+      description: 'Referência Multicaixa / ATM (comprovativo)',
+    }
+  );
   return {
-    methods: [
-      {
-        id: 'iban',
-        label: 'Pagamento via IBAN',
-        description: 'Transferência bancária nacional',
-      },
-      {
-        id: 'multicaixa',
-        label: 'Pagamento via Multicaixa',
-        description: 'Referência Multicaixa Express / ATM',
-      },
-    ],
+    methods,
     platform: {
       iban: env.payments.iban,
       bankName: env.payments.bankName,
@@ -59,7 +72,46 @@ function getMethods() {
     },
     premiumPriceKz: env.premiumPriceKz,
     instant: require('./paymentPspService').publicStatus(),
+    weframe,
   };
+}
+
+async function resolveCheckoutAmount({ type, videoId, packId }) {
+  let amountKz = env.premiumPriceKz;
+  let resolvedVideoId = null;
+  let resolvedPackId = null;
+
+  if (type === 'pack') {
+    await featureFlagService.assertEnabled('tvod_packs_enabled', 'Packs TVOD indisponíveis');
+    if (!packId) {
+      throw createError(400, 'packId obrigatório', 'VALIDATION');
+    }
+    const phase26Repository = require('../repositories/phase26Repository');
+    const pack = await phase26Repository.findPackById(packId);
+    if (!pack || !pack.is_active) {
+      throw createError(404, 'Pack não encontrado', 'PACK_NOT_FOUND');
+    }
+    amountKz = assertPositiveKz(pack.price_kz);
+    resolvedPackId = pack.id;
+  } else if (type === 'rental') {
+    if (!videoId) {
+      throw createError(400, 'Vídeo obrigatório para aluguer', 'VALIDATION');
+    }
+    const row = await contentRepository.findPublishedById(videoId);
+    if (!row) {
+      throw createError(404, 'Vídeo não encontrado', 'CONTENT_NOT_FOUND');
+    }
+    const content = mapContentInternal(row);
+    if (content.monetization !== 'tvod') {
+      throw createError(400, 'Este conteúdo não está disponível para aluguer', 'NOT_TVOD');
+    }
+    amountKz = assertPositiveKz(content.rentalPriceKz || env.tvodDefaultPriceKz);
+    resolvedVideoId = content.id;
+  } else {
+    amountKz = assertPositiveKz(amountKz);
+  }
+
+  return { amountKz, resolvedVideoId, resolvedPackId };
 }
 
 async function submitCheckout({
@@ -105,39 +157,11 @@ async function submitCheckout({
     }
   }
 
-  let amountKz = env.premiumPriceKz;
-  let resolvedVideoId = null;
-  let resolvedPackId = null;
-
-  if (type === 'pack') {
-    await featureFlagService.assertEnabled('tvod_packs_enabled', 'Packs TVOD indisponíveis');
-    if (!packId) {
-      throw createError(400, 'packId obrigatório', 'VALIDATION');
-    }
-    const phase26Repository = require('../repositories/phase26Repository');
-    const pack = await phase26Repository.findPackById(packId);
-    if (!pack || !pack.is_active) {
-      throw createError(404, 'Pack não encontrado', 'PACK_NOT_FOUND');
-    }
-    amountKz = assertPositiveKz(pack.price_kz);
-    resolvedPackId = pack.id;
-  } else if (type === 'rental') {
-    if (!videoId) {
-      throw createError(400, 'Vídeo obrigatório para aluguer', 'VALIDATION');
-    }
-    const row = await contentRepository.findPublishedById(videoId);
-    if (!row) {
-      throw createError(404, 'Vídeo não encontrado', 'CONTENT_NOT_FOUND');
-    }
-    const content = mapContentInternal(row);
-    if (content.monetization !== 'tvod') {
-      throw createError(400, 'Este conteúdo não está disponível para aluguer', 'NOT_TVOD');
-    }
-    amountKz = assertPositiveKz(content.rentalPriceKz || env.tvodDefaultPriceKz);
-    resolvedVideoId = content.id;
-  } else {
-    amountKz = assertPositiveKz(amountKz);
-  }
+  const { amountKz, resolvedVideoId, resolvedPackId } = await resolveCheckoutAmount({
+    type,
+    videoId,
+    packId,
+  });
 
   const proofUrl = `/uploads/proofs/${file.filename}`;
   let proofBytes = null;
@@ -414,6 +438,110 @@ async function getReceipt(userId, transactionId) {
   return receipt;
 }
 
+async function createWeframeSession({ userId, type, videoId, packId, idempotencyKey }) {
+  await featureFlagService.assertNotMaintenance();
+  await featureFlagService.assertEnabled(
+    'checkout_enabled',
+    'Checkout temporariamente indisponível'
+  );
+  const weframe = require('./emisWeframeService');
+  if (!weframe.isEnabled()) {
+    throw createError(503, 'WeFrame está desligado', 'WEFRAME_DISABLED');
+  }
+  if (!['subscription', 'rental', 'pack'].includes(type)) {
+    throw createError(400, 'Tipo de transação inválido', 'VALIDATION');
+  }
+
+  const key = idempotencyKey ? String(idempotencyKey).slice(0, 80) : null;
+  if (key) {
+    const existing = await transactionRepository.findByIdempotency(userId, key);
+    if (existing) {
+      const token = weframe.signSession({
+        transactionId: existing.id,
+        userId,
+        amountKz: existing.amount_kz,
+      });
+      return {
+        transaction: {
+          id: existing.id,
+          status: toApiStatus(existing.status),
+          amountKz: existing.amount_kz,
+        },
+        embedUrl: `${weframe.apiPublicBase()}/pay/weframe?s=${encodeURIComponent(token)}`,
+        live: weframe.hasTags(),
+        idempotentReplay: true,
+      };
+    }
+  }
+
+  const { amountKz, resolvedVideoId, resolvedPackId } = await resolveCheckoutAmount({
+    type,
+    videoId,
+    packId,
+  });
+
+  let tx;
+  try {
+    tx = await transactionRepository.create({
+      userId,
+      videoId: resolvedVideoId,
+      packId: resolvedPackId,
+      type,
+      paymentMethod: 'weframe',
+      amountKz,
+      proofUrl: null,
+      idempotencyKey: key,
+    });
+  } catch (err) {
+    if (String(err.message || '').includes('weframe') || err.code === '22P02') {
+      throw createError(
+        503,
+        'A base ainda não tem o método WeFrame. Aplique a migração 035.',
+        'WEFRAME_MIGRATION'
+      );
+    }
+    throw err;
+  }
+
+  await notificationService.notifyPaymentSubmitted(userId, {
+    transactionId: tx.id,
+    amountKz,
+    type,
+  });
+
+  const token = weframe.signSession({
+    transactionId: tx.id,
+    userId,
+    amountKz,
+  });
+  return {
+    transaction: {
+      id: tx.id,
+      status: toApiStatus(tx.status),
+      amountKz: tx.amount_kz,
+    },
+    embedUrl: `${weframe.apiPublicBase()}/pay/weframe?s=${encodeURIComponent(token)}`,
+    live: weframe.hasTags(),
+    message: weframe.hasTags()
+      ? 'Confirme o pagamento no Multicaixa Express.'
+      : 'Página de checkout criada. O terminal EMIS aparece aqui quando as tags WeFrame estiverem no Railway.',
+  };
+}
+
+async function getWeframeSession(userId, transactionId) {
+  const row = await transactionRepository.findOwnedById(userId, transactionId);
+  if (!row) throw createError(404, 'Pagamento não encontrado', 'NOT_FOUND');
+  return {
+    transaction: {
+      id: row.id,
+      status: toApiStatus(row.status),
+      amountKz: row.amount_kz,
+      paymentMethod: row.payment_method,
+      paidAt: row.paid_at,
+    },
+  };
+}
+
 module.exports = {
   upload,
   getMethods,
@@ -422,4 +550,6 @@ module.exports = {
   listPendingAdmin,
   reviewTransaction,
   getReceipt,
+  createWeframeSession,
+  getWeframeSession,
 };

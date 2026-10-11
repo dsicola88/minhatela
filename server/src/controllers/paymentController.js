@@ -47,6 +47,25 @@ async function pending(req, res) {
   res.json(result);
 }
 
+async function weframeSession(req, res) {
+  const result = await paymentService.createWeframeSession({
+    userId: req.user.id,
+    type: req.body.type,
+    videoId: req.body.videoId,
+    packId: req.body.packId,
+    idempotencyKey:
+      req.headers['idempotency-key'] ||
+      req.headers['x-idempotency-key'] ||
+      req.body.idempotencyKey,
+  });
+  res.status(result.idempotentReplay ? 200 : 201).json(result);
+}
+
+async function weframeStatus(req, res) {
+  const result = await paymentService.getWeframeSession(req.user.id, req.params.id);
+  res.json(result);
+}
+
 async function review(req, res) {
   const statusMap = {
     paid: STATUS.PAID,
@@ -70,4 +89,13 @@ async function review(req, res) {
   res.json(result);
 }
 
-module.exports = { methods, checkout, myTransactions, receipt, pending, review };
+module.exports = {
+  methods,
+  checkout,
+  myTransactions,
+  receipt,
+  pending,
+  review,
+  weframeSession,
+  weframeStatus,
+};

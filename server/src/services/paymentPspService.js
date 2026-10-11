@@ -41,14 +41,15 @@ async function createReference(/* payload */) {
 }
 
 function verifyWebhook(req) {
-  const secret = env.payments.pspWebhookSecret;
+  const secret = env.payments.pspWebhookSecret || env.payments.weframe.webhookSecret;
   if (!secret) {
     throw createError(503, 'Webhook de pagamentos não configurado', 'PSP_WEBHOOK_UNCONFIGURED');
   }
   const header =
     req.headers['x-webhook-token'] ||
     req.headers['x-psp-signature'] ||
-    req.headers['authorization'];
+    req.headers['authorization'] ||
+    req.query.token;
   const token = String(header || '').replace(/^Bearer\s+/i, '');
   const expected = Buffer.from(String(secret));
   const got = Buffer.from(token);
@@ -68,27 +69,36 @@ async function handleWebhook(req) {
     payload: body,
   });
 
-  if (inserted.duplicate) {
-    return { accepted: true, duplicate: true, applied: false };
-  }
-
   logger.info('webhook.psp.received', {
     provider,
     eventId: inserted.id,
+    duplicate: inserted.duplicate,
     type: body.event || body.type,
   });
 
+  let applied = { applied: false };
+  try {
+    applied = await require('./emisWeframeService').tryApplyPaid(body);
+  } catch (err) {
+    logger.warn('webhook.psp.apply_failed', { message: err.message });
+  }
+
   await webhookRepository.markProcessed(
     inserted.id,
-    'accepted',
-    'Aguardando mapeamento do prestador para libertar Premium'
+    applied.applied ? 'applied' : 'accepted',
+    applied.applied
+      ? `Pagamento libertado ${applied.transactionId}`
+      : applied.reason || 'Aguardando mapeamento do prestador para libertar Premium'
   );
 
   return {
     accepted: true,
-    applied: false,
-    code: 'PSP_ADAPTER_PENDING',
-    message: 'Evento guardado. Quando o contrato do prestador chegar, este webhook liberta o acesso.',
+    applied: Boolean(applied.applied),
+    transactionId: applied.transactionId || null,
+    code: applied.applied ? 'PAID' : 'PSP_ADAPTER_PENDING',
+    message: applied.applied
+      ? 'Pagamento confirmado. O acesso foi libertado.'
+      : 'Evento guardado. Se a referência for o id MinhaTela e o estado pago, o acesso liberta-se sozinho.',
   };
 }
 

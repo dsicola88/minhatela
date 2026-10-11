@@ -115,6 +115,13 @@ function createApp() {
     express.static(path.join(env.uploadsDir))
   );
 
+  app.get(
+    '/pay/weframe',
+    require('./utils/asyncHandler').asyncHandler(async (req, res) => {
+      await require('./services/emisWeframeService').renderFromQuery(req, res);
+    })
+  );
+
   app.post(
     '/webhooks/payments/:provider',
     rateLimit({ windowMs: 60_000, max: 60 }),

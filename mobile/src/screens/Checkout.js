@@ -7,14 +7,21 @@ import {
   ScrollView,
   useWindowDimensions,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { WebView } from 'react-native-webview';
 import { PrimaryButton, FieldLabel } from '../components/ui';
 import { colors, layout } from '../theme/tokens';
-import { fetchPaymentMethods, submitCheckout } from '../services/payments';
+import {
+  fetchPaymentMethods,
+  submitCheckout,
+  startWeframeSession,
+  fetchWeframeSession,
+} from '../services/payments';
 
 export default function Checkout({
   type = 'subscription',
@@ -26,12 +33,14 @@ export default function Checkout({
   const { width } = useWindowDimensions();
   const isCompact = width < 768;
   const [methods, setMethods] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState('iban');
+  const [paymentMethod, setPaymentMethod] = useState('weframe');
   const [proof, setProof] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [embedUrl, setEmbedUrl] = useState('');
+  const [weframeTxId, setWeframeTxId] = useState(null);
 
   const amount =
     type === 'rental'
@@ -47,6 +56,8 @@ export default function Checkout({
         const data = await fetchPaymentMethods();
         if (!mounted) return;
         setMethods(data);
+        const first = data?.methods?.[0]?.id;
+        if (first) setPaymentMethod(first);
       } catch (err) {
         if (mounted) setError(err.message || 'Falha ao carregar métodos de pagamento');
       } finally {
@@ -88,9 +99,55 @@ export default function Checkout({
     }
   }
 
+  useEffect(() => {
+    if (!weframeTxId) return undefined;
+    let cancelled = false;
+    let settled = false;
+    let id;
+    const tick = async () => {
+      if (settled || cancelled) return;
+      try {
+        const data = await fetchWeframeSession(weframeTxId);
+        const status = data?.transaction?.status;
+        if (!cancelled && (status === 'paid' || status === 'pago')) {
+          settled = true;
+          if (id) clearInterval(id);
+          setSuccess('Pagamento confirmado. O acesso já está libertado.');
+          onSubmitted?.(data);
+        }
+      } catch {
+        /* keep polling */
+      }
+    };
+    id = setInterval(tick, 4000);
+    tick();
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [weframeTxId, onSubmitted]);
+
   async function handleSubmit() {
     setError('');
     setSuccess('');
+    if (paymentMethod === 'weframe') {
+      setSubmitting(true);
+      try {
+        const result = await startWeframeSession({
+          type,
+          videoId: video?.id,
+          packId: pack?.id,
+        });
+        setEmbedUrl(result.embedUrl);
+        setWeframeTxId(result.transaction?.id || null);
+        setSuccess(result.message || 'Abra o Multicaixa Express para confirmar.');
+      } catch (err) {
+        setError(err.message || 'Não foi possível abrir o checkout Multicaixa Express');
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
     if (!proof) {
       setError('Carregue o comprovativo da transferência.');
       return;
@@ -146,10 +203,8 @@ export default function Checkout({
           Checkout Angola
         </Text>
         <Text style={{ color: colors.textSecondary, marginBottom: 28, lineHeight: 22 }}>
-          Pagamento local via IBAN ou Multicaixa. O acesso só é libertado após o administrador
-          confirmar o comprovativo (
-          {type === 'rental' ? 'aluguer 48h' : type === 'pack' ? 'pack TVOD' : 'Premium'}
-          ).
+          Multicaixa Express neste ecrã, ou IBAN com comprovativo. (
+          {type === 'rental' ? 'aluguer 48h' : type === 'pack' ? 'pack TVOD' : 'Premium'})
         </Text>
 
         <View
@@ -180,7 +235,7 @@ export default function Checkout({
         </View>
 
         <FieldLabel>Método de pagamento</FieldLabel>
-        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
           {(methods?.methods || []).map((method) => {
             const active = paymentMethod === method.id;
             return (
@@ -188,7 +243,8 @@ export default function Checkout({
                 key={method.id}
                 onPress={() => setPaymentMethod(method.id)}
                 style={{
-                  flex: 1,
+                  flexGrow: 1,
+                  minWidth: 140,
                   borderWidth: 1,
                   borderColor: active ? colors.red : colors.border,
                   backgroundColor: active ? 'rgba(206,17,38,0.12)' : colors.elevated,
@@ -205,6 +261,7 @@ export default function Checkout({
           })}
         </View>
 
+        {paymentMethod !== 'weframe' ? (
         <View
           style={{
             backgroundColor: colors.surface,
@@ -225,7 +282,45 @@ export default function Checkout({
             <InfoRow label="Multicaixa" value={methods.platform.multicaixaRef} />
           ) : null}
         </View>
+        ) : null}
 
+        {paymentMethod === 'weframe' && embedUrl ? (
+          <View
+            style={{
+              height: 520,
+              marginBottom: 16,
+              borderRadius: 8,
+              overflow: 'hidden',
+              borderWidth: 1,
+              borderColor: colors.gold,
+            }}
+          >
+            {Platform.OS === 'web' ? (
+              <iframe
+                title="Multicaixa Express"
+                src={embedUrl}
+                style={{ width: '100%', height: '100%', border: 0, background: '#111' }}
+              />
+            ) : (
+              <WebView
+                source={{ uri: embedUrl }}
+                onMessage={(event) => {
+                  try {
+                    const payload = JSON.parse(event.nativeEvent.data);
+                    if (payload?.paid) {
+                      setSuccess('Pagamento confirmado. O acesso já está libertado.');
+                    }
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+              />
+            )}
+          </View>
+        ) : null}
+
+        {paymentMethod !== 'weframe' ? (
+        <>
         <FieldLabel>Comprovativo (imagem ou PDF)</FieldLabel>
         <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
           <PrimaryButton label="Galeria" variant="outline" onPress={pickImage} style={{ flex: 1 }} />
@@ -256,16 +351,20 @@ export default function Checkout({
             </Text>
           </View>
         ) : null}
+        </>
+        ) : null}
 
         {error ? <Text style={{ color: colors.red, marginBottom: 12 }}>{error}</Text> : null}
         {success ? <Text style={{ color: colors.success, marginBottom: 12 }}>{success}</Text> : null}
 
+        {paymentMethod === 'weframe' && embedUrl ? null : (
         <PrimaryButton
-          label="Enviar comprovativo"
+          label={paymentMethod === 'weframe' ? 'Pagar com Multicaixa Express' : 'Enviar comprovativo'}
           onPress={handleSubmit}
           loading={submitting}
           variant="gold"
         />
+        )}
 
         <Text
           style={{

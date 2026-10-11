@@ -106,6 +106,13 @@ async function run() {
     assert(r.status === 200 && r.json?.status === 'ok', `health ${r.status}`);
   });
 
+  await step('Plataforma · WeFrame GPO host', async () => {
+    const r = await req('GET', '/pay/weframe');
+    assert(r.status === 200, `weframe ${r.status}`);
+    const html = String(r.json?.raw || '');
+    assert(/Multicaixa Express|WeFrame/i.test(html), 'html host');
+  });
+
   await step('Plataforma · ready (sem secrets)', async () => {
     const ready = await req('GET', '/ready');
     assert([200, 503].includes(ready.status), `ready ${ready.status}`);
@@ -280,6 +287,7 @@ async function run() {
     const methods = r.json?.methods || [];
     assert(methods.some((m) => m.id === 'iban'), 'iban');
     assert(methods.some((m) => m.id === 'multicaixa'), 'multicaixa');
+    assert(methods.some((m) => m.id === 'weframe'), 'weframe method');
     assert(r.json?.platform?.iban || r.json?.platform?.bankName, 'platform bank');
     return `iban=${Boolean(r.json.platform?.iban)}`;
   });
