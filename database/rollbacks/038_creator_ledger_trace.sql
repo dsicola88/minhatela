@@ -1,6 +1,5 @@
 -- Reversão de 038_creator_ledger_trace.sql
--- Não repõe linhas de crédito duplicadas que a migração tenha removido.
--- Essas linhas violavam a regra de um crédito por pessoa, filme e dia.
+-- A 038 já não apaga linhas. Esta reversão só remove índice e coluna.
 
 DROP INDEX IF EXISTS creator_earnings_trace_key_uidx;
 

@@ -966,6 +966,8 @@ export default function AdminCommandCenter({ onBack }) {
               ))
             )}
 
+            {(user?.roles || []).includes('super_admin') ? (
+            <>
             <SectionTitle>Livro do cineasta</SectionTitle>
             <View style={getCardStyle()}>
               <Text style={{ color: colors.muted, marginBottom: 10, lineHeight: 20 }}>
@@ -1022,6 +1024,8 @@ export default function AdminCommandCenter({ onBack }) {
                 }
               />
             </View>
+            </>
+            ) : null}
 
             <SectionTitle>Anúncios à espera</SectionTitle>
             {campaigns.length === 0 ? (

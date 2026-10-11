@@ -24,7 +24,17 @@ ALTER TABLE ad_impressions
   ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
 
-CREATE UNIQUE INDEX IF NOT EXISTS ad_clicks_impression_unique ON ad_clicks(impression_id);
+-- Índice único só se não houver duplicados. Inspeccionar com npm run inspect-pre-boot.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM ad_clicks GROUP BY impression_id HAVING COUNT(*) > 1
+  ) THEN
+    RAISE NOTICE '037: ad_clicks.impression_id tem duplicados — índice único adiado';
+  ELSE
+    CREATE UNIQUE INDEX IF NOT EXISTS ad_clicks_impression_unique ON ad_clicks(impression_id);
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS campaign_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
