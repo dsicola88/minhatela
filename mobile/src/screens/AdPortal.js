@@ -9,6 +9,7 @@ import {
   Platform,
   Image,
 } from 'react-native';
+import { Video, ResizeMode } from 'expo-av';
 import * as DocumentPicker from 'expo-document-picker';
 import { StatusBar } from 'expo-status-bar';
 import { PrimaryButton, FieldLabel } from '../components/ui';
@@ -28,6 +29,12 @@ import {
   uploadAdCreative,
 } from '../services/ads';
 import { fileKind, mediaKindFromUrl, previewUsesVideo } from './adCreativeKind';
+import {
+  PLACEMENT_SCREENS,
+  containedRect,
+  frameMock,
+  mediaFileLabel,
+} from './adPlacementFrame';
 
 const STEPS = [
   { id: 1, title: 'Objectivo' },
@@ -505,7 +512,7 @@ export default function AdPortal({ onCatalog, onAccount }) {
                   ) : null}
                   {item.creative?.mediaUrl ? (
                     <Text style={{ color: colors.muted, marginTop: 6 }} numberOfLines={1}>
-                      {creativeKindLabel(item.creative)} · {resolveAdMediaUrl(item.creative.mediaUrl)}
+                      {creativeKindLabel(item.creative)} · {mediaFileLabel(item.creative.mediaUrl)}
                     </Text>
                   ) : null}
                   {item.status === 'active' ? (
@@ -535,9 +542,14 @@ export default function AdPortal({ onCatalog, onAccount }) {
 }
 
 function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, onSubmit, measurement }) {
+  const { width } = useWindowDimensions();
+  const wideFormats = width >= 760;
   const [uploading, setUploading] = useState(false);
   const [stepError, setStepError] = useState('');
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [activeCard, setActiveCard] = useState(0);
   const ready = creativeReady(draft, step);
+  const pastedLink = /^https?:\/\//i.test(String(draft.mediaUrl || ''));
 
   async function loadFile(into) {
     setStepError('');
@@ -565,6 +577,7 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
         return;
       }
       if (into === 'single') {
+        setPasteOpen(false);
         setField('mediaUrl', uploaded.mediaUrl);
         if (uploaded.mediaKind === 'video') setField('mediaKind', 'video');
         if (uploaded.mediaKind === 'image' && draft.mediaKind === 'video') setField('mediaKind', 'image');
@@ -621,113 +634,205 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
       ) : null}
       {step === 3 ? (
         <>
-          <Text style={{ color: colors.text, fontWeight: '700', marginTop: 12, marginBottom: 8 }}>
+          <Text style={{ color: colors.text, fontWeight: '700', marginTop: 12, marginBottom: 4 }}>
             Formato do anúncio
           </Text>
-          {AD_FORMATS.map((format) => (
-            <Pressable
-              key={format.id}
-              onPress={() => {
-                setField('mediaKind', format.id);
-                if (draft.mediaUrl && mediaKindFromUrl(draft.mediaUrl) !== format.id && format.id !== 'carousel') {
-                  setField('mediaUrl', '');
-                }
-              }}
-              style={choice(draft.mediaKind === format.id)}
-            >
-              <Text style={{ color: colors.text, fontWeight: '700' }}>{format.label}</Text>
-              <Text style={{ color: colors.muted, marginTop: 4 }}>{format.hint}</Text>
-            </Pressable>
-          ))}
+          <Text style={{ color: colors.muted, marginBottom: 12, lineHeight: 20 }}>
+            O anúncio ocupa o ecrã do filme, no telemóvel e no computador. Pode substituir ou remover o ficheiro a qualquer momento.
+          </Text>
+          <View style={{ flexDirection: wideFormats ? 'row' : 'column', gap: 8, marginBottom: 8 }}>
+            {AD_FORMATS.map((format) => {
+              const selected = draft.mediaKind === format.id;
+              return (
+                <Pressable
+                  key={format.id}
+                  onPress={() => {
+                    setField('mediaKind', format.id);
+                    setPasteOpen(false);
+                    if (draft.mediaUrl && mediaKindFromUrl(draft.mediaUrl) !== format.id && format.id !== 'carousel') {
+                      setField('mediaUrl', '');
+                    }
+                  }}
+                  style={{
+                    flex: wideFormats ? 1 : undefined,
+                    borderWidth: selected ? 2 : 1,
+                    borderColor: selected ? colors.red : colors.border,
+                    backgroundColor: colors.surface,
+                    padding: 12,
+                    borderRadius: 8,
+                  }}
+                >
+                  <Text style={{ color: colors.text, fontWeight: '800' }}>{format.label}</Text>
+                  <Text style={{ color: colors.muted, marginTop: 4, lineHeight: 18 }}>{format.hint}</Text>
+                  {selected ? (
+                    <Text style={{ color: colors.red, fontWeight: '700', marginTop: 8, fontSize: 12 }}>
+                      Selecionado
+                    </Text>
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </View>
           {draft.mediaKind === 'carousel' ? (
             <>
               <Text style={{ color: colors.muted, marginTop: 8, marginBottom: 8, lineHeight: 20 }}>
-                Cada cartão é uma imagem. Carregue o ficheiro ou cole uma ligação HTTPS.
+                De 2 a 10 imagens. Cada cartão pode ser substituído ou removido.
               </Text>
               {draft.cards.map((card, index) => (
-                <View key={`card-${index}`} style={{ marginBottom: 8 }}>
-                  <FieldLabel>Cartão {index + 1}</FieldLabel>
-                  <PrimaryButton
-                    label={uploading ? 'A carregar…' : 'Carregar imagem'}
-                    variant="outline"
-                    disabled={uploading}
-                    onPress={() => loadFile(index)}
-                    style={{ marginBottom: 8 }}
-                  />
-                  <TextInput
-                    value={card.mediaUrl}
-                    onChangeText={(value) =>
-                      setField(
-                        'cards',
-                        draft.cards.map((item, itemIndex) =>
-                          itemIndex === index ? { ...item, mediaUrl: value } : item
+                <View
+                  key={`card-${index}`}
+                  style={{
+                    marginBottom: 10,
+                    borderWidth: 1,
+                    borderColor: index === activeCard ? colors.red : colors.border,
+                    borderRadius: 8,
+                    padding: 12,
+                  }}
+                >
+                  <Pressable onPress={() => setActiveCard(index)}>
+                    <Text style={{ color: colors.text, fontWeight: '800' }}>Cartão {index + 1}</Text>
+                  </Pressable>
+                  {card.mediaUrl ? (
+                    <MediaActions
+                      label={mediaFileLabel(card.mediaUrl)}
+                      uploading={uploading}
+                      onReplace={() => {
+                        setActiveCard(index);
+                        loadFile(index);
+                      }}
+                      onRemove={() => {
+                        if (draft.cards.length > 2) {
+                          const next = draft.cards.filter((_, itemIndex) => itemIndex !== index);
+                          setField('cards', next);
+                          setActiveCard(Math.max(0, index - 1));
+                        } else {
+                          setField(
+                            'cards',
+                            draft.cards.map((item, itemIndex) =>
+                              itemIndex === index ? { ...item, mediaUrl: '' } : item
+                            )
+                          );
+                        }
+                      }}
+                    />
+                  ) : (
+                    <Pressable
+                      onPress={() => loadFile(index)}
+                      disabled={uploading}
+                      style={dropStyle()}
+                    >
+                      <Text style={{ color: colors.text, fontWeight: '800' }}>
+                        {uploading ? 'A carregar…' : 'Escolher imagem'}
+                      </Text>
+                      <Text style={{ color: colors.muted, marginTop: 4 }}>JPG, PNG ou WEBP</Text>
+                    </Pressable>
+                  )}
+                  {!String(card.mediaUrl || '').startsWith('/uploads/') ? (
+                    <TextInput
+                      value={card.mediaUrl}
+                      onChangeText={(value) =>
+                        setField(
+                          'cards',
+                          draft.cards.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, mediaUrl: value } : item
+                          )
                         )
-                      )
-                    }
-                    style={fieldStyle()}
-                    autoCapitalize="none"
-                    placeholder="https://… ou ficheiro carregado"
-                    placeholderTextColor={colors.muted}
-                  />
-                  <CreativePreview url={card.mediaUrl} kind="image" />
+                      }
+                      style={[fieldStyle(), { marginTop: 8, marginBottom: 0 }]}
+                      autoCapitalize="none"
+                      placeholder="Ou cole uma ligação HTTPS"
+                      placeholderTextColor={colors.muted}
+                    />
+                  ) : null}
                 </View>
               ))}
-              <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-                {draft.cards.length < 10 ? (
-                  <PrimaryButton
-                    label="Adicionar cartão"
-                    variant="outline"
-                    onPress={() =>
-                      setField('cards', [...draft.cards, { mediaUrl: '', mediaKind: 'image' }])
-                    }
-                  />
-                ) : null}
-                {draft.cards.length > 2 ? (
-                  <PrimaryButton
-                    label="Remover último"
-                    variant="outline"
-                    onPress={() => setField('cards', draft.cards.slice(0, -1))}
-                  />
-                ) : null}
-              </View>
+              {draft.cards.length < 10 ? (
+                <PrimaryButton
+                  label="Adicionar cartão"
+                  variant="outline"
+                  onPress={() => {
+                    setField('cards', [...draft.cards, { mediaUrl: '', mediaKind: 'image' }]);
+                    setActiveCard(draft.cards.length);
+                  }}
+                />
+              ) : null}
+              <PlacementFrames
+                url={previewableMedia(
+                  draft.cards[activeCard]?.mediaUrl || draft.cards.find((card) => card.mediaUrl)?.mediaUrl
+                )}
+                kind="image"
+                ctaLabel={draft.ctaLabel}
+              />
             </>
           ) : (
             <>
-              <Text style={{ color: colors.muted, marginTop: 8, marginBottom: 8, lineHeight: 20 }}>
-                {draft.mediaKind === 'video'
-                  ? 'Carregue um MP4, WEBM ou MOV, ou cole uma ligação HTTPS.'
-                  : 'Carregue um JPG, PNG ou WEBP, ou cole uma ligação HTTPS.'}
-              </Text>
-              <PrimaryButton
-                label={uploading ? 'A carregar…' : draft.mediaKind === 'video' ? 'Carregar vídeo' : 'Carregar imagem'}
-                variant="outline"
-                disabled={uploading}
-                onPress={() => loadFile('single')}
-                style={{ marginBottom: 8 }}
-              />
-              <TextInput
-                value={draft.mediaUrl}
-                onChangeText={(value) => setField('mediaUrl', value)}
-                style={fieldStyle()}
-                autoCapitalize="none"
-                placeholder="https://…"
-                placeholderTextColor={colors.muted}
-              />
+              {draft.mediaUrl ? (
+                <MediaActions
+                  label={mediaFileLabel(draft.mediaUrl)}
+                  uploading={uploading}
+                  onReplace={() => loadFile('single')}
+                  onRemove={() => {
+                    setField('mediaUrl', '');
+                    setPasteOpen(false);
+                  }}
+                />
+              ) : (
+                <Pressable onPress={() => loadFile('single')} disabled={uploading} style={dropStyle()}>
+                  <Text style={{ color: colors.text, fontWeight: '800' }}>
+                    {uploading
+                      ? 'A carregar…'
+                      : draft.mediaKind === 'video'
+                        ? 'Escolher vídeo'
+                        : 'Escolher imagem'}
+                  </Text>
+                  <Text style={{ color: colors.muted, marginTop: 4 }}>
+                    {draft.mediaKind === 'video' ? 'MP4, WEBM ou MOV' : 'JPG, PNG ou WEBP'}
+                  </Text>
+                </Pressable>
+              )}
+              {!draft.mediaUrl && !pasteOpen ? (
+                <Pressable onPress={() => setPasteOpen(true)} style={{ marginTop: 10 }}>
+                  <Text style={{ color: colors.text, fontWeight: '700' }}>Colar uma ligação HTTPS</Text>
+                </Pressable>
+              ) : null}
+              {(pasteOpen || pastedLink) && !String(draft.mediaUrl || '').startsWith('/uploads/') ? (
+                <TextInput
+                  value={draft.mediaUrl}
+                  onChangeText={(value) => setField('mediaUrl', value)}
+                  style={[fieldStyle(), { marginTop: 10 }]}
+                  autoCapitalize="none"
+                  placeholder="https://"
+                  placeholderTextColor={colors.muted}
+                />
+              ) : null}
               {draft.mediaKind === 'image' ? (
                 <>
-                  <FieldLabel>Tempo no ecrã</FieldLabel>
-                  {['5', '6', '10', '15'].map((seconds) => (
-                    <Pressable
-                      key={seconds}
-                      onPress={() => setField('imageSeconds', seconds)}
-                      style={choice(String(draft.imageSeconds) === seconds)}
-                    >
-                      <Text style={{ color: colors.text }}>{seconds} segundos</Text>
-                    </Pressable>
-                  ))}
+                  <Text style={{ color: colors.text, fontWeight: '700', marginTop: 8, marginBottom: 8 }}>
+                    Tempo no ecrã
+                  </Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    {['5', '6', '10', '15'].map((seconds) => {
+                      const selected = String(draft.imageSeconds) === seconds;
+                      return (
+                        <Pressable
+                          key={seconds}
+                          onPress={() => setField('imageSeconds', seconds)}
+                          style={{
+                            borderWidth: selected ? 2 : 1,
+                            borderColor: selected ? colors.red : colors.border,
+                            borderRadius: 20,
+                            paddingHorizontal: 14,
+                            paddingVertical: 8,
+                          }}
+                        >
+                          <Text style={{ color: colors.text, fontWeight: '700' }}>{seconds} s</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
                 </>
               ) : null}
-              <CreativePreview url={draft.mediaUrl} kind={draft.mediaKind} />
+              <PlacementFrames url={previewableMedia(draft.mediaUrl)} kind={draft.mediaKind} ctaLabel={draft.ctaLabel} />
             </>
           )}
           {stepError ? (
@@ -747,11 +852,38 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
             placeholderTextColor={colors.muted}
           />
           <FieldLabel>Texto do botão</FieldLabel>
-          {['Saber mais', 'Visitar', 'Ver oferta'].map((c) => (
-            <Pressable key={c} onPress={() => setField('ctaLabel', c)} style={choice(draft.ctaLabel === c)}>
-              <Text style={{ color: colors.text }}>{c}</Text>
-            </Pressable>
-          ))}
+          <TextInput
+            value={draft.ctaLabel}
+            onChangeText={(value) => setField('ctaLabel', value.slice(0, 32))}
+            style={fieldStyle()}
+            placeholder="Escreva o texto do botão"
+            placeholderTextColor={colors.muted}
+          />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+            {['Saber mais', 'Visitar', 'Ver oferta'].map((label) => {
+              const selected = draft.ctaLabel === label;
+              return (
+                <Pressable
+                  key={label}
+                  onPress={() => setField('ctaLabel', label)}
+                  style={{
+                    borderWidth: selected ? 2 : 1,
+                    borderColor: selected ? colors.red : colors.border,
+                    borderRadius: 20,
+                    paddingHorizontal: 14,
+                    paddingVertical: 8,
+                  }}
+                >
+                  <Text style={{ color: colors.text, fontWeight: '700' }}>{label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <PlacementFrames
+            url={creativePreviewUrl(draft)}
+            kind={draft.mediaKind === 'carousel' ? 'image' : draft.mediaKind}
+            ctaLabel={draft.ctaLabel}
+          />
         </>
       ) : null}
       {step === 5 ? (
@@ -809,7 +941,13 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
             {'\n'}
             {creativeKindLabel(draft)}: {creativeSummary(draft)}
             {draft.clickUrl ? `\nDestino: ${draft.clickUrl}` : ''}
+            {draft.ctaLabel ? `\nBotão: ${draft.ctaLabel}` : ''}
           </Text>
+          <PlacementFrames
+            url={creativePreviewUrl(draft)}
+            kind={draft.mediaKind === 'carousel' ? 'image' : draft.mediaKind}
+            ctaLabel={draft.ctaLabel}
+          />
           <Text style={{ color: colors.gold, marginTop: 12, lineHeight: 20 }}>
             A seguir paga o orçamento (IBAN ou Multicaixa Express). Sem pagamento confirmado o
             SuperAdmin não põe o anúncio no ar.
@@ -843,6 +981,19 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
   );
 }
 
+function previewableMedia(url) {
+  const value = String(url || '').trim();
+  if (/^https?:\/\//i.test(value) || value.startsWith('/uploads/')) return value;
+  return '';
+}
+
+function creativePreviewUrl(draft) {
+  if (draft.mediaKind === 'carousel') {
+    return previewableMedia((draft.cards || []).find((card) => card.mediaUrl)?.mediaUrl);
+  }
+  return previewableMedia(draft.mediaUrl);
+}
+
 function creativeKindLabel(creative) {
   if (creative?.mediaKind === 'image') return 'Imagem';
   if (creative?.mediaKind === 'carousel') return 'Carrossel';
@@ -854,7 +1005,7 @@ function creativeSummary(draft) {
     const count = (draft.cards || []).filter((card) => String(card.mediaUrl || '').trim()).length;
     return `${count} imagens`;
   }
-  return draft.mediaUrl || '—';
+  return mediaFileLabel(draft.mediaUrl) || '—';
 }
 
 function creativeReady(draft, step) {
@@ -897,33 +1048,188 @@ async function pickAdFile(kind) {
   return result.assets?.[0] || null;
 }
 
-function CreativePreview({ url, kind }) {
-  if (!url) return null;
-  const uri = resolveAdMediaUrl(url);
+function MediaActions({ label, uploading, onReplace, onRemove }) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 16,
+        marginTop: 10,
+        flexWrap: 'wrap',
+      }}
+    >
+      <Text style={{ color: colors.text, fontWeight: '700', flexGrow: 1 }}>{label}</Text>
+      <Pressable onPress={onReplace} disabled={uploading}>
+        <Text style={{ color: colors.text, fontWeight: '800' }}>{uploading ? 'A carregar…' : 'Substituir'}</Text>
+      </Pressable>
+      <Pressable onPress={onRemove} disabled={uploading}>
+        <Text style={{ color: colors.red, fontWeight: '800' }}>Remover</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function dropStyle() {
+  return {
+    marginTop: 8,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingVertical: 28,
+    alignItems: 'center',
+    backgroundColor: colors.surfaceSecondary,
+  };
+}
+
+function PlacementFrames({ url, kind, ctaLabel }) {
+  const { width } = useWindowDimensions();
+  const [natural, setNatural] = useState(null);
+  const uri = url ? resolveAdMediaUrl(url) : '';
   const detected = mediaKindFromUrl(url);
   const showVideo = previewUsesVideo(url, kind);
+
+  useEffect(() => {
+    setNatural(null);
+  }, [uri]);
+
+  if (!url) return null;
   if (detected === 'image' && kind === 'video') {
     return (
-      <Text style={{ color: colors.red, marginBottom: 12 }}>
-        Este ficheiro é uma imagem. Escolha o formato Imagem para o ver.
+      <Text style={{ color: colors.red, marginTop: 12 }}>
+        Este ficheiro é uma imagem. Escolha o formato Imagem para o ver no tamanho do ecrã.
       </Text>
     );
   }
+
+  const sideBySide = width >= 900;
+  const screens = [PLACEMENT_SCREENS.phone, PLACEMENT_SCREENS.desktop];
+
+  return (
+    <View style={{ marginTop: 16 }}>
+      <Text style={{ color: colors.text, fontWeight: '800' }}>Como fica no ecrã</Text>
+      <Text style={{ color: colors.muted, marginTop: 4, marginBottom: 12, lineHeight: 20 }}>
+        O retângulo preto é o ecrã de reprodução. O anúncio fica centrado, com o tamanho real do ficheiro, sem ser esticado.
+      </Text>
+      <View style={{ flexDirection: sideBySide ? 'row' : 'column', gap: 16, alignItems: 'flex-start' }}>
+        {screens.map((screen) => {
+          const maxWidth = screen.id === 'phone' ? 230 : sideBySide ? 520 : Math.min(width - 80, 640);
+          const maxHeight = screen.id === 'phone' ? 460 : 300;
+          const mock = frameMock(screen, maxWidth, maxHeight);
+          const fit = natural
+            ? containedRect(natural.width, natural.height, screen.width, screen.height)
+            : null;
+          const box = fit
+            ? {
+                width: Math.max(1, Math.round(fit.width * mock.scale)),
+                height: Math.max(1, Math.round(fit.height * mock.scale)),
+                x: Math.round(fit.x * mock.scale),
+                y: Math.round(fit.y * mock.scale),
+              }
+            : { width: mock.width, height: mock.height, x: 0, y: 0 };
+          const heightPct = fit ? Math.round((fit.height / screen.height) * 100) : null;
+          const widthPct = fit ? Math.round((fit.width / screen.width) * 100) : null;
+          return (
+            <View key={screen.id} style={{ maxWidth: '100%' }}>
+              <Text style={{ color: colors.text, fontWeight: '700', marginBottom: 6 }}>{screen.label}</Text>
+              <View
+                style={{
+                  width: mock.width,
+                  height: mock.height,
+                  backgroundColor: '#000',
+                  borderRadius: screen.id === 'phone' ? 24 : 8,
+                  overflow: 'hidden',
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                }}
+              >
+                <View style={{ position: 'absolute', left: box.x, top: box.y, width: box.width, height: box.height }}>
+                  <FittedCreative
+                    uri={uri}
+                    showVideo={showVideo}
+                    width={box.width}
+                    height={box.height}
+                    onSize={(next) => setNatural(next)}
+                  />
+                </View>
+                <Text
+                  style={{
+                    position: 'absolute',
+                    top: 10,
+                    left: 12,
+                    color: '#F7D417',
+                    fontWeight: '700',
+                    fontSize: 11,
+                  }}
+                >
+                  Publicidade
+                </Text>
+                {ctaLabel ? (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      right: 10,
+                      bottom: 12,
+                      backgroundColor: '#F7D417',
+                      borderRadius: 4,
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                    }}
+                  >
+                    <Text style={{ color: '#000', fontWeight: '800', fontSize: 11 }}>{ctaLabel}</Text>
+                  </View>
+                ) : null}
+              </View>
+              <Text style={{ color: colors.muted, marginTop: 6, fontSize: 12, lineHeight: 18, maxWidth: mock.width }}>
+                {fit
+                  ? `Ecrã ${screen.width}×${screen.height}. O anúncio fica a ${fit.width}×${fit.height} px (${widthPct}% da largura, ${heightPct}% da altura).`
+                  : `Ecrã ${screen.width}×${screen.height}. A medir o ficheiro…`}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+function FittedCreative({ uri, showVideo, width, height, onSize }) {
+  if (showVideo && Platform.OS === 'web') {
+    return createElement('video', {
+      src: uri,
+      controls: true,
+      playsInline: true,
+      onLoadedMetadata: (event) => {
+        const video = event.currentTarget;
+        if (video?.videoWidth) onSize({ width: video.videoWidth, height: video.videoHeight });
+      },
+      style: { width, height, objectFit: 'contain', background: '#000' },
+    });
+  }
   if (showVideo) {
-    if (Platform.OS === 'web') {
-      return createElement('video', {
-        src: uri,
-        controls: true,
-        style: { width: '100%', maxHeight: 220, background: '#000', marginBottom: 12 },
-      });
-    }
-    return <Text style={{ color: colors.muted, marginBottom: 12 }}>Vídeo carregado</Text>;
+    return (
+      <Video
+        source={{ uri }}
+        style={{ width, height }}
+        resizeMode={ResizeMode.CONTAIN}
+        useNativeControls
+        onReadyForDisplay={(event) => {
+          const size = event?.naturalSize;
+          if (size?.width && size?.height) onSize({ width: size.width, height: size.height });
+        }}
+      />
+    );
   }
   return (
     <Image
       source={{ uri }}
       resizeMode="contain"
-      style={{ width: '100%', height: 180, marginBottom: 12, backgroundColor: colors.surfaceSecondary }}
+      onLoad={(event) => {
+        const source = event?.nativeEvent?.source;
+        if (source?.width && source?.height) onSize({ width: source.width, height: source.height });
+      }}
+      style={{ width, height, backgroundColor: '#000' }}
     />
   );
 }
