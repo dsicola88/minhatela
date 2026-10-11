@@ -9,14 +9,17 @@ const { assertPositiveKz } = require('../utils/money');
 
 function mapCreator(row) {
   if (!row) return null;
+  const { creatorTypeLabel, workflowLabel } = require('../utils/opsCopy');
   return {
     id: row.id,
     userId: row.user_id,
     type: row.type,
+    typeLabel: creatorTypeLabel(row.type),
     displayName: row.display_name,
     bio: row.bio,
     country: row.country,
     status: row.status,
+    statusLabel: workflowLabel(row.status),
     bankIban: row.bank_iban,
     bankName: row.bank_name,
     bankAccountName: row.bank_account_name,
@@ -26,14 +29,20 @@ function mapCreator(row) {
 }
 
 function mapContent(row) {
+  const { workflowLabel, monetizationLabel } = require('../utils/opsCopy');
   return {
     id: row.id,
     title: row.title,
     slug: row.slug,
     workflowStatus: row.workflow_status,
+    workflowLabel: workflowLabel(row.workflow_status),
     monetization: row.monetization,
+    monetizationLabel: monetizationLabel(row.monetization),
+    synopsisShort: row.synopsis_short || null,
     posterUrl: row.poster_url,
     bunnyVideoId: row.bunny_video_id,
+    encodingStatus: row.encoding_status || null,
+    hasVideo: Boolean(row.bunny_video_id),
     rentalPriceKz: row.rental_price_kz,
     durationSeconds: row.duration_seconds,
     releaseYear: row.release_year,
@@ -48,15 +57,73 @@ function mapContent(row) {
   };
 }
 
+function studioGuide(creator, contents) {
+  if (!creator) {
+    return {
+      step: 1,
+      of: 4,
+      title: 'Candidatura ao estúdio',
+      body: 'A MinhaTela revê quem entra. Só depois envia filmes para o catálogo da app.',
+    };
+  }
+  if (creator.status === 'pending') {
+    return {
+      step: 2,
+      of: 4,
+      title: 'A equipa está a ver a sua candidatura',
+      body: 'Não precisa de voltar a enviar. Recebe um aviso quando puder carregar filmes.',
+    };
+  }
+  if (creator.status === 'rejected') {
+    return {
+      step: 1,
+      of: 4,
+      title: 'Candidatura não aceite',
+      body: 'Fale com a MinhaTela se quiser voltar a candidatar-se.',
+    };
+  }
+  if (creator.status === 'suspended') {
+    return {
+      step: 0,
+      of: 4,
+      title: 'Estúdio suspenso',
+      body: 'Os envios estão parados até a equipa decidir.',
+    };
+  }
+  const list = contents || [];
+  if (list.some((c) => c.workflowStatus === 'published')) {
+    return {
+      step: 4,
+      of: 4,
+      title: 'Os seus títulos estão na app',
+      body: 'Quem abre a MinhaTela já os pode ver. Pode enviar mais quando quiser.',
+    };
+  }
+  if (list.some((c) => ['submitted', 'under_review'].includes(c.workflowStatus))) {
+    return {
+      step: 3,
+      of: 4,
+      title: 'Filme na mesa da equipa',
+      body: 'Moderação decide se entra no catálogo. Recebe aviso da decisão.',
+    };
+  }
+  return {
+    step: 3,
+    of: 4,
+    title: 'Envie o primeiro filme',
+    body: 'Título, cartaz e ficheiro. A equipa publica — não vai directo para a app.',
+  };
+}
+
 async function requireActiveCreator(userId) {
   const creator = await creatorRepository.findByUserId(userId);
   if (!creator) {
-    throw createError(403, 'Conta de criador necessária', 'CREATOR_REQUIRED');
+    throw createError(403, 'Peça o estúdio primeiro', 'CREATOR_REQUIRED');
   }
   if (creator.status !== 'active') {
     throw createError(
       403,
-      'A sua conta de criador ainda não está activa',
+      'A equipa ainda não aceitou o seu estúdio',
       'CREATOR_NOT_ACTIVE',
       { status: creator.status }
     );
@@ -84,7 +151,17 @@ async function registerCreator(userId, body) {
     bankAccountName: body.bankAccountName,
   });
 
-  await userRepository.assignRole(userId, 'creator');
+  try {
+    await require('./notificationService').notify({
+      userId,
+      type: 'creator_applied',
+      title: 'Candidatura recebida',
+      body: 'A equipa MinhaTela vai rever o seu estúdio. Recebe um aviso quando puder enviar filmes.',
+      data: { creatorId: creator.id },
+    });
+  } catch {
+    /* notify best-effort */
+  }
 
   return { creator: mapCreator(creator), alreadyExists: false };
 }
@@ -92,7 +169,7 @@ async function registerCreator(userId, body) {
 async function getStudioHome(userId) {
   const creator = await creatorRepository.findByUserId(userId);
   if (!creator) {
-    return { creator: null, contents: [], analytics: null };
+    return { creator: null, contents: [], analytics: null, guide: studioGuide(null, []) };
   }
 
   const [contents, analytics] = await Promise.all([
@@ -102,10 +179,12 @@ async function getStudioHome(userId) {
       : null,
   ]);
 
+  const mapped = contents.map(mapContent);
   return {
     creator: mapCreator(creator),
-    contents: contents.map(mapContent),
+    contents: mapped,
     analytics,
+    guide: studioGuide(mapCreator(creator), mapped),
   };
 }
 
@@ -171,7 +250,7 @@ async function submitContent(userId, contentId) {
   if (!isValidBunnyVideoId(current.bunny_video_id)) {
     throw createError(
       400,
-      'Antes de submeter, indique um Bunny Video ID válido (GUID da Stream Library)',
+      'Antes de enviar à equipa, crie a ficha de vídeo e carregue o ficheiro.',
       'BUNNY_VIDEO_REQUIRED'
     );
   }
@@ -211,6 +290,24 @@ async function adminReviewCreator(adminId, creatorId, status) {
 
   if (status === 'active' && row.user_id) {
     await userRepository.assignRole(row.user_id, 'creator');
+  }
+
+  try {
+    const notify = require('./notificationService');
+    if (row.user_id) {
+      await notify.notify({
+        userId: row.user_id,
+        type: status === 'active' ? 'creator_approved' : 'creator_rejected',
+        title: status === 'active' ? 'Estúdio aceite' : 'Candidatura não aceite',
+        body:
+          status === 'active'
+            ? 'Já pode enviar filmes. A equipa publica-os no catálogo da MinhaTela.'
+            : 'A candidatura ao estúdio não foi aceite.',
+        data: { creatorId: creatorId, status },
+      });
+    }
+  } catch {
+    /* notify best-effort */
   }
 
   await auditRepository.write({
@@ -282,6 +379,7 @@ async function adminModerateContent(adminId, contentId, { action, rejectionReaso
   }
 
   const pending = await creatorContentRepository.findById(contentId);
+  let ownerUserId = null;
   if (pending) {
     const { query } = require('../config/database');
     const owner = await query(
@@ -290,8 +388,9 @@ async function adminModerateContent(adminId, contentId, { action, rejectionReaso
        WHERE v.id = $1 LIMIT 1`,
       [contentId]
     );
-    if (owner.rows[0]?.user_id && owner.rows[0].user_id === adminId) {
-      throw createError(403, 'Não pode aprovar o próprio conteúdo', 'SELF_APPROVAL_FORBIDDEN');
+    ownerUserId = owner.rows[0]?.user_id || null;
+    if (ownerUserId && ownerUserId === adminId) {
+      throw createError(403, 'Não pode pôr o próprio filme no catálogo', 'SELF_APPROVAL_FORBIDDEN');
     }
   }
 
@@ -300,7 +399,7 @@ async function adminModerateContent(adminId, contentId, { action, rejectionReaso
     if (!pending || !isValidBunnyVideoId(pending.bunny_video_id)) {
       throw createError(
         400,
-        'Não é possível publicar sem Bunny Video ID válido (GUID Stream)',
+        'Não dá para pôr no catálogo sem o ficheiro de vídeo pronto.',
         'BUNNY_VIDEO_REQUIRED'
       );
     }
@@ -308,7 +407,7 @@ async function adminModerateContent(adminId, contentId, { action, rejectionReaso
     if (['processing', 'encoding', 'queued', 'error', 'failed'].includes(encoding)) {
       throw createError(
         400,
-        'Não é possível publicar enquanto o vídeo não estiver encoded (Bunny)',
+        'O ficheiro ainda está a processar qualidade. Espere e publique de novo.',
         'ENCODING_NOT_READY'
       );
     }
@@ -317,7 +416,7 @@ async function adminModerateContent(adminId, contentId, { action, rejectionReaso
   const row = await creatorContentRepository.moderate(contentId, {
     status,
     reviewerId: adminId,
-    rejectionReason: status === 'rejected' ? rejectionReason || 'Rejeitado pela moderação' : null,
+         rejectionReason: status === 'rejected' ? rejectionReason || 'Recusado pela equipa MinhaTela' : null,
   });
 
   if (!row) {
@@ -331,6 +430,23 @@ async function adminModerateContent(adminId, contentId, { action, rejectionReaso
     entityId: contentId,
     metadata: { status, rejectionReason: rejectionReason || null },
   });
+
+  try {
+    if (ownerUserId) {
+      await require('./notificationService').notify({
+        userId: ownerUserId,
+        type: status === 'published' ? 'content_published' : 'content_rejected',
+        title: status === 'published' ? 'O seu filme está na app' : 'Título recusado',
+        body:
+          status === 'published'
+            ? `"${row.title}" já aparece no catálogo MinhaTela.`
+            : `"${row.title}" não entrou no catálogo.${rejectionReason ? ` ${rejectionReason}` : ''}`,
+        data: { contentId, status },
+      });
+    }
+  } catch {
+    /* notify best-effort */
+  }
 
   return { content: mapContent(row) };
 }
@@ -355,7 +471,7 @@ async function createBunnySlot(userId, body) {
     libraryId: created.libraryId,
     upload: created.upload,
     message:
-      'Ficha de vídeo criada. Envie o ficheiro pelo link da biblioteca ou pelo envio retomável devolvido.',
+      'Ficha criada. Envie agora o ficheiro — depois submeta o título à equipa.',
   };
 }
 

@@ -33,13 +33,45 @@ const ENTITY_LABELS = {
   feature_flag: 'Funcionalidade',
 };
 
+const CREATOR_TYPE_LABELS = {
+  creator: 'Criador',
+  filmmaker: 'Cineasta',
+  producer: 'Produtor',
+  production_company: 'Produtora',
+};
+
+const WORKFLOW_LABELS = {
+  draft: 'Rascunho',
+  submitted: 'Na equipa',
+  under_review: 'Em revisão',
+  approved: 'Aprovado',
+  published: 'No catálogo',
+  rejected: 'Recusado',
+  archived: 'Arquivado',
+  pending: 'À espera da equipa',
+  active: 'Activo',
+  suspended: 'Suspenso',
+};
+
+const MONETIZATION_LABELS = {
+  avod: 'Gratuito com anúncios',
+  svod: 'Premium',
+  tvod: 'Aluguer',
+};
+
 const AUDIT_LABELS = {
   PAYMENT_APPROVED: 'Pagamento confirmado',
   PAYMENT_REJECTED: 'Pagamento recusado',
   PAYMENT_REFUNDED: 'Pagamento reembolsado',
   CREATOR_APPROVED: 'Criador aprovado',
   CREATOR_REJECTED: 'Criador recusado',
-  CONTENT_PUBLISHED: 'Título publicado',
+  CONTENT_PUBLISHED: 'Título no catálogo',
+  CONTENT_REJECTED: 'Título recusado',
+  CONTENT_SUBMITTED: 'Título enviado à equipa',
+  CREATOR_PAYOUT_REQUESTED: 'Levantamento pedido',
+  CREATOR_PAYOUT_PAID: 'Levantamento pago',
+  CREATOR_PAYOUT_REJECTED: 'Levantamento recusado',
+  BUNNY_VIDEO_CREATED: 'Ficha de vídeo criada',
   CAMPAIGN_APPROVED: 'Campanha aprovada',
   'mfa.enabled': 'Protecção extra activada',
   title_not_interested: 'Marcou «não me interessa»',
@@ -72,6 +104,18 @@ function entityLabel(entity) {
   return ENTITY_LABELS[entity] || entity || '';
 }
 
+function creatorTypeLabel(type) {
+  return CREATOR_TYPE_LABELS[type] || type || 'Criador';
+}
+
+function workflowLabel(status) {
+  return WORKFLOW_LABELS[status] || status || '';
+}
+
+function monetizationLabel(code) {
+  return MONETIZATION_LABELS[code] || String(code || '').toUpperCase();
+}
+
 function isLabEmail(email) {
   const e = String(email || '').toLowerCase();
   return (
@@ -86,9 +130,15 @@ module.exports = {
   ROLE_LABELS,
   SUBSCRIPTION_LABELS,
   AUDIT_LABELS,
+  CREATOR_TYPE_LABELS,
+  WORKFLOW_LABELS,
+  MONETIZATION_LABELS,
   roleLabel,
   subscriptionLabel,
   auditTitle,
   entityLabel,
+  creatorTypeLabel,
+  workflowLabel,
+  monetizationLabel,
   isLabEmail,
 };

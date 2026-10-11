@@ -594,6 +594,85 @@ async function run() {
     assert(r.status === 403 || r.status === 401, `expected forbid got ${r.status}`);
   });
 
+  await step('Estúdio · guia sem candidatura', async () => {
+    const r = await req('GET', '/api/creator-studio/home', { token: customerToken });
+    assert(r.status === 200, `home ${r.status}`);
+    assert(r.json?.creator === null, 'sem criador');
+    assert(r.json?.guide?.step === 1, `guia ${r.json?.guide?.step}`);
+  });
+
+  let studioCreatorId = null;
+  await step('Estúdio · candidatura cineasta', async () => {
+    const r = await req('POST', '/api/creator-studio/register', {
+      token: customerToken,
+      body: {
+        displayName: 'Cineasta E2E',
+        type: 'filmmaker',
+        bio: 'Cinema angolano',
+      },
+    });
+    assert([200, 201].includes(r.status), `register ${r.status} ${r.json?.message || ''}`);
+    assert(r.json?.creator?.status === 'pending', `status ${r.json?.creator?.status}`);
+    assert(r.json?.creator?.typeLabel === 'Cineasta', `typeLabel ${r.json?.creator?.typeLabel}`);
+    studioCreatorId = r.json.creator.id;
+  });
+
+  await step('Estúdio · inactivo não cria filme', async () => {
+    const home = await req('GET', '/api/creator-studio/home', { token: customerToken });
+    assert(home.json?.guide?.step === 2, `guia ${home.json?.guide?.step}`);
+    const r = await req('POST', '/api/creator-studio/contents', {
+      token: customerToken,
+      body: {
+        title: 'Filme E2E',
+        synopsisShort: 'Teste',
+        posterUrl: 'https://example.com/cartaz.jpg',
+        monetization: 'avod',
+      },
+    });
+    assert(r.status === 403, `got ${r.status}`);
+  });
+
+  await step('Estúdio · SuperAdmin aceita e o filme fica rascunho', async () => {
+    assert(adminToken, 'admin token');
+    const pending = await req('GET', '/api/admin/creators/pending', { token: adminToken });
+    assert(pending.status === 200, `pending ${pending.status}`);
+    const found = (pending.json?.creators || []).find((c) => c.id === studioCreatorId);
+    assert(found, 'candidatura na fila');
+    const acc = await req('PATCH', `/api/admin/creators/${studioCreatorId}/status`, {
+      token: adminToken,
+      body: { status: 'active' },
+    });
+    assert(acc.status === 200, `accept ${acc.status} ${acc.json?.message || ''}`);
+    assert(acc.json?.creator?.status === 'active', 'activo');
+    const draft = await req('POST', '/api/creator-studio/contents', {
+      token: customerToken,
+      body: {
+        title: 'Filme E2E',
+        synopsisShort: 'Sinopse de teste para o catálogo',
+        posterUrl: 'https://example.com/cartaz.jpg',
+        monetization: 'avod',
+      },
+    });
+    assert(draft.status === 201, `draft ${draft.status} ${draft.json?.message || ''}`);
+    const contentId = draft.json?.content?.id;
+    assert(contentId, 'content id');
+    const submit = await req('POST', `/api/creator-studio/contents/${contentId}/submit`, {
+      token: customerToken,
+      body: {},
+    });
+    assert(submit.status === 400, `submit sem vídeo ${submit.status}`);
+    const home = await req('GET', '/api/creator-studio/home', { token: customerToken });
+    assert(home.json?.creator?.status === 'active', 'home activo');
+    assert(home.json?.guide?.step === 3, `guia ${home.json?.guide?.step}`);
+  });
+
+  await step('Estúdio · Ligações SuperAdmin', async () => {
+    const r = await req('GET', '/api/admin/connections', { token: adminToken });
+    assert(r.status === 200, `connections ${r.status}`);
+    const ids = (r.json?.items || []).map((i) => i.id);
+    assert(ids.includes('weframe') || ids.includes('bunny'), `ids ${ids.join(',')}`);
+  });
+
   // ─── Report ───
   const passed = results.filter((r) => r.ok).length;
   const total = results.length;

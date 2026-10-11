@@ -1052,7 +1052,7 @@ export function ConnectionsTab({ items }) {
     <View>
       <PageHeader
         compact
-        subtitle="O que já está ligado e o que falta quando falarmos com o banco, o email, o Google ou o vídeo. Sem passwords neste ecrã."
+        subtitle="Banco, email, Google, vídeo do estúdio. O cineasta envia o ficheiro pela ligação de vídeo; aqui só colamos o que o fornecedor entregar. Sem passwords neste ecrã."
       />
       {list.length === 0 ? (
         <EmptyState title="Sem estado de ligações" />

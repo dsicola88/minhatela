@@ -523,8 +523,8 @@ export default function AdminCommandCenter({ onBack }) {
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 }}>
               <QueueChip label="Pagamentos" count={queues.payments || 0} onPress={() => setTab('payments')} />
               <QueueChip label="Atendimento" count={queues.tickets || 0} onPress={() => setTab('support')} />
-              <QueueChip label="Criadores" count={queues.creators || 0} onPress={() => setTab('moderation')} />
-              <QueueChip label="Conteúdo" count={queues.content || 0} onPress={() => setTab('moderation')} />
+              <QueueChip label="Candidaturas" count={queues.creators || 0} onPress={() => setTab('moderation')} />
+              <QueueChip label="Filmes" count={queues.content || 0} onPress={() => setTab('moderation')} />
               <QueueChip label="Pagamentos a criadores" count={queues.payouts || 0} onPress={() => setTab('moderation')} />
               <QueueChip label="Campanhas" count={queues.campaigns || 0} onPress={() => setTab('moderation')} />
             </View>
@@ -857,58 +857,70 @@ export default function AdminCommandCenter({ onBack }) {
           <View>
             <PageHeader
               compact
-              subtitle="Criadores, conteúdo, payouts e campanhas à espera de decisão."
+              subtitle="Candidaturas ao estúdio, filmes para o catálogo, levantamentos e anúncios. O que publica aqui é o que o público vê na app."
             />
-            <SectionTitle>Criadores</SectionTitle>
+            <SectionTitle>Candidaturas ao estúdio</SectionTitle>
             {creators.length === 0 ? (
-              <EmptyState title="Sem criadores pendentes" />
+              <EmptyState title="Nenhuma candidatura à espera" subtitle="Quando um cineasta pede o estúdio, aparece aqui." />
             ) : (
               creators.map((c) => (
                 <View key={c.id} style={getCardStyle()}>
                   <Text style={{ color: colors.text, fontWeight: '700' }}>{c.displayName}</Text>
                   <Text style={{ color: colors.muted }}>
-                    {c.email} · {c.type}
+                    {c.email} · {c.typeLabel || c.type}
                   </Text>
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
                     <AdminButton
-                      label="Activar"
+                      label="Aceitar no estúdio"
                       onPress={() => run(c.id, () => reviewCreator(c.id, 'active'))}
                     />
                     <AdminButton
-                      label="Rejeitar"
+                      label="Recusar"
                       variant="outline"
-                      onPress={() => run(c.id, () => reviewCreator(c.id, 'rejected'))}
+                      onPress={() =>
+                        setRejectTarget({ type: 'creator', id: c.id, title: c.displayName })
+                      }
                     />
                   </View>
                 </View>
               ))
             )}
 
-            <SectionTitle>Conteúdo submetido</SectionTitle>
+            <SectionTitle>Filmes para o catálogo</SectionTitle>
             {contents.length === 0 ? (
-              <EmptyState title="Sem conteúdos em revisão" />
+              <EmptyState
+                title="Nenhum filme na mesa"
+                subtitle="O cineasta envia no Estúdio; aqui decide se entra na app."
+              />
             ) : (
               contents.map((item) => (
                 <View key={item.id} style={getCardStyle()}>
                   <Text style={{ color: colors.text, fontWeight: '700' }}>{item.title}</Text>
-                  <Text style={{ color: colors.muted }}>{item.workflowStatus || item.status}</Text>
-                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+                  <Text style={{ color: colors.muted, marginTop: 4 }}>
+                    {item.creatorDisplayName || 'Cineasta'}
+                    {item.creatorEmail ? ` · ${item.creatorEmail}` : ''}
+                  </Text>
+                  <Text style={{ color: colors.muted, marginTop: 4 }}>
+                    {item.workflowLabel || item.workflowStatus} · {item.monetizationLabel || item.monetization}
+                    {item.hasVideo ? ' · vídeo na ficha' : ' · sem ficheiro'}
+                  </Text>
+                  {item.synopsisShort ? (
+                    <Text style={{ color: colors.textSecondary, marginTop: 8, lineHeight: 20 }}>
+                      {item.synopsisShort}
+                    </Text>
+                  ) : null}
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
                     <AdminButton
-                      label="Publicar"
+                      label="Pôr na app"
                       onPress={() =>
                         run(item.id, () => moderateContent(item.id, { action: 'publish' }))
                       }
                     />
                     <AdminButton
-                      label="Rejeitar"
+                      label="Recusar"
                       variant="outline"
                       onPress={() =>
-                        run(item.id, () =>
-                          moderateContent(item.id, {
-                            action: 'reject',
-                            rejectionReason: 'Não cumpre guidelines',
-                          })
-                        )
+                        setRejectTarget({ type: 'content', id: item.id, title: item.title })
                       }
                     />
                   </View>
@@ -916,9 +928,9 @@ export default function AdminCommandCenter({ onBack }) {
               ))
             )}
 
-            <SectionTitle>Payouts criadores</SectionTitle>
+            <SectionTitle>Levantamentos dos cineastas</SectionTitle>
             {payouts.length === 0 ? (
-              <EmptyState title="Sem payouts pendentes" />
+              <EmptyState title="Nenhum levantamento à espera" />
             ) : (
               payouts.map((p) => (
                 <View key={p.id} style={getCardStyle()}>
@@ -1437,12 +1449,12 @@ export default function AdminCommandCenter({ onBack }) {
             }}
           >
             <Text style={{ color: colors.text, fontWeight: '700', fontSize: 18, marginBottom: 12 }}>
-              Motivo da rejeição
+              Motivo da recusa
             </Text>
             <TextInput
               value={rejectReason}
               onChangeText={setRejectReason}
-              placeholder="Ex.: comprovativo ilegível"
+              placeholder="O cineasta e o cliente vêem este texto"
               placeholderTextColor={colors.muted}
               style={inputStyle({ minHeight: 80, textAlignVertical: 'top' })}
               multiline
@@ -1453,14 +1465,24 @@ export default function AdminCommandCenter({ onBack }) {
                 label="Confirmar"
                 onPress={() => {
                   const target = rejectTarget;
+                  const reason = rejectReason || 'Recusado';
                   setRejectTarget(null);
+                  setRejectReason('');
                   if (target?.type === 'payment') {
                     run(target.id, () =>
                       reviewPayment(target.id, {
                         status: 'rejeitado',
-                        adminNotes: rejectReason || 'Rejeitado',
+                        adminNotes: reason,
                       })
                     );
+                  }
+                  if (target?.type === 'content') {
+                    run(target.id, () =>
+                      moderateContent(target.id, { action: 'reject', rejectionReason: reason })
+                    );
+                  }
+                  if (target?.type === 'creator') {
+                    run(target.id, () => reviewCreator(target.id, 'rejected'));
                   }
                 }}
               />

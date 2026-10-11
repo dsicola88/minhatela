@@ -172,7 +172,7 @@ export default function Navbar({
               </Text>
             </Focusable>
             {onCreatorStudio ? (
-              <Focusable id="nav-creator" onPress={onCreatorStudio} accessibilityLabel="Creator Studio">
+              <Focusable id="nav-creator" onPress={onCreatorStudio} accessibilityLabel="Estúdio de cineastas">
                 <Ionicons name="film-outline" size={isTV ? 28 : 22} color={colors.text} />
               </Focusable>
             ) : null}

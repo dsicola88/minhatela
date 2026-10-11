@@ -331,7 +331,7 @@ export default function Account({
           </Text>
           {onCatalog ? <Row label="Catálogo" value="Assistir" icon="play-outline" onPress={onCatalog} /> : null}
           {onCreatorStudio ? (
-            <Row label="Estúdio" value="Conteúdos" icon="film-outline" onPress={onCreatorStudio} />
+            <Row label="Estúdio" value="Os meus filmes" icon="film-outline" onPress={onCreatorStudio} />
           ) : null}
           {onAds ? <Row label="Anúncios" value="Campanhas" icon="megaphone-outline" onPress={onAds} /> : null}
           {onAdmin ? (

@@ -47,7 +47,7 @@ async function createDraft(payload) {
       rental_price_kz, duration_seconds, release_year, is_featured, is_published,
       workflow_status, creator_id, age_rating, language_code, country_code,
       genre, director_name, tenant_id, created_by_user_id, content_format,
-      production_company_id
+      production_company_id, kind
     ) VALUES (
       $1,$2,$3,$4,$5,$6,
       $7,$8,$9,$10,$11,
@@ -55,7 +55,7 @@ async function createDraft(payload) {
       'draft',$15,$16,$17,$18,
       $19,$20,
       (SELECT id FROM tenants WHERE slug = 'minhatela' LIMIT 1),
-      $21, COALESCE($22, 'movie'), $23
+      $21, COALESCE($22, 'movie'), $23, 'movie'
     ) RETURNING *`,
     [
       ...args,
@@ -152,8 +152,8 @@ async function findById(contentId) {
 
 async function listByCreator(creatorId) {
   const result = await query(
-    `SELECT id, title, slug, workflow_status, monetization, poster_url,
-            bunny_video_id, rental_price_kz, duration_seconds, release_year, is_published,
+    `SELECT id, title, slug, workflow_status, monetization, poster_url, synopsis_short,
+            bunny_video_id, encoding_status, rental_price_kz, duration_seconds, release_year, is_published,
             submitted_at, reviewed_at, rejection_reason, created_at, updated_at
      FROM videos
      WHERE creator_id = $1

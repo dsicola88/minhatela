@@ -6,6 +6,7 @@ import {
   TextInput,
   Pressable,
   useWindowDimensions,
+  Linking,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,15 +24,29 @@ import { fetchMyPayouts, requestPayout } from '../services/payouts';
 
 const STATUS_LABEL = {
   draft: 'Rascunho',
-  submitted: 'Submetido',
+  submitted: 'Na equipa',
   under_review: 'Em revisão',
   approved: 'Aprovado',
-  published: 'Publicado',
-  rejected: 'Rejeitado',
+  published: 'No catálogo',
+  rejected: 'Recusado',
   archived: 'Arquivado',
-  pending: 'Pendente',
+  pending: 'À espera da equipa',
   active: 'Activo',
+  suspended: 'Suspenso',
 };
+
+const TYPE_LABEL = {
+  creator: 'Criador',
+  filmmaker: 'Cineasta',
+  producer: 'Produtor',
+  production_company: 'Produtora',
+};
+
+const MONETIZATION = [
+  { id: 'avod', label: 'Gratuito com anúncios' },
+  { id: 'svod', label: 'Premium' },
+  { id: 'tvod', label: 'Aluguer' },
+];
 
 export default function CreatorStudio({ onBack, onCompany }) {
   const { width } = useWindowDimensions();
@@ -39,6 +54,7 @@ export default function CreatorStudio({ onBack, onCompany }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [data, setData] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [registerForm, setRegisterForm] = useState({
@@ -56,6 +72,7 @@ export default function CreatorStudio({ onBack, onCompany }) {
     monetization: 'avod',
     rentalPriceKz: '1500',
     bunnyVideoId: '',
+    uploadDashboardUrl: '',
     genre: 'Cinema Angolano',
   });
 
@@ -69,7 +86,7 @@ export default function CreatorStudio({ onBack, onCompany }) {
         setPayouts(p);
       }
     } catch (err) {
-      setError(err.message || 'Falha ao carregar Creator Studio');
+      setError(err.message || 'Não foi possível abrir o estúdio');
     } finally {
       setLoading(false);
     }
@@ -111,6 +128,7 @@ export default function CreatorStudio({ onBack, onCompany }) {
         monetization: 'avod',
         rentalPriceKz: '1500',
         bunnyVideoId: '',
+        uploadDashboardUrl: '',
         genre: 'Cinema Angolano',
       });
       await load();
@@ -135,17 +153,31 @@ export default function CreatorStudio({ onBack, onCompany }) {
 
   async function handleCreateBunnySlot() {
     if (!contentForm.title.trim()) {
-      setError('Indique o título antes de criar o slot Bunny');
+      setError('Indique o título antes de criar a ficha de vídeo');
+      return;
+    }
+    if (contentForm.bunnyVideoId && contentForm.uploadDashboardUrl) {
+      setInfo('A ficha já existe. Envie o ficheiro na janela que abrir.');
+      Linking.openURL(contentForm.uploadDashboardUrl).catch(() => {});
       return;
     }
     setBusy(true);
     setError('');
+    setInfo('');
     try {
       const data = await createBunnyVideoSlot({ title: contentForm.title.trim() });
-      setContentForm((s) => ({ ...s, bunnyVideoId: data.bunnyVideoId || '' }));
-      if (data.upload?.dashboardUrl) {
-        setError(`Ficha criada. Envie o ficheiro na biblioteca de vídeo: ${data.upload.dashboardUrl}`);
-      }
+      const url = data.upload?.dashboardUrl || '';
+      setContentForm((s) => ({
+        ...s,
+        bunnyVideoId: data.bunnyVideoId || '',
+        uploadDashboardUrl: url,
+      }));
+      setInfo(
+        url
+          ? 'Ficha de vídeo criada. Envie o ficheiro na janela que abrir; depois guarde o rascunho e envie à equipa.'
+          : data.message || 'Ficha de vídeo criada.'
+      );
+      if (url) Linking.openURL(url).catch(() => {});
     } catch (err) {
       setError(err.message);
     } finally {
@@ -184,23 +216,46 @@ export default function CreatorStudio({ onBack, onCompany }) {
         </Pressable>
 
         <Text style={{ color: colors.gold, fontSize: 12, fontWeight: '800', letterSpacing: 1.4 }}>
-          CREATOR STUDIO
+          ESTÚDIO
         </Text>
         <Text style={{ color: colors.text, fontSize: 28, fontWeight: '800', marginBottom: 8 }}>
-          Estúdio de Criadores
+          Os seus filmes na MinhaTela
         </Text>
         <Text style={{ color: colors.muted, marginBottom: 16, lineHeight: 22 }}>
-          Submeta filmes, séries e documentários. Nada é publicado sem revisão da MinhaTela.
+          Candidatura → filme → a equipa revê → aparece na app. Nada entra no catálogo sozinho.
         </Text>
-        <Text style={{ color: colors.textSecondary, marginBottom: 24, fontSize: 13 }}>
-          Dashboard · My Content · Uploads · Submissions · Analytics · Revenue · Payouts
-        </Text>
-        {onCompany ? (
+        {onCompany && creator?.status === 'active' ? (
           <Pressable onPress={onCompany} style={{ marginBottom: 20 }}>
-            <Text style={{ color: colors.gold, fontWeight: '700' }}>Abrir portal da produtora →</Text>
+            <Text style={{ color: colors.gold, fontWeight: '700' }}>Portal da produtora →</Text>
           </Pressable>
         ) : null}
 
+        {data?.guide ? (
+          <View
+            style={{
+              backgroundColor: '#111111',
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: colors.border,
+              borderLeftWidth: 3,
+              borderLeftColor: colors.gold,
+              padding: 16,
+              marginBottom: 20,
+            }}
+          >
+            <Text style={{ color: colors.gold, fontSize: 12, fontWeight: '800' }}>
+              PASSO {data.guide.step} DE {data.guide.of}
+            </Text>
+            <Text style={{ color: colors.text, fontWeight: '700', marginTop: 6, fontSize: 16 }}>
+              {data.guide.title}
+            </Text>
+            <Text style={{ color: colors.muted, marginTop: 6, lineHeight: 20 }}>{data.guide.body}</Text>
+          </View>
+        ) : null}
+
+        {info ? (
+          <Text style={{ color: colors.gold, marginBottom: 16, lineHeight: 20 }}>{info}</Text>
+        ) : null}
         {error ? <ErrorState message={error} onRetry={load} /> : null}
 
         {!creator ? (
@@ -216,7 +271,7 @@ export default function CreatorStudio({ onBack, onCompany }) {
             }}
           >
             <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700', marginBottom: 14 }}>
-              Tornar-se criador
+              Pedir o estúdio
             </Text>
             <FieldLabel>Tipo de conta</FieldLabel>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
@@ -266,7 +321,7 @@ export default function CreatorStudio({ onBack, onCompany }) {
               multiline
               placeholderTextColor={colors.muted}
             />
-            <FieldLabel>IBAN (payouts)</FieldLabel>
+            <FieldLabel>IBAN para levantamentos</FieldLabel>
             <TextInput
               value={registerForm.bankIban}
               onChangeText={(v) => setRegisterForm((s) => ({ ...s, bankIban: v }))}
@@ -298,11 +353,13 @@ export default function CreatorStudio({ onBack, onCompany }) {
                 {creator.displayName}
               </Text>
               <Text style={{ color: colors.gold, marginTop: 4 }}>
-                {STATUS_LABEL[creator.status] || creator.status} · {creator.type}
+                {creator.statusLabel || STATUS_LABEL[creator.status] || creator.status}
+                {' · '}
+                {creator.typeLabel || TYPE_LABEL[creator.type] || creator.type}
               </Text>
               {creator.status !== 'active' ? (
                 <Text style={{ color: colors.muted, marginTop: 10 }}>
-                  Aguarda aprovação administrativa antes de submeter conteúdo.
+                  Ainda não pode enviar filmes. A decisão aparece também nas notificações.
                 </Text>
               ) : null}
             </View>
@@ -311,9 +368,9 @@ export default function CreatorStudio({ onBack, onCompany }) {
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 22 }}>
                 <Stat label="Publicados" value={data.analytics.content?.published || 0} />
                 <Stat label="Submissões" value={data.analytics.content?.submitted || 0} />
-                <Stat label="Views" value={data.analytics.views || 0} />
-                <Stat label="Espetadores" value={data.analytics.uniqueViewers || 0} />
-                <Stat label="Fãs / lista" value={data.analytics.subscribers || 0} />
+                <Stat label="Visualizações" value={data.analytics.views || 0} />
+                <Stat label="Espectadores" value={data.analytics.uniqueViewers || 0} />
+                <Stat label="Na minha lista" value={data.analytics.subscribers || 0} />
                 <Stat label="Receita (Kz)" value={data.analytics.revenueKz || 0} gold />
               </View>
             ) : null}
@@ -330,7 +387,7 @@ export default function CreatorStudio({ onBack, onCompany }) {
                 }}
               >
                 <Text style={{ color: colors.text, fontWeight: '700', fontSize: 18, marginBottom: 8 }}>
-                  Payouts
+                  Levantamentos
                 </Text>
                 <Text style={{ color: colors.muted, marginBottom: 10 }}>
                   Disponível: {payouts.balance.availableKz.toLocaleString('pt-AO')} Kz · Mínimo 5.000 Kz
@@ -344,7 +401,7 @@ export default function CreatorStudio({ onBack, onCompany }) {
                   placeholderTextColor={colors.muted}
                 />
                 <PrimaryButton
-                  label="Pedir payout IBAN"
+                  label="Pedir levantamento para o IBAN"
                   variant="gold"
                   loading={busy}
                   onPress={async () => {
@@ -379,10 +436,10 @@ export default function CreatorStudio({ onBack, onCompany }) {
                   }}
                 >
                   <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700' }}>
-                    Os meus conteúdos
+                    Os meus filmes
                   </Text>
                   <PrimaryButton
-                    label={showForm ? 'Fechar' : 'Novo conteúdo'}
+                    label={showForm ? 'Fechar' : 'Novo filme'}
                     variant={showForm ? 'outline' : 'primary'}
                     onPress={() => setShowForm((v) => !v)}
                     style={{ minWidth: 140 }}
@@ -415,37 +472,54 @@ export default function CreatorStudio({ onBack, onCompany }) {
                       multiline
                       placeholderTextColor={colors.muted}
                     />
-                    <FieldLabel>Poster URL</FieldLabel>
+                    <FieldLabel>Ligação do cartaz</FieldLabel>
                     <TextInput
                       value={contentForm.posterUrl}
                       onChangeText={(v) => setContentForm((s) => ({ ...s, posterUrl: v }))}
                       style={inputStyle}
                       placeholderTextColor={colors.muted}
+                      placeholder="https://…"
                       autoCapitalize="none"
                     />
-                    <FieldLabel>Bunny Video ID</FieldLabel>
-                    <TextInput
-                      value={contentForm.bunnyVideoId}
-                      onChangeText={(v) => setContentForm((s) => ({ ...s, bunnyVideoId: v }))}
-                      style={inputStyle}
-                      placeholder="GUID UUID da Stream Library"
-                      placeholderTextColor={colors.muted}
-                      autoCapitalize="none"
-                    />
+                    <FieldLabel>Ficheiro de vídeo</FieldLabel>
+                    <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 8, lineHeight: 18 }}>
+                      {contentForm.bunnyVideoId
+                        ? 'Ficha pronta. Envie o ficheiro se ainda não enviou, depois grave o rascunho.'
+                        : 'Crie a ficha e envie o filme. A equipa só publica com o ficheiro pronto.'}
+                    </Text>
                     <PrimaryButton
-                      label="Criar slot Bunny (depois faça upload)"
+                      label={contentForm.bunnyVideoId ? 'Abrir envio de ficheiro de novo' : 'Criar ficha e enviar o filme'}
                       loading={busy}
                       onPress={handleCreateBunnySlot}
-                      style={{ marginTop: 8, marginBottom: 4 }}
+                      style={{ marginTop: 4, marginBottom: 12 }}
                     />
-                    <FieldLabel>Monetização (avod | svod | tvod)</FieldLabel>
-                    <TextInput
-                      value={contentForm.monetization}
-                      onChangeText={(v) => setContentForm((s) => ({ ...s, monetization: v }))}
-                      style={inputStyle}
-                      placeholderTextColor={colors.muted}
-                      autoCapitalize="none"
-                    />
+                    <FieldLabel>Como entra na app</FieldLabel>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                      {MONETIZATION.map((opt) => (
+                        <Pressable
+                          key={opt.id}
+                          onPress={() => setContentForm((s) => ({ ...s, monetization: opt.id }))}
+                          style={{
+                            paddingVertical: 8,
+                            paddingHorizontal: 12,
+                            borderRadius: 4,
+                            borderWidth: 1,
+                            borderColor: contentForm.monetization === opt.id ? colors.gold : colors.border,
+                            backgroundColor: contentForm.monetization === opt.id ? '#2a2108' : '#181818',
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: contentForm.monetization === opt.id ? colors.gold : colors.textSecondary,
+                              fontWeight: '700',
+                              fontSize: 12,
+                            }}
+                          >
+                            {opt.label}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
                     {contentForm.monetization === 'tvod' ? (
                       <>
                         <FieldLabel>Preço aluguer (Kz)</FieldLabel>
@@ -469,8 +543,8 @@ export default function CreatorStudio({ onBack, onCompany }) {
 
                 {(data.contents || []).length === 0 ? (
                   <EmptyState
-                    title="Sem conteúdos"
-                    subtitle="Crie o primeiro rascunho e submeta para revisão."
+                    title="Ainda sem filmes"
+                    subtitle="Crie a ficha, envie o ficheiro e mande à equipa. Só depois aparece na app."
                   />
                 ) : (
                   data.contents.map((item) => (
@@ -489,9 +563,9 @@ export default function CreatorStudio({ onBack, onCompany }) {
                         {item.title}
                       </Text>
                       <Text style={{ color: colors.gold, marginTop: 4 }}>
-                        {STATUS_LABEL[item.workflowStatus] || item.workflowStatus}
+                        {item.workflowLabel || STATUS_LABEL[item.workflowStatus] || item.workflowStatus}
                         {' · '}
-                        {String(item.monetization || '').toUpperCase()}
+                        {item.monetizationLabel || item.monetization}
                       </Text>
                       {item.rejectionReason ? (
                         <Text style={{ color: colors.red, marginTop: 8 }}>
@@ -500,7 +574,7 @@ export default function CreatorStudio({ onBack, onCompany }) {
                       ) : null}
                       {item.workflowStatus === 'draft' || item.workflowStatus === 'rejected' ? (
                         <PrimaryButton
-                          label="Submeter para revisão"
+                          label="Enviar à equipa"
                           variant="gold"
                           loading={busy}
                           onPress={() => handleSubmit(item.id)}
