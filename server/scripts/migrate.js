@@ -11,6 +11,9 @@ const migrationsDir =
   process.env.MIGRATIONS_DIR ||
   path.resolve(__dirname, '../../database/migrations');
 
+/** Não entra no arranque remoto. Só com APPLY_038_LEDGER_TRACE=1, depois da inspeção só de leitura. */
+const HELD_ON_REMOTE = new Set(['038_creator_ledger_trace.sql']);
+
 async function ensureTable() {
   await query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -27,8 +30,9 @@ async function appliedIds() {
 
 async function migrate() {
   const dbUrl = process.env.DATABASE_URL || '';
+  const remoteHost = /railway|onrender|amazonaws\.com|supabase\.co/i.test(dbUrl);
   if (
-    /railway|onrender|amazonaws\.com|supabase\.co/i.test(dbUrl) &&
+    remoteHost &&
     process.env.ALLOW_REMOTE_MIGRATE !== '1'
   ) {
     logger.error('migrate.blocked_remote_host');
@@ -44,6 +48,14 @@ async function migrate() {
   for (const file of files) {
     if (applied.has(file)) {
       logger.info('migrate.skip', { file });
+      continue;
+    }
+
+    if (remoteHost && HELD_ON_REMOTE.has(file) && process.env.APPLY_038_LEDGER_TRACE !== '1') {
+      logger.warn('migrate.held', {
+        file,
+        reason: 'revisão do livro pendente; não altera créditos em produção',
+      });
       continue;
     }
 

@@ -1,4 +1,5 @@
--- Livro rastreável. Não apaga linhas.
+-- Livro rastreável. Não apaga linhas nem altera amount_kz.
+-- No arranque remoto fica retida até APPLY_038_LEDGER_TRACE=1.
 -- Só a linha mais antiga de cada grupo de visualização/anúncio recebe trace_key.
 -- Duplicados ficam com trace_key NULL para inspecção (npm run inspect-pre-boot).
 -- A limpeza dessas linhas é um passo à parte, nunca deste ficheiro.

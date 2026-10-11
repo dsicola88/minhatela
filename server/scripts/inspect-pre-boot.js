@@ -1,14 +1,15 @@
 'use strict';
 
 /**
- * Só leitura. Recusa host remoto.
+ * Só SELECT. Local por omissão.
+ * Produção: INSPECT_REMOTE=1 (nunca escreve).
  * Uso: node scripts/inspect-pre-boot.js
  */
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 const { pool } = require('../src/config/database');
 
-function assertLocal() {
+function resolveHost() {
   const url = process.env.DATABASE_URL || '';
   let host = '';
   try {
@@ -16,10 +17,15 @@ function assertLocal() {
   } catch {
     throw new Error('DATABASE_URL inválida');
   }
-  if (!/^(localhost|127\.0\.0\.1)$/.test(host)) {
-    throw new Error(`recusa host ${host} — este script não lê produção`);
+  if (process.env.INSPECT_TUNNEL_PORT) {
+    host = `tunnel:${process.env.INSPECT_TUNNEL_PORT}`;
   }
-  return host;
+  const local = /^(localhost|127\.0\.0\.1)$/.test(host);
+  const remote = /railway|onrender|amazonaws\.com|supabase\.co/i.test(url) || !local;
+  if (remote && process.env.INSPECT_REMOTE !== '1') {
+    throw new Error(`recusa host ${host} — para leitura remota use INSPECT_REMOTE=1`);
+  }
+  return { host, local: !remote };
 }
 
 function dupKeyExpr() {
@@ -34,12 +40,24 @@ function dupKeyExpr() {
 }
 
 async function main() {
-  const host = assertLocal();
+  const { host, local } = resolveHost();
   const client = await pool.connect();
   try {
     const applied = await client.query(
-      `SELECT id FROM schema_migrations WHERE id IN ('037_ads_manager.sql','038_creator_ledger_trace.sql') ORDER BY id`
+      `SELECT id, applied_at FROM schema_migrations WHERE id IN ('037_ads_manager.sql','038_creator_ledger_trace.sql') ORDER BY id`
     );
+    const book = await client.query(
+      `SELECT source, COUNT(*)::int AS n, COALESCE(SUM(amount_kz),0)::int AS kz
+       FROM creator_earnings
+       GROUP BY source
+       ORDER BY source`
+    );
+    const payouts = await client.query(
+      `SELECT status, COUNT(*)::int AS n, COALESCE(SUM(amount_kz),0)::int AS kz
+       FROM creator_payouts
+       GROUP BY status
+       ORDER BY status`
+    ).catch(() => ({ rows: [] }));
     const clicks = await client.query(
       `SELECT impression_id, COUNT(*)::int AS n
        FROM ad_clicks
@@ -107,9 +125,10 @@ async function main() {
       JSON.stringify(
         {
           host,
+          local,
           readOnly: true,
-          railway: 'não consultado',
-          applied: applied.rows.map((r) => r.id),
+          writes: false,
+          applied: applied.rows,
           adClicks: {
             uniqueIndex: Boolean(clickIdx.rowCount),
             duplicateGroups: clicks.rowCount,
@@ -126,10 +145,15 @@ async function main() {
             },
             viewAdShareWithoutTrace: orphans.rows[0],
           },
+          bookBySource: book.rows,
+          payoutsByStatus: payouts.rows,
+          bootAuthorized: false,
           note:
             extra.extra_rows > 0
-              ? 'Estas linhas NÃO devem ser apagadas no arranque. Inspeccione em produção com uma sessão só de leitura antes de qualquer limpeza manual.'
-              : 'Nesta base local não há duplicados que a 038 antiga teria apagado.',
+              ? 'Há créditos duplicados na chave de rastreio. A 038 nova não os apaga; não aplicar limpeza sem backup e reconciliação.'
+              : local
+                ? 'Nesta base local não há duplicados que a 038 antiga teria apagado. Produção ainda não está comprovada só com este resultado.'
+                : 'Inspeção remota só de leitura. Arranque da 038 não autorizado neste relatório.',
         },
         null,
         2
