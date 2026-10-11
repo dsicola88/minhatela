@@ -176,6 +176,20 @@ async function adminExperiments() {
   };
 }
 
+async function setExperimentActive(id, isActive) {
+  const { createError } = require('../utils/errors');
+  const row = await phase24Repository.setExperimentActive(id, isActive);
+  if (!row) throw createError(404, 'Experiência não encontrada', 'NOT_FOUND');
+  return {
+    experiment: {
+      id: row.id,
+      key: row.key,
+      name: row.name,
+      isActive: row.is_active,
+    },
+  };
+}
+
 module.exports = {
   listDevicesDetailed,
   setDeviceTrusted,
@@ -186,4 +200,5 @@ module.exports = {
   trendingSearches,
   trackSearchEvent,
   adminExperiments,
+  setExperimentActive,
 };

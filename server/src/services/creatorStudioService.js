@@ -355,7 +355,7 @@ async function createBunnySlot(userId, body) {
     libraryId: created.libraryId,
     upload: created.upload,
     message:
-      'Slot Bunny criado. Faça upload do ficheiro no dashboard Stream ou via TUS com as credenciais devolvidas.',
+      'Ficha de vídeo criada. Envie o ficheiro pelo link da biblioteca ou pelo envio retomável devolvido.',
   };
 }
 

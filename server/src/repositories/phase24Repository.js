@@ -100,6 +100,17 @@ async function trendingSearches({ days = 7, limit = 12 } = {}) {
   return result.rows;
 }
 
+async function setExperimentActive(id, isActive) {
+  const result = await query(
+    `UPDATE experiments
+     SET is_active = $2
+     WHERE id = $1
+     RETURNING *`,
+    [id, Boolean(isActive)]
+  );
+  return result.rows[0] || null;
+}
+
 async function adminListExperiments() {
   const result = await query(
     `SELECT e.*,
@@ -121,4 +132,5 @@ module.exports = {
   trackSearch,
   trendingSearches,
   adminListExperiments,
+  setExperimentActive,
 };

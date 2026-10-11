@@ -196,7 +196,7 @@ function getPlayerDefaults() {
     defaultQuality: '480p',
     forceHighQuality: false,
     allowedStartQualities: ['auto', '480p'],
-    drmReady: false,
+    drmReady: Boolean(env.bunny.drmEnabled),
     cdnTokenAuth: Boolean(env.bunny.tokenAuthKey),
     offlineSupported: Boolean(env.bunny.cdnHostname),
   });
@@ -234,6 +234,7 @@ async function createVideo({ title }) {
     throw createError(502, 'Bunny não devolveu GUID do vídeo', 'BUNNY_CREATE_FAILED');
   }
   logger.info('bunny.video_created', { videoId, libraryId, title });
+  const tus = createTusSession(String(videoId));
   return {
     videoId: String(videoId),
     libraryId: String(libraryId),
@@ -241,8 +242,27 @@ async function createVideo({ title }) {
       libraryId: String(libraryId),
       videoId: String(videoId),
       dashboardUrl: `https://dash.bunny.net/stream/${libraryId}/library/videos/${videoId}`,
-      // Upload via dashboard ou TUS com AccessKey da library
-      note: 'Faça upload do ficheiro no dashboard Bunny Stream para este videoId',
+      tus,
+      note: 'Envie o ficheiro pelo link da biblioteca ou pelo envio retomável (TUS).',
+    },
+  };
+}
+
+/** Sessão TUS oficial Bunny Stream — pronta quando o criador enviar o ficheiro. */
+function createTusSession(videoId) {
+  if (!env.bunny.apiKey || !env.bunny.libraryId || !videoId) return null;
+  const expirationTime = Math.floor(Date.now() / 1000) + 6 * 3600;
+  const signature = sha256Hex(
+    `${env.bunny.libraryId}${env.bunny.apiKey}${expirationTime}${videoId}`
+  );
+  return {
+    endpoint: 'https://video.bunnycdn.com/tusupload',
+    expirationTime,
+    headers: {
+      AuthorizationSignature: signature,
+      AuthorizationExpire: String(expirationTime),
+      LibraryId: String(env.bunny.libraryId),
+      VideoId: String(videoId),
     },
   };
 }
@@ -255,5 +275,6 @@ module.exports = {
   getPlayerDefaults,
   createToken,
   createVideo,
+  createTusSession,
   assertConfigured,
 };

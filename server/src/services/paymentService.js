@@ -58,6 +58,7 @@ function getMethods() {
       multicaixaRef: env.payments.multicaixaRef,
     },
     premiumPriceKz: env.premiumPriceKz,
+    instant: require('./paymentPspService').publicStatus(),
   };
 }
 

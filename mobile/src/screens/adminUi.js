@@ -4,6 +4,7 @@ import { colors } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { PrimaryButton } from '../components/ui';
 import Focusable from '../tv/Focusable';
+import { auditTitle, entityLabel } from './adminCopy';
 
 export function AdminButton(props) {
   return <PrimaryButton compact {...props} />;
@@ -68,8 +69,8 @@ export const NAV_GROUPS = [
     items: [
       { id: 'cms', label: 'Títulos', icon: 'film-outline' },
       { id: 'editorial', label: 'Editorial', icon: 'albums-outline' },
-      { id: 'catalog', label: 'Packs & estreias', icon: 'gift-outline' },
-      { id: 'uploads', label: 'Media uploads', icon: 'cloud-upload-outline' },
+      { id: 'catalog', label: 'Ofertas e estreias', icon: 'gift-outline' },
+      { id: 'uploads', label: 'Ficheiros', icon: 'cloud-upload-outline' },
     ],
   },
   {
@@ -90,7 +91,7 @@ export const NAV_GROUPS = [
   {
     id: 'mediaops',
     label: 'Media',
-    items: [{ id: 'media', label: 'CDN / encode', icon: 'cloud-outline' }],
+    items: [{ id: 'media', label: 'Vídeo e qualidade', icon: 'cloud-outline' }],
   },
   {
     id: 'gov',
@@ -107,10 +108,11 @@ export const NAV_GROUPS = [
     label: 'Plataforma',
     superOnly: true,
     items: [
-      { id: 'landing', label: 'Landing & textos', icon: 'color-palette-outline', superOnly: true },
-      { id: 'config', label: 'Textos & marca', icon: 'text-outline', superOnly: true },
-      { id: 'flags', label: 'Flags', icon: 'toggle-outline', superOnly: true },
-      { id: 'tenants', label: 'Tenants', icon: 'globe-outline', superOnly: true },
+      { id: 'landing', label: 'Página de entrada', icon: 'color-palette-outline', superOnly: true },
+      { id: 'config', label: 'Marca e textos', icon: 'text-outline', superOnly: true },
+      { id: 'flags', label: 'Funcionalidades', icon: 'toggle-outline', superOnly: true },
+      { id: 'tenants', label: 'Mercados', icon: 'globe-outline', superOnly: true },
+      { id: 'connections', label: 'Ligações', icon: 'link-outline', superOnly: true },
     ],
   },
 ];
@@ -452,6 +454,9 @@ export function QueueChip({ label, count, onPress }) {
 }
 
 export function AuditRow({ item }) {
+  const title = item.title || auditTitle(item.action);
+  const who = item.actor?.name || item.actor?.email || '';
+  const what = item.entityLabel || entityLabel(item.entity);
   return (
     <View
       style={{
@@ -473,11 +478,9 @@ export function AuditRow({ item }) {
         }}
       />
       <View style={{ flex: 1 }}>
-        <Text style={{ color: colors.text, fontWeight: '700' }}>{item.action}</Text>
+        <Text style={{ color: colors.text, fontWeight: '700' }}>{title}</Text>
         <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 2 }}>
-          {item.entity}
-          {item.actor?.email ? ` · ${item.actor.email}` : ''}
-          {item.ip ? ` · ${item.ip}` : ''}
+          {[what, who].filter(Boolean).join(' · ')}
         </Text>
         <Text style={{ color: colors.muted, fontSize: 11, marginTop: 4 }}>
           {item.createdAt ? new Date(item.createdAt).toLocaleString('pt-AO') : '—'}

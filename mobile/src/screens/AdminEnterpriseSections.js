@@ -12,6 +12,7 @@ import {
   AdminButton,
   ActionRow,
 } from './adminUi';
+import { uniqueRoleLabels, subscriptionLabel } from './adminCopy';
 import {
   updateUser,
   upsertPlan,
@@ -501,8 +502,8 @@ export function UsersTab({ users, userQuery, setUserQuery, onSearch, run, canMan
         compact
         subtitle={
           canManageAdmins
-            ? 'Promova operadores (Admin), Premium e four-eyes para SuperAdmin. Só SuperAdmin altera papéis de operador.'
-            : 'Pesquisa, Premium e estado de assinatura. Promoção de operadores está reservada ao SuperAdmin.'
+            ? 'Pessoas da MinhaTela: promover operadores, atribuir ou retirar Premium. Só o SuperAdmin altera quem opera a consola.'
+            : 'Pesquisa e Premium. Promover operadores é exclusivo do SuperAdmin.'
         }
       />
       <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -527,12 +528,11 @@ export function UsersTab({ users, userQuery, setUserQuery, onSearch, run, canMan
             <Text style={{ color: colors.textSecondary, marginTop: 2, fontSize: 13 }}>{u.email}</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
               <StatusBadge tone={toneForStatus(u.subscriptionStatus)}>
-                {u.subscriptionStatus || 'none'}
+                {u.subscriptionLabel || subscriptionLabel(u.subscriptionStatus)}
               </StatusBadge>
-              {u.isAdmin ? <StatusBadge tone="gold">admin</StatusBadge> : null}
-              {(u.roles || []).slice(0, 4).map((r) => (
-                <StatusBadge key={r} tone={r === 'super_admin' ? 'gold' : 'info'}>
-                  {r.replace(/_/g, ' ')}
+              {uniqueRoleLabels(u).map((label) => (
+                <StatusBadge key={label} tone={label === 'SuperAdmin' ? 'gold' : 'info'}>
+                  {label}
                 </StatusBadge>
               ))}
             </View>
@@ -956,9 +956,12 @@ export function AcquisitionTab({ items, run }) {
 export function RightsTab({ items }) {
   return (
     <View>
-      <PageHeader compact subtitle="Licença activa, território, janela e modalidades AVOD / SVOD / TVOD / LIVE." />
+      <PageHeader compact subtitle="Quem pode ver cada título, em que país e até quando: grátis, Premium, aluguer ou directo." />
       {(items || []).length === 0 ? (
-        <EmptyState title="Sem licenças registadas (legado = permitido)" />
+        <EmptyState
+          title="Ainda sem licenças escritas"
+          subtitle="Os títulos já publicados continuam visíveis em Angola até registar uma janela."
+        />
       ) : (
         items.map((r) => (
           <View key={r.id} style={getCardStyle()}>
@@ -985,10 +988,10 @@ export function TenantsTab({ items, run }) {
     <View>
       <PageHeader
         compact
-        subtitle="Isolamento de mercado. Suspender exige motivo e pode entrar em four-eyes."
+        subtitle="Cada mercado é independente. Suspender pede motivo escrito; com dois SuperAdmins a decisão exige os dois."
       />
       {(items || []).length === 0 ? (
-        <EmptyState title="Sem tenants" />
+        <EmptyState title="Sem mercados" />
       ) : (
         items.map((t) => (
           <View key={t.id} style={getCardStyle()}>
@@ -1010,7 +1013,7 @@ export function TenantsTab({ items, run }) {
             />
             {t.status === 'active' ? (
               <AdminButton
-                label="Suspender tenant"
+                label="Suspender mercado"
                 variant="outline"
                 onPress={() =>
                   run(`ten-${t.id}`, () => {
@@ -1036,6 +1039,43 @@ export function TenantsTab({ items, run }) {
                 }
               />
             )}
+          </View>
+        ))
+      )}
+    </View>
+  );
+}
+
+export function ConnectionsTab({ items }) {
+  const list = items || [];
+  return (
+    <View>
+      <PageHeader
+        compact
+        subtitle="O que já está ligado e o que falta quando falarmos com o banco, o email, o Google ou o vídeo. Sem passwords neste ecrã."
+      />
+      {list.length === 0 ? (
+        <EmptyState title="Sem estado de ligações" />
+      ) : (
+        list.map((c) => (
+          <View key={c.id} style={getCardStyle()}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+              <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16, flex: 1 }}>
+                {c.title}
+              </Text>
+              <StatusBadge tone={c.ready ? 'success' : 'warning'}>
+                {c.status || (c.ready ? 'ligado' : 'à espera')}
+              </StatusBadge>
+            </View>
+            {c.you ? (
+              <Text style={{ color: colors.textSecondary, marginTop: 10, lineHeight: 20 }}>{c.you}</Text>
+            ) : null}
+            {c.partner ? (
+              <Text style={{ color: colors.muted, marginTop: 6, fontSize: 12 }}>Fornecedor: {c.partner}</Text>
+            ) : null}
+            {c.webhook ? (
+              <Text style={{ color: colors.muted, marginTop: 6, fontSize: 12 }}>Entrada: {c.webhook}</Text>
+            ) : null}
           </View>
         ))
       )}

@@ -116,6 +116,15 @@ function createApp() {
   );
 
   app.post(
+    '/webhooks/payments/:provider',
+    rateLimit({ windowMs: 60_000, max: 60 }),
+    require('./utils/asyncHandler').asyncHandler(async (req, res) => {
+      const result = await require('./services/paymentPspService').handleWebhook(req);
+      res.json(result);
+    })
+  );
+
+  app.post(
     '/webhooks/bunny',
     rateLimit({ windowMs: 60_000, max: 120 }),
     require('./utils/asyncHandler').asyncHandler(async (req, res) => {

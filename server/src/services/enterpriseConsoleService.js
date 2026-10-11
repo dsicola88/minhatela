@@ -10,8 +10,10 @@ const { createError } = require('../utils/errors');
 
 /* ─── Users ─────────────────────────────────────────────── */
 
-async function listUsers({ q, limit = 40, offset = 0 } = {}) {
+async function listUsers({ q, limit = 40, offset = 0, includeLab } = {}) {
+  const { isLabEmail, roleLabel, subscriptionLabel } = require('../utils/opsCopy');
   const needle = q ? `%${String(q).trim().toLowerCase()}%` : null;
+  const hideLab = includeLab !== true && includeLab !== '1' && !needle;
   const result = await query(
     `SELECT u.id, u.email, u.full_name, u.subscription_status, u.premium_expires_at,
             u.is_admin, u.created_at, u.updated_at,
@@ -26,8 +28,24 @@ async function listUsers({ q, limit = 40, offset = 0 } = {}) {
      GROUP BY u.id
      ORDER BY u.created_at DESC
      LIMIT $2 OFFSET $3`,
-    [needle, Math.min(100, Number(limit) || 40), Math.max(0, Number(offset) || 0)]
+    [needle, Math.min(200, Number(limit) || 40), Math.max(0, Number(offset) || 0)]
   );
+  let users = result.rows.map((r) => ({
+    id: r.id,
+    email: r.email,
+    fullName: r.full_name,
+    subscriptionStatus: r.subscription_status,
+    subscriptionLabel: subscriptionLabel(r.subscription_status),
+    premiumExpiresAt: r.premium_expires_at,
+    isAdmin: r.is_admin,
+    roles: r.roles || [],
+    roleLabels: (r.roles || []).map(roleLabel).filter(Boolean),
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  }));
+  if (hideLab) {
+    users = users.filter((u) => !isLabEmail(u.email));
+  }
   const count = await query(
     `SELECT COUNT(*)::int AS c FROM users u
      WHERE ${require('../utils/tenantScope').opsUserSql('u')}
@@ -37,18 +55,8 @@ async function listUsers({ q, limit = 40, offset = 0 } = {}) {
     [needle]
   );
   return {
-    total: count.rows[0].c,
-    users: result.rows.map((r) => ({
-      id: r.id,
-      email: r.email,
-      fullName: r.full_name,
-      subscriptionStatus: r.subscription_status,
-      premiumExpiresAt: r.premium_expires_at,
-      isAdmin: r.is_admin,
-      roles: r.roles || [],
-      createdAt: r.created_at,
-      updatedAt: r.updated_at,
-    })),
+    total: hideLab ? users.length : count.rows[0].c,
+    users: users.slice(0, Math.min(100, Number(limit) || 40)),
   };
 }
 

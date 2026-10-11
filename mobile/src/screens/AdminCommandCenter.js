@@ -73,6 +73,7 @@ import {
   fetchEncoding,
   fetchPaymentRisk,
   fetchExperiments,
+  setExperimentActive,
   fetchUsers,
   fetchAdminPlans,
   fetchLeads,
@@ -85,6 +86,7 @@ import {
   fetchAcquisitions,
   fetchRights,
   fetchTenants,
+  fetchConnections,
   createAcquisition,
   fetchApprovals,
   decideApproval,
@@ -104,6 +106,7 @@ import {
   AcquisitionTab,
   RightsTab,
   TenantsTab,
+  ConnectionsTab,
 } from './AdminEnterpriseSections';
 
 function getCardStyle() {
@@ -160,6 +163,7 @@ export default function AdminCommandCenter({ onBack }) {
   const [acquisitions, setAcquisitions] = useState([]);
   const [rights, setRights] = useState([]);
   const [tenants, setTenants] = useState([]);
+  const [connections, setConnections] = useState([]);
   const [acqTitle, setAcqTitle] = useState('');
   const [catalogQuery, setCatalogQuery] = useState('');
   const [userQuery, setUserQuery] = useState('');
@@ -351,6 +355,10 @@ export default function AdminCommandCenter({ onBack }) {
       const d = await fetchTenants().catch(() => ({ tenants: [] }));
       setTenants(d.tenants || []);
     }
+    if (nextTab === 'connections') {
+      const d = await fetchConnections().catch(() => ({ items: [] }));
+      setConnections(d.items || []);
+    }
     } finally {
       setTabLoading(false);
     }
@@ -474,8 +482,8 @@ export default function AdminCommandCenter({ onBack }) {
               compact
               subtitle={
                 roleLabel === 'SuperAdmin'
-                  ? 'Plataforma: marca, landing, flags, tenants e promoção de operadores. Sem código.'
-                  : 'Operação do tenant: filas, catálogo, pagamentos e atendimento. Sem acesso a flags, tenants ou textos da plataforma.'
+                  ? 'Marca, página de entrada, funcionalidades, mercados e operadores — tudo daqui, sem pedir a engenharia.'
+                  : 'Filas, catálogo, pagamentos e atendimento deste mercado. A marca e as funcionalidades da plataforma ficam no SuperAdmin.'
               }
             />
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 8 }}>
@@ -517,13 +525,13 @@ export default function AdminCommandCenter({ onBack }) {
               <QueueChip label="Atendimento" count={queues.tickets || 0} onPress={() => setTab('support')} />
               <QueueChip label="Criadores" count={queues.creators || 0} onPress={() => setTab('moderation')} />
               <QueueChip label="Conteúdo" count={queues.content || 0} onPress={() => setTab('moderation')} />
-              <QueueChip label="Payouts" count={queues.payouts || 0} onPress={() => setTab('moderation')} />
+              <QueueChip label="Pagamentos a criadores" count={queues.payouts || 0} onPress={() => setTab('moderation')} />
               <QueueChip label="Campanhas" count={queues.campaigns || 0} onPress={() => setTab('moderation')} />
             </View>
 
             {approvals.length > 0 ? (
               <View>
-                <SectionTitle>Four-eyes pendente</SectionTitle>
+                <SectionTitle>À espera do segundo SuperAdmin</SectionTitle>
                 {approvals.map((req) => (
                   <View key={req.id} style={getCardStyle()}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
@@ -646,7 +654,7 @@ export default function AdminCommandCenter({ onBack }) {
           <View>
             <PageHeader
               compact
-              subtitle="Confirmação manual IBAN / Multicaixa. Aprovações disparam entitlement no servidor."
+              subtitle="Confirme transferências IBAN e referências Multicaixa. Quando aprova, o Premium ou o aluguer libertam-se na hora."
             />
             {payments.length === 0 ? (
               <EmptyState title="Fila limpa" subtitle="Nenhum comprovativo à espera." />
@@ -1015,10 +1023,10 @@ export default function AdminCommandCenter({ onBack }) {
           <View>
             <PageHeader
               compact
-              subtitle="Ligar ou desligar capacidades da app sem deploy. Mutações só SuperAdmin."
+              subtitle="Ligue ou desligue partes da app (checkout, extras, experiências) sem esperar por um lançamento."
             />
             {flags.length === 0 ? (
-              <EmptyState title="Sem flags" />
+              <EmptyState title="Nenhuma funcionalidade configurada" />
             ) : (
               flags.map((f) => (
                 <View
@@ -1032,9 +1040,8 @@ export default function AdminCommandCenter({ onBack }) {
                   }}
                 >
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: colors.text, fontWeight: '700' }}>{f.key}</Text>
-                    <Text style={{ color: colors.muted, marginTop: 4 }}>
-                      {f.description || '—'}
+                    <Text style={{ color: colors.text, fontWeight: '700' }}>
+                      {f.description || f.key}
                     </Text>
                   </View>
                   <Switch
@@ -1049,19 +1056,43 @@ export default function AdminCommandCenter({ onBack }) {
               ))
             )}
 
-            <SectionTitle>Experiências A/B</SectionTitle>
+            <SectionTitle>Testes de ecrã (A/B)</SectionTitle>
             {experiments.length === 0 ? (
-              <EmptyState title="Sem experiências activas" />
+              <EmptyState title="Nenhum teste a correr" />
             ) : (
               experiments.map((e, idx) => (
-                <View key={e.key || e.id || idx} style={getCardStyle()}>
-                  <Text style={{ color: colors.text, fontWeight: '700' }}>
-                    {e.key || e.name || e.id}
-                  </Text>
-                  <Text style={{ color: colors.muted, marginTop: 4 }}>
-                    {(e.variants || []).join(' / ') || '—'} · {e.assignments ?? 0} atribuições ·{' '}
-                    {e.isActive ? 'activa' : 'inactiva'}
-                  </Text>
+                <View
+                  key={e.key || e.id || idx}
+                  style={{
+                    ...getCardStyle(),
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: colors.text, fontWeight: '700' }}>
+                      {e.name || e.key || e.id}
+                    </Text>
+                    <Text style={{ color: colors.muted, marginTop: 4 }}>
+                      {e.description ||
+                        (Array.isArray(e.variants) ? e.variants.join(' · ') : 'Duas versões do ecrã')}
+                      {e.assignments ? ` · ${e.assignments} pessoas` : ''}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={Boolean(e.isActive)}
+                    onValueChange={(isActive) =>
+                      run(`exp-${e.id}`, async () => {
+                        await setExperimentActive(e.id, isActive);
+                        const d = await fetchExperiments();
+                        setExperiments(d.experiments || d.items || []);
+                      })
+                    }
+                    trackColor={{ false: colors.border, true: colors.red }}
+                    thumbColor={colors.text}
+                  />
                 </View>
               ))
             )}
@@ -1082,10 +1113,10 @@ export default function AdminCommandCenter({ onBack }) {
           <View>
             <PageHeader
               compact
-              subtitle="Saúde Bunny Stream e fila de encode. Sem JSON cru."
+              subtitle="A imagem chega bem aos telemóveis? Verifique a rede de vídeo e o que ainda está a processar."
               extra={
                 <AdminButton
-                  label={busy === 'cdn-probe' ? 'A testar…' : 'Probe CDN'}
+                  label={busy === 'cdn-probe' ? 'A verificar…' : 'Verificar rede'}
                   onPress={() =>
                     run('cdn-probe', async () => {
                       const r = await probeCdn();
@@ -1102,7 +1133,7 @@ export default function AdminCommandCenter({ onBack }) {
             />
             <View style={getCardStyle()}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
-                <Text style={{ color: colors.text, fontWeight: '700' }}>Bunny / CDN</Text>
+                <Text style={{ color: colors.text, fontWeight: '700' }}>Rede de vídeo</Text>
                 <StatusBadge tone={cdn?.healthy ? 'success' : cdn?.latest ? 'warning' : 'info'}>
                   {cdn?.healthy ? 'saudável' : cdn?.latest ? 'atenção' : 'sem probe'}
                 </StatusBadge>
@@ -1122,9 +1153,9 @@ export default function AdminCommandCenter({ onBack }) {
                 <Text style={{ color: colors.gold, marginTop: 8 }}>{String(cdn.latest.error)}</Text>
               ) : null}
             </View>
-            <SectionTitle>Fila de encoding</SectionTitle>
+            <SectionTitle>A processar qualidade</SectionTitle>
             {encoding.length === 0 ? (
-              <EmptyState title="Fila vazia ou encoding desactivado" />
+              <EmptyState title="Nada a processar" subtitle="Quando um título entra, aparece aqui até ficar pronto a ver." />
             ) : (
               encoding.slice(0, 30).map((item) => (
                 <View key={item.id || item.contentId} style={getCardStyle()}>
@@ -1328,7 +1359,7 @@ export default function AdminCommandCenter({ onBack }) {
 
         {tab === 'live' ? (
           <View>
-            <PageHeader compact subtitle="Sessões de playback activas neste momento." />
+            <PageHeader compact subtitle="Quem está a ver agora, em que dispositivo." />
             {streams.length === 0 ? (
               <EmptyState title="Ninguém a assistir agora" />
             ) : (
@@ -1346,7 +1377,7 @@ export default function AdminCommandCenter({ onBack }) {
 
         {tab === 'audit' ? (
           <View>
-            <PageHeader compact subtitle="Acções privilegiadas com actor, entidade e IP." />
+            <PageHeader compact subtitle="Quem fez o quê, e quando. Útil para disputas e segurança." />
             {audit.length === 0 ? (
               <EmptyState title="Sem registos" />
             ) : (
@@ -1381,6 +1412,7 @@ export default function AdminCommandCenter({ onBack }) {
         ) : null}
         {tab === 'rights' ? <RightsTab items={rights} /> : null}
         {tab === 'tenants' ? <TenantsTab items={tenants} run={run} /> : null}
+        {tab === 'connections' ? <ConnectionsTab items={connections} /> : null}
       </ScrollView>
 
       <Modal visible={Boolean(rejectTarget)} transparent animationType="fade">

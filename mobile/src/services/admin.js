@@ -180,6 +180,10 @@ export async function fetchExperiments() {
   return api.get('/api/admin/experiments');
 }
 
+export async function setExperimentActive(id, isActive) {
+  return api.patch(`/api/admin/experiments/${id}`, { isActive });
+}
+
 export async function fetchUsers(params = {}) {
   const q = new URLSearchParams();
   if (params.q) q.set('q', params.q);
@@ -324,6 +328,7 @@ export default {
   updateEncoding,
   fetchPaymentRisk,
   fetchExperiments,
+  setExperimentActive,
   fetchUsers,
   updateUser,
   fetchAdminPlans,
@@ -371,6 +376,10 @@ export async function createRight(body) {
 
 export async function fetchTenants() {
   return api.get('/api/admin/tenants');
+}
+
+export async function fetchConnections() {
+  return api.get('/api/admin/connections');
 }
 
 export async function updateTenant(id, body) {

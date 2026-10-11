@@ -129,6 +129,14 @@ router.patch(
 );
 
 router.get(
+  '/connections',
+  superOnly,
+  asyncHandler(async (_req, res) => {
+    res.json(require('../services/connectionsService').list());
+  })
+);
+
+router.get(
   '/feature-flags',
   elevated,
   asyncHandler(async (_req, res) => {
@@ -309,6 +317,19 @@ router.get(
   '/experiments',
   asyncHandler(async (_req, res) => {
     const result = await require('../services/phase24Service').adminExperiments();
+    res.json(result);
+  })
+);
+router.patch(
+  '/experiments/:id',
+  requirePermission('platform.settings.manage'),
+  asyncHandler(async (req, res) => {
+    const next =
+      req.body.isActive !== undefined ? req.body.isActive : req.body.enabled;
+    const result = await require('../services/phase24Service').setExperimentActive(
+      req.params.id,
+      next !== false
+    );
     res.json(result);
   })
 );

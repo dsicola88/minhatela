@@ -169,7 +169,9 @@ function mapAudit(row) {
   return {
     id: row.id,
     action: row.action,
+    title: require('../utils/opsCopy').auditTitle(row.action),
     entity: row.entity,
+    entityLabel: require('../utils/opsCopy').entityLabel(row.entity),
     entityId: row.entity_id,
     metadata: row.metadata || {},
     ip: row.ip,

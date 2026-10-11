@@ -144,7 +144,7 @@ export default function CreatorStudio({ onBack, onCompany }) {
       const data = await createBunnyVideoSlot({ title: contentForm.title.trim() });
       setContentForm((s) => ({ ...s, bunnyVideoId: data.bunnyVideoId || '' }));
       if (data.upload?.dashboardUrl) {
-        setError(`Slot criado. Faça upload em: ${data.upload.dashboardUrl}`);
+        setError(`Ficha criada. Envie o ficheiro na biblioteca de vídeo: ${data.upload.dashboardUrl}`);
       }
     } catch (err) {
       setError(err.message);

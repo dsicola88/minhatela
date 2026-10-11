@@ -98,12 +98,18 @@ const env = Object.freeze({
     tokenAuthKey: process.env.BUNNY_TOKEN_AUTH_KEY || '',
     requireToken: process.env.BUNNY_REQUIRE_TOKEN === 'true',
     tokenAuthWithIp: process.env.BUNNY_TOKEN_AUTH_WITH_IP === 'true',
+    drmEnabled: process.env.BUNNY_DRM_ENABLED === 'true',
+    webhookSecret: process.env.BUNNY_WEBHOOK_SECRET || '',
   }),
   payments: Object.freeze({
     iban: process.env.PLATFORM_IBAN || '',
     bankName: process.env.PLATFORM_BANK_NAME || 'Banco Atlântico',
     accountName: process.env.PLATFORM_ACCOUNT_NAME || 'MinhaTela Lda',
     multicaixaRef: process.env.PLATFORM_MULTICAIXA_REF || null,
+    pspProvider: String(process.env.PSP_PROVIDER || '').toLowerCase(),
+    pspApiBaseUrl: process.env.PSP_API_BASE_URL || '',
+    pspApiKey: process.env.PSP_API_KEY || '',
+    pspWebhookSecret: process.env.PSP_WEBHOOK_SECRET || '',
   }),
   uploadsDir: path.resolve(__dirname, '../../uploads'),
   oauth: Object.freeze({
