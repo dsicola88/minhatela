@@ -90,6 +90,7 @@ import {
   createAcquisition,
   fetchApprovals,
   decideApproval,
+  postCreatorLedger,
 } from '../services/admin';
 import { fetchPendingPayouts, reviewPayout } from '../services/payouts';
 import {
@@ -176,6 +177,12 @@ export default function AdminCommandCenter({ onBack }) {
   });
   const [editorialForm, setEditorialForm] = useState({ slug: '', title: '', subtitle: '' });
   const [giftForm, setGiftForm] = useState({ email: '', days: '30', note: '' });
+  const [ledgerForm, setLedgerForm] = useState({
+    creatorId: '',
+    source: 'adjustment',
+    amountKz: '',
+    reason: '',
+  });
   const [configDrafts, setConfigDrafts] = useState({});
   const [busy, setBusy] = useState(null);
   const [rejectTarget, setRejectTarget] = useState(null);
@@ -937,9 +944,16 @@ export default function AdminCommandCenter({ onBack }) {
                   <Text style={{ color: colors.text, fontWeight: '700' }}>
                     {p.displayName || p.creatorName} · {p.amountKz?.toLocaleString('pt-AO')} Kz
                   </Text>
+                  <Text style={{ color: colors.muted, marginTop: 4 }}>
+                    {p.email || ''}
+                    {p.bankIban ? ` · IBAN …${String(p.bankIban).slice(-4)}` : ' · sem IBAN'}
+                  </Text>
+                  <Text style={{ color: colors.muted, marginTop: 4 }}>
+                    Marcar pago só depois da transferência fora da app. Isto não envia dinheiro.
+                  </Text>
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
                     <AdminButton
-                      label="Pagar"
+                      label="Marcar pago"
                       onPress={() => run(p.id, () => reviewPayout(p.id, { status: 'paid' }))}
                     />
                     <AdminButton
@@ -951,6 +965,63 @@ export default function AdminCommandCenter({ onBack }) {
                 </View>
               ))
             )}
+
+            <SectionTitle>Livro do cineasta</SectionTitle>
+            <View style={getCardStyle()}>
+              <Text style={{ color: colors.muted, marginBottom: 10, lineHeight: 20 }}>
+                Ajuste aumenta o saldo. Reversão reduz. Não é pagamento bancário. Use o identificador do cineasta.
+              </Text>
+              <TextInput
+                value={ledgerForm.creatorId}
+                onChangeText={(creatorId) => setLedgerForm((f) => ({ ...f, creatorId }))}
+                placeholder="identificador do cineasta"
+                placeholderTextColor={colors.muted}
+                autoCapitalize="none"
+                style={inputStyle()}
+              />
+              <View style={{ flexDirection: 'row', gap: 12, marginBottom: 10 }}>
+                {[['adjustment', 'Ajuste'], ['reversal', 'Reversão']].map(([id, label]) => (
+                  <AdminButton
+                    key={id}
+                    label={label}
+                    variant={ledgerForm.source === id ? undefined : 'outline'}
+                    onPress={() => setLedgerForm((f) => ({ ...f, source: id }))}
+                  />
+                ))}
+              </View>
+              <TextInput
+                value={ledgerForm.amountKz}
+                onChangeText={(amountKz) => setLedgerForm((f) => ({ ...f, amountKz }))}
+                placeholder="valor em Kz"
+                keyboardType="numeric"
+                placeholderTextColor={colors.muted}
+                style={inputStyle()}
+              />
+              <TextInput
+                value={ledgerForm.reason}
+                onChangeText={(reason) => setLedgerForm((f) => ({ ...f, reason }))}
+                placeholder="motivo (obrigatório para a auditoria)"
+                placeholderTextColor={colors.muted}
+                style={inputStyle()}
+              />
+              <AdminButton
+                label="Lançar no livro"
+                onPress={() =>
+                  run('ledger', async () => {
+                    if (!ledgerForm.creatorId || !ledgerForm.amountKz || !ledgerForm.reason.trim()) {
+                      throw new Error('Identificador, valor e motivo são obrigatórios.');
+                    }
+                    await postCreatorLedger({
+                      creatorId: ledgerForm.creatorId.trim(),
+                      source: ledgerForm.source,
+                      amountKz: Number(ledgerForm.amountKz),
+                      reason: ledgerForm.reason.trim(),
+                    });
+                    setLedgerForm({ creatorId: '', source: 'adjustment', amountKz: '', reason: '' });
+                  })
+                }
+              />
+            </View>
 
             <SectionTitle>Anúncios à espera</SectionTitle>
             {campaigns.length === 0 ? (

@@ -55,6 +55,20 @@ async function updateStatus(id, status) {
   return result.rows[0] || null;
 }
 
+async function updateBank(id, { bankIban, bankName, bankAccountName }) {
+  const result = await query(
+    `UPDATE creators
+     SET bank_iban = $2,
+         bank_name = COALESCE($3, bank_name),
+         bank_account_name = COALESCE($4, bank_account_name),
+         updated_at = NOW()
+     WHERE id = $1
+     RETURNING *`,
+    [id, bankIban, bankName || null, bankAccountName || null]
+  );
+  return result.rows[0] || null;
+}
+
 async function listPending() {
   const { opsVideoSql } = require('../utils/tenantScope');
   const result = await query(
@@ -73,5 +87,6 @@ module.exports = {
   findById,
   create,
   updateStatus,
+  updateBank,
   listPending,
 };

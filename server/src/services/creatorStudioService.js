@@ -6,6 +6,13 @@ const userRepository = require('../repositories/userRepository');
 const auditRepository = require('../repositories/auditRepository');
 const { createError } = require('../utils/errors');
 const { assertPositiveKz } = require('../utils/money');
+const { env } = require('../config/env');
+const {
+  rightsConfirmed,
+  encodingBlocksPublish,
+  periodDays,
+  MIN_PAYOUT_KZ,
+} = require('../utils/studioRules');
 
 function mapCreator(row) {
   if (!row) return null;
@@ -166,26 +173,119 @@ async function registerCreator(userId, body) {
   return { creator: mapCreator(creator), alreadyExists: false };
 }
 
-async function getStudioHome(userId) {
+async function getStudioHome(userId, { period } = {}) {
   const creator = await creatorRepository.findByUserId(userId);
   if (!creator) {
-    return { creator: null, contents: [], analytics: null, guide: studioGuide(null, []) };
+    return { creator: null, contents: [], analytics: null, guide: studioGuide(null, []), tasks: studioTasks(null, []) };
   }
 
+  const days = periodDays(period);
   const [contents, analytics] = await Promise.all([
     creatorContentRepository.listByCreator(creator.id),
     creator.status === 'active'
-      ? creatorContentRepository.creatorAnalytics(creator.id)
+      ? creatorContentRepository.creatorAnalytics(creator.id, { periodDays: days })
       : null,
   ]);
 
   const mapped = contents.map(mapContent);
+  let studioAnalytics = analytics;
+  if (studioAnalytics) {
+    const payoutService = require('./payoutService');
+    const [finance, payouts] = await Promise.all([
+      payoutService.balance(creator.id),
+      payoutService.statusCounts(creator.id),
+    ]);
+    studioAnalytics = {
+      ...studioAnalytics,
+      period: days ? `${days}d` : 'all',
+      finance,
+      payouts,
+      rules: monetizationRules(),
+      unavailable: unavailableMetrics(),
+    };
+  }
+
   return {
     creator: mapCreator(creator),
     contents: mapped,
-    analytics,
+    analytics: studioAnalytics,
     guide: studioGuide(mapCreator(creator), mapped),
+    tasks: studioTasks(mapCreator(creator), mapped, studioAnalytics?.payouts),
   };
+}
+
+function monetizationRules() {
+  const viewKz = Math.max(0, Number(env.creatorViewKz || 0));
+  const adSharePercent = Math.round(Number(env.creatorAdShareBps || 0) / 100);
+  return {
+    qualifiedView:
+      'Uma visualização válida conta quando a reprodução chega a 92% e essa pessoa ainda não foi contada nesse filme nesse dia.',
+    viewKz,
+    adSharePercent,
+    minPayoutKz: MIN_PAYOUT_KZ,
+    territory: env.market?.country || 'AO',
+    subscriptionShare: null,
+    rentalShare: null,
+  };
+}
+
+function unavailableMetrics() {
+  return [
+    { id: 'impressions', label: 'Impressões do cartaz', reason: 'Este evento não é registado.' },
+    { id: 'watchTime', label: 'Tempo total assistido', reason: 'Só guardamos a última posição, não o tempo acumulado.' },
+    { id: 'pendingRevenue', label: 'Receita por confirmar', reason: 'O livro só tem receita já registada.' },
+    { id: 'commissions', label: 'Comissões e reembolsos', reason: 'Não há movimentos deste tipo no livro.' },
+    { id: 'subscriptionShare', label: 'Parte da assinatura Premium', reason: 'A assinatura não credita o estúdio.' },
+    { id: 'rentalShare', label: 'Parte do aluguer', reason: 'O preço do aluguer não credita o estúdio.' },
+  ];
+}
+
+function studioTasks(creator, contents, payouts) {
+  const tasks = [];
+  if (!creator) {
+    tasks.push({ id: 'apply', title: 'Pedir o estúdio', detail: 'Sem candidatura aceite não há envio de filmes.' });
+    return tasks;
+  }
+  if (creator.status === 'pending') {
+    tasks.push({ id: 'pending', title: 'Candidatura à espera', detail: 'A equipa ainda não decidiu.' });
+  }
+  if (creator.status === 'rejected') {
+    tasks.push({ id: 'rejected-studio', title: 'Candidatura recusada', detail: 'Fale com a MinhaTela para voltar a candidatar-se.' });
+  }
+  const rejected = (contents || []).filter((item) => item.workflowStatus === 'rejected');
+  if (rejected.length) {
+    tasks.push({
+      id: 'fix-films',
+      title: `${rejected.length} filme(s) para corrigir`,
+      detail: 'A recusa traz o motivo. Pode editar e enviar outra vez.',
+    });
+  }
+  const processing = (contents || []).filter((item) =>
+    encodingBlocksPublish(item.encodingStatus) &&
+    ['processing', 'encoding', 'queued'].includes(String(item.encodingStatus || '').toLowerCase())
+  );
+  if (processing.length) {
+    tasks.push({
+      id: 'encoding',
+      title: `${processing.length} ficheiro(s) a processar`,
+      detail: 'A equipa não publica enquanto a qualidade não estiver pronta.',
+    });
+  }
+  if (payouts?.pending) {
+    tasks.push({
+      id: 'payout',
+      title: `${payouts.pending} levantamento(s) em curso`,
+      detail: 'O pedido está com a equipa financeira. Ainda não é um pagamento feito.',
+    });
+  }
+  if (creator.status === 'active' && !creator.bankIban) {
+    tasks.push({
+      id: 'iban',
+      title: 'Falta o IBAN',
+      detail: 'Sem IBAN a equipa não trata levantamentos. Guarde-o em Receitas.',
+    });
+  }
+  return tasks;
 }
 
 async function createContent(userId, body) {
@@ -240,7 +340,7 @@ async function updateContent(userId, contentId, body) {
   return { content: mapContent(row) };
 }
 
-async function submitContent(userId, contentId) {
+async function submitContent(userId, contentId, body = {}) {
   const creator = await requireActiveCreator(userId);
   const current = await creatorContentRepository.findOwned(contentId, creator.id);
   if (!current) {
@@ -254,18 +354,44 @@ async function submitContent(userId, contentId) {
       'BUNNY_VIDEO_REQUIRED'
     );
   }
+  if (!rightsConfirmed(body)) {
+    throw createError(
+      400,
+      'Confirme que tem autorização para distribuir este filme na MinhaTela. Esta confirmação é uma declaração, não uma prova de propriedade.',
+      'RIGHTS_NOT_CONFIRMED'
+    );
+  }
   const row = await creatorContentRepository.submitForReview(contentId, creator.id);
   if (!row) {
     throw createError(404, 'Conteúdo não pode ser submetido', 'NOT_SUBMISSION');
   }
 
+  const rightsConfirmedAt = new Date().toISOString();
   await auditRepository.write({
     actorId: userId,
     action: 'CONTENT_SUBMITTED',
     entity: 'video',
     entityId: contentId,
-    metadata: { creatorId: creator.id },
+      metadata: {
+      creatorId: creator.id,
+      rightsConfirmed: true,
+      rightsConfirmedAt,
+      ownershipProven: false,
+      territory: env.market?.country || 'AO',
+    },
   });
+
+  try {
+    await require('./notificationService').notify({
+      userId,
+      type: 'content_submitted',
+      title: 'Filme enviado',
+      body: `"${row.title}" está na mesa da equipa. Não entra no catálogo até haver decisão.`,
+      data: { contentId, status: 'submitted' },
+    });
+  } catch {
+    /* notify best-effort */
+  }
 
   return { content: mapContent(row) };
 }
@@ -404,7 +530,7 @@ async function adminModerateContent(adminId, contentId, { action, rejectionReaso
       );
     }
     const encoding = String(pending.encoding_status || '').toLowerCase();
-    if (['processing', 'encoding', 'queued', 'error', 'failed'].includes(encoding)) {
+    if (encodingBlocksPublish(encoding)) {
       throw createError(
         400,
         'O ficheiro ainda está a processar qualidade. Espere e publique de novo.',
@@ -475,9 +601,34 @@ async function createBunnySlot(userId, body) {
   };
 }
 
+async function updateBankDetails(userId, body = {}) {
+  const creator = await creatorRepository.findByUserId(userId);
+  if (!creator) {
+    throw createError(403, 'Peça o estúdio primeiro', 'CREATOR_REQUIRED');
+  }
+  const bankIban = String(body.bankIban || '').replace(/\s/g, '').toUpperCase();
+  if (bankIban.length < 15) {
+    throw createError(400, 'IBAN inválido', 'VALIDATION');
+  }
+  const row = await creatorRepository.updateBank(creator.id, {
+    bankIban,
+    bankName: body.bankName,
+    bankAccountName: body.bankAccountName,
+  });
+  await auditRepository.write({
+    actorId: userId,
+    action: 'CREATOR_BANK_UPDATED',
+    entity: 'creator',
+    entityId: creator.id,
+    metadata: { last4: bankIban.slice(-4) },
+  });
+  return { creator: mapCreator(row) };
+}
+
 module.exports = {
   registerCreator,
   getStudioHome,
+  updateBankDetails,
   createContent,
   updateContent,
   submitContent,

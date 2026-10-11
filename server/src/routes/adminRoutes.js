@@ -98,6 +98,31 @@ router.patch(
 
 router.get('/payouts/pending', requirePermission('finance.review'), asyncHandler(payoutController.pending));
 router.patch('/payouts/:id/status', requirePermission('finance.review'), asyncHandler(payoutController.review));
+router.post(
+  '/creator-ledger',
+  requirePermission('finance.review'),
+  asyncHandler(async (req, res) => {
+    const creatorEarningsService = require('../services/creatorEarningsService');
+    const auditRepository = require('../repositories/auditRepository');
+    const entry = await creatorEarningsService.postStaffEntry({
+      creatorId: req.body.creatorId,
+      contentId: req.body.contentId || null,
+      source: req.body.source,
+      amountKz: req.body.amountKz,
+      traceKey: req.body.traceKey,
+      reason: req.body.reason,
+    });
+    await auditRepository.write({
+      actorId: req.user.id,
+      action: 'CREATOR_LEDGER_POSTED',
+      entity: 'creator_earning',
+      entityId: entry.id,
+      metadata: { source: entry.source, amountKz: entry.amountKz, creatorId: req.body.creatorId },
+      ip: req.ip,
+    });
+    res.status(201).json({ entry });
+  })
+);
 
 router.get(
   '/promos',

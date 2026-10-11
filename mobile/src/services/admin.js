@@ -393,3 +393,7 @@ export async function fetchApprovals() {
 export async function decideApproval(id, body) {
   return api.post(`/api/admin/approvals/${id}/decide`, body);
 }
+
+export async function postCreatorLedger(body) {
+  return api.post('/api/admin/creator-ledger', body);
+}

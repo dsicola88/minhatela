@@ -50,7 +50,7 @@ async function review({ reportId, reviewerId, status, notes }) {
          reviewed_at = NOW(),
          review_notes = $4
      WHERE id = $1
-     RETURNING id, status, reviewed_at`,
+     RETURNING id, content_id, status, reviewed_at`,
     [reportId, status, reviewerId, notes || null]
   );
   return result.rows[0] || null;

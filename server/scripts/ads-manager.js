@@ -213,6 +213,36 @@ async function run() {
     assert(r.status === 400, `got ${r.status}`);
   });
 
+  await step('Recusada não volta a ser entregue', async () => {
+    const r = await req('POST', '/api/ads/campaigns', {
+      token: a.token,
+      body: {
+        name: 'Campanha recusada',
+        budgetKz: 8000,
+        startsAt: new Date().toISOString(),
+        endsAt: new Date(Date.now() + 7 * 86400000).toISOString(),
+        creative: { mediaUrl: 'https://example.com/rejected.mp4' },
+      },
+    });
+    const id = r.json?.campaign?.id;
+    assert(id, 'rejected campaign id');
+    const rej = await req('PATCH', `/api/admin/campaigns/${id}/status`, {
+      token: adminToken,
+      body: { status: 'rejected', reason: 'Não cumpre as regras MinhaTela' },
+    });
+    assert(rej.status === 200 && rej.json?.campaign?.status === 'rejected', `rej ${rej.status}`);
+    const cheat = await req('PATCH', `/api/admin/campaigns/${id}/status`, {
+      token: a.token,
+      body: { status: 'active' },
+    });
+    assert([401, 403].includes(cheat.status), `advertiser activate ${cheat.status}`);
+    const d = await req('POST', '/api/ads/decision', {
+      token: a.token,
+      body: { contentId, monetization: 'avod', placement: 'pre_roll' },
+    });
+    assert(d.json?.decision?.campaignId !== id, 'rejected served');
+  });
+
   await step('Pôr no ar', async () => {
     const r = await req('PATCH', `/api/admin/campaigns/${campaignId}/status`, {
       token: adminToken,

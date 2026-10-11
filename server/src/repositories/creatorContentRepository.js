@@ -227,14 +227,26 @@ async function moderate(contentId, { status, reviewerId, rejectionReason }) {
   return result.rows[0] || null;
 }
 
-async function creatorAnalytics(creatorId) {
-  const [content, views, earnings, audience] = await Promise.all([
+async function creatorAnalytics(creatorId, { periodDays = null } = {}) {
+  const days = Number.isInteger(periodDays) && periodDays > 0 ? periodDays : null;
+  const params = days ? [creatorId, days] : [creatorId];
+  const eventWindow = days ? `AND ae.created_at >= NOW() - ($2::int * INTERVAL '1 day')` : '';
+  const earnWindow = days ? `AND created_at >= NOW() - ($2::int * INTERVAL '1 day')` : '';
+
+  const [content, views, earnings, audience, bySource] = await Promise.all([
     query(
       `SELECT
          COUNT(*)::int AS total,
          COUNT(*) FILTER (WHERE workflow_status = 'published')::int AS published,
          COUNT(*) FILTER (WHERE workflow_status = 'submitted')::int AS submitted,
-         COUNT(*) FILTER (WHERE workflow_status = 'draft')::int AS drafts
+         COUNT(*) FILTER (WHERE workflow_status = 'under_review')::int AS under_review,
+         COUNT(*) FILTER (WHERE workflow_status = 'draft')::int AS drafts,
+         COUNT(*) FILTER (WHERE workflow_status = 'rejected')::int AS rejected,
+         COUNT(*) FILTER (WHERE workflow_status = 'approved')::int AS approved,
+         COUNT(*) FILTER (WHERE workflow_status = 'archived')::int AS archived,
+         COUNT(*) FILTER (
+           WHERE encoding_status IN ('processing', 'encoding', 'queued')
+         )::int AS processing
        FROM videos WHERE creator_id = $1`,
       [creatorId]
     ),
@@ -242,36 +254,121 @@ async function creatorAnalytics(creatorId) {
       `SELECT COUNT(*)::int AS views
        FROM analytics_events ae
        JOIN videos v ON v.id = ae.content_id
-       WHERE v.creator_id = $1 AND ae.event_name IN ('video_started', 'video_played')`,
-      [creatorId]
+       WHERE v.creator_id = $1
+         AND ae.event_name IN ('video_started', 'video_played')
+         ${eventWindow}`,
+      params
     ),
     query(
-      `SELECT COALESCE(SUM(amount_kz), 0)::int AS total_kz
-       FROM creator_earnings WHERE creator_id = $1`,
-      [creatorId]
+      `SELECT COALESCE(SUM(amount_kz) FILTER (WHERE source <> 'reversal'), 0)::int AS credits_kz,
+              COALESCE(SUM(amount_kz) FILTER (WHERE source = 'reversal'), 0)::int AS reversals_kz,
+              COUNT(*) FILTER (WHERE source = 'view')::int AS valid_views
+       FROM creator_earnings
+       WHERE creator_id = $1 ${earnWindow}`,
+      params
     ),
     query(
       `SELECT
          (SELECT COUNT(DISTINCT ae.user_id)::int
             FROM analytics_events ae
             JOIN videos v ON v.id = ae.content_id
-           WHERE v.creator_id = $1 AND ae.user_id IS NOT NULL) AS unique_viewers,
+           WHERE v.creator_id = $1
+             AND ae.user_id IS NOT NULL
+             AND ae.event_name IN ('video_started', 'video_played')
+             ${eventWindow}) AS unique_viewers,
          (SELECT COUNT(DISTINCT p.user_id)::int
             FROM favorites f
             JOIN videos v ON v.id = f.content_id
             JOIN profiles p ON p.id = f.profile_id
-           WHERE v.creator_id = $1) AS subscribers
-`,
-      [creatorId]
+           WHERE v.creator_id = $1) AS subscribers`,
+      params
+    ),
+    query(
+      `SELECT source, COALESCE(SUM(amount_kz), 0)::int AS total_kz
+       FROM creator_earnings
+       WHERE creator_id = $1 ${earnWindow}
+       GROUP BY source`,
+      params
     ),
   ]);
 
+  let completion = null;
+  try {
+    const progress = await query(
+      `SELECT
+         COUNT(*)::int AS with_progress,
+         COUNT(*) FILTER (WHERE wp.completed)::int AS completed
+       FROM watch_progress wp
+       JOIN videos v ON v.id = wp.video_id
+       WHERE v.creator_id = $1`,
+      [creatorId]
+    );
+    const row = progress.rows[0];
+    completion = {
+      withProgress: row.with_progress,
+      completed: row.completed,
+      rate: row.with_progress > 0 ? Math.round((row.completed / row.with_progress) * 1000) / 10 : null,
+    };
+  } catch {
+    completion = null;
+  }
+
+  let titles = [];
+  try {
+    const windowSql = days ? `AND created_at >= NOW() - ($2::int * INTERVAL '1 day')` : '';
+    const perTitle = await query(
+      `SELECT v.id, v.title,
+              (SELECT COUNT(*)::int FROM analytics_events ae
+                WHERE ae.content_id = v.id
+                  AND ae.event_name IN ('video_started', 'video_played')
+                  ${days ? `AND ae.created_at >= NOW() - ($2::int * INTERVAL '1 day')` : ''}) AS starts,
+              (SELECT COALESCE(SUM(CASE WHEN ce.source = 'reversal' THEN -ce.amount_kz ELSE ce.amount_kz END), 0)::int
+                 FROM creator_earnings ce
+                WHERE ce.content_id = v.id AND ce.creator_id = v.creator_id ${windowSql}) AS earnings_kz,
+              (SELECT COUNT(*)::int FROM creator_earnings ce
+                WHERE ce.content_id = v.id AND ce.creator_id = v.creator_id
+                  AND ce.source = 'view' ${windowSql}) AS valid_views
+       FROM videos v
+       WHERE v.creator_id = $1
+       ORDER BY v.title ASC`,
+      params
+    );
+    titles = perTitle.rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      starts: row.starts,
+      validViews: row.valid_views,
+      earningsKz: row.earnings_kz,
+    }));
+  } catch {
+    titles = [];
+  }
+
+  const earningsBySource = {};
+  for (const row of bySource.rows) earningsBySource[row.source] = row.total_kz;
+  const snapshot = content.rows[0];
+
   return {
-    content: content.rows[0],
+    content: {
+      total: snapshot.total,
+      published: snapshot.published,
+      submitted: snapshot.submitted,
+      underReview: snapshot.under_review,
+      drafts: snapshot.drafts,
+      rejected: snapshot.rejected,
+      approved: snapshot.approved,
+      archived: snapshot.archived,
+      processing: snapshot.processing,
+    },
     views: views.rows[0].views,
-    revenueKz: earnings.rows[0].total_kz,
+    validViews: earnings.rows[0].valid_views,
+    revenueKz: earnings.rows[0].credits_kz - earnings.rows[0].reversals_kz,
+    reversalsKz: earnings.rows[0].reversals_kz,
+    earningsBySource,
     uniqueViewers: audience.rows[0].unique_viewers || 0,
     subscribers: audience.rows[0].subscribers || 0,
+    completion,
+    titles,
   };
 }
 

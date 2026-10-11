@@ -36,6 +36,8 @@ export const AUDIT_LABELS = {
   CAMPAIGN_APPROVED: 'Anúncio no ar',
   CAMPAIGN_REJECTED: 'Anúncio recusado',
   CAMPAIGN_PAUSED: 'Anúncio pausado',
+  CREATOR_LEDGER_POSTED: 'Lançamento no livro do cineasta',
+  CREATOR_BANK_UPDATED: 'IBAN do estúdio actualizado',
   'mfa.enabled': 'Protecção extra activada',
   title_not_interested: 'Marcou «não me interessa»',
   USER_PROMOTED: 'Operador promovido',

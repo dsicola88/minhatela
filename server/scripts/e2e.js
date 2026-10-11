@@ -675,6 +675,70 @@ async function run() {
     assert(home.json?.guide?.step === 3, `guia ${home.json?.guide?.step}`);
   });
 
+  await step('Estúdio · livro, IBAN e levantamento', async () => {
+    const ledger = await req('GET', '/api/creator-studio/ledger', { token: customerToken });
+    assert(ledger.status === 200, `ledger ${ledger.status}`);
+    assert(Array.isArray(ledger.json?.entries), 'entries');
+    const noIban = await req('POST', '/api/creator-studio/payouts', {
+      token: customerToken,
+      body: { amountKz: 5000 },
+    });
+    assert(noIban.status === 400 && noIban.json?.code === 'IBAN_REQUIRED', `iban ${noIban.status} ${noIban.json?.code}`);
+    const bank = await req('PATCH', '/api/creator-studio/bank', {
+      token: customerToken,
+      body: {
+        bankIban: 'AO06000600000000000000000',
+        bankName: 'BFA',
+        bankAccountName: 'Cineasta E2E',
+      },
+    });
+    assert(bank.status === 200 && bank.json?.creator?.bankIban, `bank ${bank.status}`);
+    const low = await req('POST', '/api/creator-studio/payouts', {
+      token: customerToken,
+      body: { amountKz: 1000 },
+    });
+    assert(low.status === 400 && low.json?.code === 'MIN_PAYOUT', `min ${low.status} ${low.json?.code}`);
+  });
+
+  await step('Estúdio · SuperAdmin lança ajuste no livro', async () => {
+    assert(studioCreatorId, 'creator id');
+    const traceKey = `e2e-adj-${Date.now()}`;
+    const posted = await req('POST', '/api/admin/creator-ledger', {
+      token: adminToken,
+      body: {
+        creatorId: studioCreatorId,
+        source: 'adjustment',
+        amountKz: 6000,
+        reason: 'Ajuste e2e',
+        traceKey,
+      },
+    });
+    assert(posted.status === 201 && posted.json?.entry?.id, `post ${posted.status} ${posted.json?.code || ''}`);
+    const dup = await req('POST', '/api/admin/creator-ledger', {
+      token: adminToken,
+      body: {
+        creatorId: studioCreatorId,
+        source: 'adjustment',
+        amountKz: 6000,
+        reason: 'Ajuste e2e',
+        traceKey,
+      },
+    });
+    assert(dup.status === 409, `dup ${dup.status}`);
+    const forbid = await req('POST', '/api/admin/creator-ledger', {
+      token: customerToken,
+      body: { creatorId: studioCreatorId, source: 'adjustment', amountKz: 1, reason: 'x' },
+    });
+    assert([401, 403].includes(forbid.status), `forbid ${forbid.status}`);
+    const ledger = await req('GET', '/api/creator-studio/ledger', { token: customerToken });
+    assert((ledger.json?.entries || []).some((e) => e.id === posted.json.entry.id), 'ajuste visível');
+    const payout = await req('POST', '/api/creator-studio/payouts', {
+      token: customerToken,
+      body: { amountKz: 5000 },
+    });
+    assert(payout.status === 201 && payout.json?.payout?.status === 'pending', `payout ${payout.status}`);
+  });
+
   await step('Estúdio · Ligações SuperAdmin', async () => {
     const r = await req('GET', '/api/admin/connections', { token: adminToken });
     assert(r.status === 200, `connections ${r.status}`);

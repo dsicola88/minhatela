@@ -18,6 +18,12 @@ router.post(
 
 router.get('/home', asyncHandler(creatorStudioController.home));
 
+router.patch(
+  '/bank',
+  rateLimit({ windowMs: 60_000, max: 20 }),
+  asyncHandler(creatorStudioController.updateBank)
+);
+
 router.post(
   '/contents',
   asyncHandler(creatorStudioController.createContent)
@@ -43,5 +49,22 @@ const payoutController = require('../controllers/payoutController');
 
 router.get('/payouts', asyncHandler(payoutController.mine));
 router.post('/payouts', asyncHandler(payoutController.request));
+router.get('/ledger', asyncHandler(async (req, res) => {
+  const creatorRepository = require('../repositories/creatorRepository');
+  const creatorEarningsService = require('../services/creatorEarningsService');
+  const creator = await creatorRepository.findByUserId(req.user.id);
+  if (!creator) {
+    res.json({
+      entries: [],
+      ownershipNote: 'A declaração de direitos do estúdio não prova a propriedade do filme.',
+    });
+    return;
+  }
+  const entries = await creatorEarningsService.listForCreator(creator.id);
+  res.json({
+    entries,
+    ownershipNote: 'A declaração de direitos do estúdio não prova a propriedade do filme.',
+  });
+}));
 
 module.exports = router;

@@ -8,7 +8,9 @@ async function register(req, res) {
 }
 
 async function home(req, res) {
-  const result = await creatorStudioService.getStudioHome(req.user.id);
+  const result = await creatorStudioService.getStudioHome(req.user.id, {
+    period: req.query.period,
+  });
   res.json(result);
 }
 
@@ -27,7 +29,11 @@ async function updateContent(req, res) {
 }
 
 async function submit(req, res) {
-  const result = await creatorStudioService.submitContent(req.user.id, req.params.id);
+  const result = await creatorStudioService.submitContent(
+    req.user.id,
+    req.params.id,
+    req.body || {}
+  );
   res.json(result);
 }
 
@@ -36,9 +42,15 @@ async function createBunnySlot(req, res) {
   res.status(201).json(result);
 }
 
+async function updateBank(req, res) {
+  const result = await creatorStudioService.updateBankDetails(req.user.id, req.body || {});
+  res.json(result);
+}
+
 module.exports = {
   register,
   home,
+  updateBank,
   createContent,
   updateContent,
   submit,

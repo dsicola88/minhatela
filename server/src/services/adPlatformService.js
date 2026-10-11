@@ -517,6 +517,7 @@ async function decideAd({
     billed: false,
     billableEvent: BILLING.billableEvent,
     decisionId: impression.id,
+    campaignId: active.campaign_id,
     creative: {
       id: active.creative_id,
       title: active.title,

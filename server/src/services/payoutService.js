@@ -5,24 +5,34 @@ const creatorRepository = require('../repositories/creatorRepository');
 const auditRepository = require('../repositories/auditRepository');
 const { createError } = require('../utils/errors');
 const { assertPositiveKz } = require('../utils/money');
+const { MIN_PAYOUT_KZ, payoutRefusal } = require('../utils/studioRules');
+const { settleLedger } = require('../utils/ledger');
 
 async function balance(creatorId) {
-  const [earned, paid] = await Promise.all([
+  const [lines, payouts] = await Promise.all([
     query(
-      `SELECT COALESCE(SUM(amount_kz),0)::int AS total FROM creator_earnings WHERE creator_id = $1`,
+      `SELECT source, COALESCE(SUM(amount_kz), 0)::int AS amount_kz
+       FROM creator_earnings
+       WHERE creator_id = $1
+       GROUP BY source`,
       [creatorId]
     ),
     query(
-      `SELECT COALESCE(SUM(amount_kz),0)::int AS total
+      `SELECT status, COALESCE(SUM(amount_kz), 0)::int AS amount_kz
        FROM creator_payouts
-       WHERE creator_id = $1 AND status IN ('pending','paid')`,
+       WHERE creator_id = $1
+       GROUP BY status`,
       [creatorId]
     ),
   ]);
+  const settled = settleLedger(lines.rows, payouts.rows);
   return {
-    earnedKz: earned.rows[0].total,
-    reservedOrPaidKz: paid.rows[0].total,
-    availableKz: Math.max(0, earned.rows[0].total - paid.rows[0].total),
+    earnedKz: settled.netKz,
+    creditsKz: settled.creditsKz,
+    reversalsKz: settled.reversalsKz,
+    reservedOrPaidKz: settled.reservedOrPaidKz,
+    availableKz: settled.availableKz,
+    deficitKz: settled.deficitKz,
   };
 }
 
@@ -36,8 +46,8 @@ async function requestPayout(userId, { amountKz, notes }) {
   }
 
   const amount = assertPositiveKz(amountKz);
-  if (amount < 5000) {
-    throw createError(400, 'Payout mínimo: 5.000 Kz', 'MIN_PAYOUT');
+  if (payoutRefusal(amount, Number.MAX_SAFE_INTEGER) === 'MIN_PAYOUT') {
+    throw createError(400, `Payout mínimo: ${MIN_PAYOUT_KZ.toLocaleString('pt-AO')} Kz`, 'MIN_PAYOUT');
   }
 
   const { withTransaction } = require('../config/database');
@@ -45,22 +55,24 @@ async function requestPayout(userId, { amountKz, notes }) {
     await client.query(`SELECT id FROM creators WHERE id = $1 FOR UPDATE`, [creator.id]);
     const [earned, paid] = await Promise.all([
       client.query(
-        `SELECT COALESCE(SUM(amount_kz),0)::int AS total FROM creator_earnings WHERE creator_id = $1`,
+        `SELECT source, COALESCE(SUM(amount_kz), 0)::int AS amount_kz
+         FROM creator_earnings WHERE creator_id = $1 GROUP BY source`,
         [creator.id]
       ),
       client.query(
-        `SELECT COALESCE(SUM(amount_kz),0)::int AS total
-         FROM creator_payouts
-         WHERE creator_id = $1 AND status IN ('pending','paid')`,
+        `SELECT status, COALESCE(SUM(amount_kz), 0)::int AS amount_kz
+         FROM creator_payouts WHERE creator_id = $1 GROUP BY status`,
         [creator.id]
       ),
     ]);
-    const availableKz = Math.max(0, earned.rows[0].total - paid.rows[0].total);
-    if (amount > availableKz) {
+    const settled = settleLedger(earned.rows, paid.rows);
+    const availableKz = settled.availableKz;
+    if (payoutRefusal(amount, availableKz) === 'INSUFFICIENT_BALANCE') {
       throw createError(400, 'Saldo insuficiente para payout', 'INSUFFICIENT_BALANCE', {
-        earnedKz: earned.rows[0].total,
-        reservedOrPaidKz: paid.rows[0].total,
+        earnedKz: settled.netKz,
+        reservedOrPaidKz: settled.reservedOrPaidKz,
         availableKz,
+        deficitKz: settled.deficitKz,
       });
     }
     return client.query(
@@ -80,6 +92,30 @@ async function requestPayout(userId, { amountKz, notes }) {
   });
 
   return { payout: mapPayout(result.rows[0]), balance: await balance(creator.id) };
+}
+
+async function statusCounts(creatorId) {
+  const result = await query(
+    `SELECT status, COUNT(*)::int AS n, COALESCE(SUM(amount_kz), 0)::int AS total
+     FROM creator_payouts
+     WHERE creator_id = $1
+     GROUP BY status`,
+    [creatorId]
+  );
+  const counts = {
+    pending: 0,
+    paid: 0,
+    rejected: 0,
+    pendingKz: 0,
+    paidKz: 0,
+    rejectedKz: 0,
+  };
+  for (const row of result.rows) {
+    if (!Object.prototype.hasOwnProperty.call(counts, row.status)) continue;
+    counts[row.status] = row.n;
+    counts[`${row.status}Kz`] = row.total;
+  }
+  return counts;
 }
 
 async function listMine(userId) {
@@ -164,6 +200,7 @@ function mapPayout(row) {
 
 module.exports = {
   balance,
+  statusCounts,
   requestPayout,
   listMine,
   listPendingAdmin,
