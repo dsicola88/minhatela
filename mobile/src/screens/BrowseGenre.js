@@ -12,9 +12,11 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, brand, layout } from '../theme/tokens';
-import { fetchGenre, fetchGenres } from '../services/browse';
+import { fetchGenres } from '../services/browse';
+import { searchContent, fetchFacets } from '../services/discovery';
 import Focusable from '../tv/Focusable';
 import { EmptyState, ErrorState } from '../components/StateViews';
+import { titleMeta } from './catalogLabels';
 
 export default function BrowseGenre({ genre: initialGenre, onBack, onSelect }) {
   const insets = useSafeAreaInsets();
@@ -24,6 +26,9 @@ export default function BrowseGenre({ genre: initialGenre, onBack, onSelect }) {
   const [genres, setGenres] = useState([]);
   const [genre, setGenre] = useState(initialGenre || '');
   const [items, setItems] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [sort, setSort] = useState('added');
+  const [sorts, setSorts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -31,17 +36,24 @@ export default function BrowseGenre({ genre: initialGenre, onBack, onSelect }) {
     const data = await fetchGenres();
     const list = data.genres || [];
     setGenres(list);
-    if (!genre && list[0]) setGenre(list[0].name);
+    setGenre((current) => current || list[0]?.name || '');
     return list;
-  }, [genre]);
+  }, []);
 
-  const loadItems = useCallback(async (name) => {
+  const loadItems = useCallback(async (name, nextSort, offset, append) => {
     if (!name) return;
-    setLoading(true);
+    if (!append) setLoading(true);
     try {
       setError('');
-      const data = await fetchGenre(name);
-      setItems(data.items || []);
+      const data = await searchContent('', {
+        genre: name,
+        sort: nextSort || 'added',
+        limit: 24,
+        offset: offset || 0,
+      });
+      const page = data.results || [];
+      setItems((current) => (append ? [...current, ...page] : page));
+      setTotal(Number(data.total ?? page.length));
     } catch (err) {
       setError(err.message || 'Falha ao carregar género');
     } finally {
@@ -52,11 +64,14 @@ export default function BrowseGenre({ genre: initialGenre, onBack, onSelect }) {
   useEffect(() => {
     (async () => {
       try {
-        const list = await loadGenres();
+        const [list] = await Promise.all([
+          loadGenres(),
+          fetchFacets().then((data) => setSorts((data.sorts || []).filter((item) => item.id !== 'relevance'))).catch(() => {}),
+        ]);
         const name = initialGenre || list[0]?.name;
         if (name) {
           setGenre(name);
-          await loadItems(name);
+          await loadItems(name, 'added', 0, false);
         } else {
           setLoading(false);
         }
@@ -106,7 +121,8 @@ export default function BrowseGenre({ genre: initialGenre, onBack, onSelect }) {
             id={`genre-${g.slug}`}
             onPress={() => {
               setGenre(g.name);
-              loadItems(g.name);
+              setSort('added');
+              loadItems(g.name, 'added', 0, false);
             }}
             style={{
               paddingHorizontal: 14,
@@ -129,6 +145,30 @@ export default function BrowseGenre({ genre: initialGenre, onBack, onSelect }) {
         ))}
       </ScrollView>
 
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: isCompact ? 16 : 40, paddingBottom: 8 }}>
+        {sorts.map((item) => (
+          <Focusable
+            key={item.id}
+            id={`browse-sort-${item.id}`}
+            onPress={() => {
+              setSort(item.id);
+              loadItems(genre, item.id, 0, false);
+            }}
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              marginRight: 8,
+              borderRadius: 4,
+              borderWidth: 1,
+              borderColor: sort === item.id ? colors.text : colors.border,
+              backgroundColor: sort === item.id ? colors.text : 'transparent',
+            }}
+          >
+            <Text style={{ color: sort === item.id ? colors.black : colors.textSecondary, fontWeight: '700', fontSize: 12 }}>{item.label}</Text>
+          </Focusable>
+        ))}
+      </ScrollView>
+
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={colors.red} />
@@ -146,7 +186,7 @@ export default function BrowseGenre({ genre: initialGenre, onBack, onSelect }) {
             paddingBottom: 64,
           }}
         >
-          {error ? <ErrorState message={error} onRetry={() => loadItems(genre)} /> : null}
+          {error ? <ErrorState message={error} onRetry={() => loadItems(genre, sort, 0, false)} /> : null}
           {!error && !items.length ? (
             <View style={{ width: '100%' }}>
               <EmptyState title="Sem títulos" subtitle="Tente outro género." />
@@ -172,11 +212,19 @@ export default function BrowseGenre({ genre: initialGenre, onBack, onSelect }) {
                   resizeMode="cover"
                 />
               </View>
-              <Text numberOfLines={2} style={{ color: colors.text, marginTop: 8, fontWeight: '600' }}>
+              <Text numberOfLines={2} style={{ color: colors.text, marginTop: 8, fontWeight: '700' }}>
                 {item.title}
+              </Text>
+              <Text numberOfLines={2} style={{ color: colors.muted, fontSize: 11, marginTop: 2 }}>
+                {titleMeta(item)}
               </Text>
             </Pressable>
           ))}
+          {items.length < total ? (
+            <Pressable onPress={() => loadItems(genre, sort, items.length, true)} style={{ width: '100%', alignItems: 'center', paddingVertical: 16 }}>
+              <Text style={{ color: colors.text, fontWeight: '800' }}>Mostrar mais</Text>
+            </Pressable>
+          ) : null}
         </ScrollView>
       )}
     </View>

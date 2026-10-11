@@ -7,6 +7,10 @@ export async function searchContent(q, filters = {}) {
   if (filters.monetization) params.set('monetization', filters.monetization);
   if (filters.genre) params.set('genre', filters.genre);
   if (filters.year) params.set('year', String(filters.year));
+  if (filters.creator) params.set('creator', filters.creator);
+  if (filters.subtitle) params.set('subtitle', filters.subtitle);
+  if (filters.sort) params.set('sort', filters.sort);
+  if (filters.offset) params.set('offset', String(filters.offset));
   if (filters.limit) params.set('limit', String(filters.limit));
   const qs = params.toString();
   return api.get(`/api/search${qs ? `?${qs}` : ''}`);

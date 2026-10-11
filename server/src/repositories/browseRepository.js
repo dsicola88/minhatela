@@ -37,8 +37,7 @@ async function listGenres() {
        AND v.genre <> ''
        AND ${videoTenantSql('v')}
      GROUP BY v.genre
-     ORDER BY count DESC, v.genre ASC
-     LIMIT 40`
+     ORDER BY count DESC, v.genre ASC`
   );
   return result.rows.map((r) => ({
     name: r.name,

@@ -5,9 +5,9 @@ const { videoTenantSql } = require('../utils/tenantScope');
 
 async function suggest({ q, limit = 8, maturityMax = 18 }) {
   const term = String(q || '').trim();
-  if (term.length < 1) return { titles: [], genres: [], creators: [] };
+  if (term.length < 1) return { titles: [], genres: [], creators: [], people: [] };
 
-  const [titles, genres, creators] = await Promise.all([
+  const [titles, genres, creators, people] = await Promise.all([
     query(
       `SELECT id, title, slug, kind, poster_url, monetization, release_year
        FROM videos v
@@ -51,6 +51,14 @@ async function suggest({ q, limit = 8, maturityMax = 18 }) {
        LIMIT 6`,
       [term]
     ).catch(() => ({ rows: [] })),
+    query(
+      `SELECT full_name
+       FROM people
+       WHERE full_name ILIKE '%' || $1 || '%'
+       ORDER BY full_name
+       LIMIT 6`,
+      [term]
+    ).catch(() => ({ rows: [] })),
   ]);
 
   return {
@@ -67,6 +75,7 @@ async function suggest({ q, limit = 8, maturityMax = 18 }) {
     })),
     genres: genres.rows.map((r) => ({ label: r.genre, type: 'genre' })),
     creators: creators.rows.map((r) => ({ label: r.creator_name, type: 'creator' })),
+    people: (people.rows || []).map((r) => ({ label: r.full_name, type: 'person' })),
   };
 }
 

@@ -12,6 +12,10 @@ async function search(req, res) {
     monetization: req.query.monetization,
     genre: req.query.genre,
     year: req.query.year,
+    creator: req.query.creator,
+    subtitle: req.query.subtitle,
+    sort: req.query.sort,
+    offset: req.query.offset,
   });
   res.json(result);
 }

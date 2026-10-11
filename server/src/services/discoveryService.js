@@ -10,20 +10,27 @@ const { createError } = require('../utils/errors');
 
 async function search(userId, query) {
   const profileId = query.profileId;
+  let maturityMax = 18;
   if (profileId) {
     const owned = await profileRepository.findOwned(profileId, userId);
     if (!owned) throw createError(403, 'Perfil inválido', 'INVALID_PROFILE');
+    maturityMax = owned.maturity_max ?? 18;
   }
 
   const result = await discoveryRepository.search({
     q: query.q,
     limit: query.limit,
+    offset: query.offset,
     userId,
     profileId,
     kind: query.kind,
     monetization: query.monetization,
     genre: query.genre,
     year: query.year,
+    creator: query.creator,
+    subtitle: query.subtitle,
+    sort: query.sort,
+    maturityMax,
   });
 
   if (result.query && result.query.length >= 2) {
@@ -49,7 +56,7 @@ async function search(userId, query) {
 }
 
 async function facets() {
-  const genres = await engagementSocialRepository.listGenres();
+  const catalog = await discoveryRepository.catalogFacets();
   return {
     kinds: [
       { id: 'movie', label: 'Filmes' },
@@ -60,7 +67,7 @@ async function facets() {
       { id: 'svod', label: 'Premium' },
       { id: 'tvod', label: 'Aluguer' },
     ],
-    genres: genres.map((g) => ({ id: g.genre, label: g.genre, count: g.count })),
+    ...catalog,
   };
 }
 
