@@ -116,7 +116,9 @@ export default function Account({
   onInvoices,
   onCatalog,
   onCreatorStudio,
+  creatorMember,
   onAds,
+  adsMember,
   onAdmin,
 }) {
   const insets = useSafeAreaInsets();
@@ -936,16 +938,20 @@ export default function Account({
               ) : null}
               {onCreatorStudio ? (
                 <Row
-                  label="Estúdio"
-                  value="Os meus filmes"
+                  label={creatorMember ? 'Estúdio' : 'Sou cineasta'}
+                  value={creatorMember ? 'Os meus filmes' : 'Candidatar o seu cinema'}
                   icon="film-outline"
                   onPress={onCreatorStudio}
                 />
               ) : null}
               {onAds ? (
                 <Row
-                  label="Anúncios"
-                  value="A sua publicidade"
+                  label={adsMember ? 'Consola de anúncios' : 'Anunciar na MinhaTela'}
+                  value={
+                    adsMember
+                      ? 'Campanhas e orçamento'
+                      : 'Publicidade antes dos filmes gratuitos'
+                  }
                   icon="megaphone-outline"
                   onPress={onAds}
                 />

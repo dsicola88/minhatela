@@ -14,6 +14,7 @@ async function checkout(req, res) {
     paymentMethod: req.body.paymentMethod,
     videoId: req.body.videoId,
     packId: req.body.packId,
+    campaignId: req.body.campaignId,
     file: req.file,
     idempotencyKey:
       req.headers['idempotency-key'] ||
@@ -53,6 +54,7 @@ async function weframeSession(req, res) {
     type: req.body.type,
     videoId: req.body.videoId,
     packId: req.body.packId,
+    campaignId: req.body.campaignId,
     idempotencyKey:
       req.headers['idempotency-key'] ||
       req.headers['x-idempotency-key'] ||

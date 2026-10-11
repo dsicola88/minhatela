@@ -9,10 +9,12 @@ import {
   Platform,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
 import { PrimaryButton, FieldLabel } from '../components/ui';
 import { LoadingState, EmptyState, ErrorState } from '../components/StateViews';
 import { colors, layout } from '../theme/tokens';
+import { useRouter } from 'expo-router';
+import { useAuth } from '../context/AuthContext';
+import WorkspaceBar from '../components/WorkspaceBar';
 import {
   registerAdvertiser,
   fetchAdPortal,
@@ -46,7 +48,9 @@ const emptyDraft = () => ({
   frequencyCapPerDay: '0',
 });
 
-export default function AdPortal({ onBack }) {
+export default function AdPortal({ onCatalog, onAccount }) {
+  const router = useRouter();
+  const { refreshSession } = useAuth();
   const { width } = useWindowDimensions();
   const isCompact = width < 900;
   const [loading, setLoading] = useState(true);
@@ -132,11 +136,23 @@ export default function AdPortal({ onBack }) {
           ctaLabel: draft.ctaLabel,
         },
       });
-      setInfo(res.message || 'Enviada. A MinhaTela confirma antes de ir para o ar.');
       setWizard(false);
       setStep(1);
       setDraft(emptyDraft());
       await load();
+      if (res.campaign?.id) {
+        router.push({
+          pathname: '/checkout',
+          params: {
+            type: 'ad_campaign',
+            campaignId: res.campaign.id,
+            title: res.campaign.name || draft.name,
+            priceKz: String(res.campaign.budgetKz || draft.budgetKz),
+          },
+        });
+        return;
+      }
+      setInfo(res.message || 'Campanha criada. Pague o orçamento para a MinhaTela a poder pôr no ar.');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -174,6 +190,29 @@ export default function AdPortal({ onBack }) {
   return (
     <View style={{ flex: 1, backgroundColor: colors.black }}>
       <StatusBar style="light" />
+      <WorkspaceBar
+        product="Anúncios"
+        links={[
+          {
+            label: 'Campanhas',
+            active: !wizard,
+            onPress: () => {
+              setWizard(false);
+            },
+          },
+          advertiser
+            ? {
+                label: 'Nova campanha',
+                onPress: () => {
+                  setWizard(true);
+                  setStep(1);
+                },
+              }
+            : null,
+          onAccount ? { label: 'Conta', onPress: onAccount } : null,
+        ].filter(Boolean)}
+        onCatalog={onCatalog}
+      />
       <ScrollView
         contentContainerStyle={{
           padding: isCompact ? 16 : 32,
@@ -183,23 +222,13 @@ export default function AdPortal({ onBack }) {
           paddingBottom: 80,
         }}
       >
-        <Pressable
-          onPress={onBack}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 20 }}
-        >
-          <Ionicons name="arrow-back" size={20} color={colors.text} />
-          <Text style={{ color: colors.textSecondary }}>Voltar</Text>
-        </Pressable>
-
-        <Text style={{ color: colors.gold, fontSize: 12, fontWeight: '800', letterSpacing: 1.4 }}>
-          PUBLICIDADE
-        </Text>
         <Text style={{ color: colors.text, fontSize: 28, fontWeight: '800', marginBottom: 8 }}>
-          Gestão de anúncios
+          Consola de publicidade
         </Text>
         <Text style={{ color: colors.muted, marginBottom: 22, lineHeight: 22 }}>
-          Empresa → campanha em passos → a MinhaTela confirma → passa antes dos filmes gratuitos.
-          Só a visualização completa gasta o orçamento. Angola. Sem dados pessoais do público.
+          Empresa ou particular: cria a campanha, paga o orçamento (IBAN ou Multicaixa Express) e a
+          MinhaTela confirma. Só então o anúncio passa antes dos filmes gratuitos. Só a visualização
+          completa gasta o saldo pago. Angola.
         </Text>
 
         {data?.guide && !wizard ? (
@@ -235,14 +264,14 @@ export default function AdPortal({ onBack }) {
         {!advertiser ? (
           <View style={panelStyle}>
             <Text style={{ color: colors.text, fontSize: 18, fontWeight: '700', marginBottom: 12 }}>
-              Identificar a empresa
+              Identificar empresa ou particular
             </Text>
             <FieldLabel>Empresa</FieldLabel>
             <TextInput
               value={companyName}
               onChangeText={setCompanyName}
               style={inputStyle}
-              placeholder="Nome comercial"
+              placeholder="Empresa ou o seu nome"
               placeholderTextColor={colors.muted}
             />
             <FieldLabel>Email de contacto</FieldLabel>
@@ -264,7 +293,8 @@ export default function AdPortal({ onBack }) {
                 setError('');
                 try {
                   await registerAdvertiser({ companyName, contactEmail });
-                  setInfo('Conta aberta. Crie a primeira campanha.');
+                  await refreshSession?.();
+                  setInfo('Consola de anúncios aberta. Crie a primeira campanha e pague o orçamento.');
                   await load();
                 } catch (err) {
                   setError(err.message);
@@ -296,6 +326,13 @@ export default function AdPortal({ onBack }) {
                 {advertiser.companyName}
               </Text>
               <Text style={{ color: colors.muted }}>{advertiser.contactEmail}</Text>
+              <Text style={{ color: colors.gold, marginTop: 8, fontWeight: '700' }}>
+                Conta aberta
+              </Text>
+              <Text style={{ color: colors.muted, marginTop: 4, lineHeight: 20 }}>
+                Criar campanha não publica. Pagar não publica. Só a MinhaTela põe no ar depois do
+                pagamento confirmado.
+              </Text>
             </View>
 
             {stats ? (
@@ -391,8 +428,13 @@ export default function AdPortal({ onBack }) {
                 <View key={item.id} style={panelStyle}>
                   <Text style={{ color: colors.text, fontWeight: '700' }}>{item.name}</Text>
                   <Text style={{ color: colors.gold, marginTop: 4 }}>
-                    {item.statusLabel} · {item.placementLabel}
+                    {item.lifecycle?.label || item.statusLabel} · {item.placementLabel}
                   </Text>
+                  {item.lifecycle?.hint ? (
+                    <Text style={{ color: colors.muted, marginTop: 6, lineHeight: 20 }}>
+                      {item.lifecycle.hint}
+                    </Text>
+                  ) : null}
                   <Text style={{ color: colors.muted, marginTop: 6 }}>
                     {item.startsAt ? new Date(item.startsAt).toLocaleDateString('pt-AO') : '—'} →{' '}
                     {item.endsAt ? new Date(item.endsAt).toLocaleDateString('pt-AO') : '—'}
@@ -402,6 +444,24 @@ export default function AdPortal({ onBack }) {
                     {Number(item.spentKz || 0).toLocaleString('pt-AO')} Kz · saldo{' '}
                     {Number(item.remainingKz || 0).toLocaleString('pt-AO')} Kz
                   </Text>
+                  {item.lifecycle?.canPay ? (
+                    <Pressable
+                      onPress={() =>
+                        router.push({
+                          pathname: '/checkout',
+                          params: {
+                            type: 'ad_campaign',
+                            campaignId: item.id,
+                            title: item.name,
+                            priceKz: String(item.budgetKz || ''),
+                          },
+                        })
+                      }
+                      style={{ marginTop: 10 }}
+                    >
+                      <Text style={{ color: colors.gold, fontWeight: '700' }}>Pagar orçamento</Text>
+                    </Pressable>
+                  ) : null}
                   {item.rejectionReason ? (
                     <Text style={{ color: colors.red, marginTop: 6 }}>Motivo: {item.rejectionReason}</Text>
                   ) : null}
@@ -568,7 +628,8 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
             {draft.clickUrl ? `\nDestino: ${draft.clickUrl}` : ''}
           </Text>
           <Text style={{ color: colors.gold, marginTop: 12, lineHeight: 20 }}>
-            Não entra no ar sozinha. A equipa MinhaTela confirma.
+            A seguir paga o orçamento (IBAN ou Multicaixa Express). Sem pagamento confirmado o
+            SuperAdmin não põe o anúncio no ar.
           </Text>
         </>
       ) : null}
@@ -582,7 +643,7 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
           <PrimaryButton label="Continuar" onPress={() => setStep(step + 1)} style={{ flexGrow: 1 }} />
         ) : (
           <PrimaryButton
-            label="Enviar à MinhaTela"
+            label="Criar e pagar"
             variant="gold"
             loading={busy}
             onPress={onSubmit}

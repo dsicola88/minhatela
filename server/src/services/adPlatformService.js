@@ -7,6 +7,7 @@ const auditRepository = require('../repositories/auditRepository');
 const { createError } = require('../utils/errors');
 const { assertPositiveKz } = require('../utils/money');
 const { campaignStatusLabel, placementLabel } = require('../utils/opsCopy');
+const { campaignLifecycle, portalStage } = require('../utils/adsLifecycle');
 const { env } = require('../config/env');
 
 const OBJECTIVES = {
@@ -55,10 +56,20 @@ function mapCampaign(row) {
     budgetKz: budget,
     spentKz: spent,
     remainingKz: Math.max(0, budget - spent),
+    funded: Boolean(row.funded),
+    fundedAt: row.funded_at || null,
+    transactionId: row.transaction_id || null,
     startsAt: row.starts_at,
     endsAt: row.ends_at,
     status: row.status,
     statusLabel: campaignStatusLabel(row.status),
+    paymentStatus: row.payment_status || null,
+    lifecycle: campaignLifecycle({
+      status: row.status,
+      funded: row.funded,
+      paymentStatus: row.payment_status,
+      transactionId: row.transaction_id,
+    }),
     targeting: row.targeting || { territory: 'AO' },
     rejectionReason: row.rejection_reason || null,
     reviewedAt: row.reviewed_at || null,
@@ -131,44 +142,7 @@ function assertSafeHttpsUrl(value, field, { optional = false } = {}) {
 }
 
 function portalGuide(advertiser, campaigns) {
-  if (!advertiser) {
-    return {
-      step: 1,
-      of: 3,
-      title: 'Identifique a empresa',
-      body: 'Nome e email de contacto. Depois cria a campanha em passos; a MinhaTela confirma antes de ir para o ar.',
-    };
-  }
-  if (!campaigns.length) {
-    return {
-      step: 2,
-      of: 3,
-      title: 'Crie a primeira campanha',
-      body: 'Objectivo, vídeo, página, orçamento em Kwanza e datas. Nada entra sozinho.',
-    };
-  }
-  if (campaigns.some((c) => c.status === 'active')) {
-    return {
-      step: 3,
-      of: 3,
-      title: 'No ar',
-      body: 'O anúncio passa antes dos filmes gratuitos. Só a visualização completa desce o orçamento.',
-    };
-  }
-  if (campaigns.some((c) => c.status === 'pending_review')) {
-    return {
-      step: 3,
-      of: 3,
-      title: 'A MinhaTela confirma',
-      body: 'A campanha está na fila. Quando a equipa puser no ar, o público vê-a antes do filme.',
-    };
-  }
-  return {
-    step: 3,
-    of: 3,
-    title: 'Campanhas',
-    body: 'Pausada ou recusada não toca no catálogo. Envie outra quando estiver pronta.',
-  };
+  return portalStage(advertiser, campaigns);
 }
 
 function measurementPayload(stats = {}) {
@@ -308,9 +282,23 @@ async function getMyCampaign(userId, campaignId) {
   };
 }
 
+const MIN_AD_BUDGET_KZ = 5000;
+
 async function createCampaign(userId, body) {
   const advertiser = await requireAdvertiser(userId);
-  assertPositiveKz(body.budgetKz);
+  let budgetKz;
+  try {
+    budgetKz = assertPositiveKz(body.budgetKz);
+  } catch {
+    throw createError(400, 'Orçamento em Kwanza inválido', 'VALIDATION');
+  }
+  if (budgetKz < MIN_AD_BUDGET_KZ) {
+    throw createError(
+      400,
+      `Orçamento mínimo: ${MIN_AD_BUDGET_KZ.toLocaleString('pt-AO')} Kz`,
+      'AD_BUDGET_MIN'
+    );
+  }
 
   if (!body.name || !body.startsAt || !body.endsAt || !body.creative?.mediaUrl) {
     throw createError(
@@ -349,7 +337,7 @@ async function createCampaign(userId, body) {
     advertiserId: advertiser.id,
     name: String(body.name).trim(),
     placement: 'pre_roll',
-    budgetKz: body.budgetKz,
+    budgetKz,
     startsAt: startsAt.toISOString(),
     endsAt: endsAt.toISOString(),
     targeting,
@@ -384,7 +372,8 @@ async function createCampaign(userId, body) {
       duration_seconds: creative.duration_seconds,
     }),
     creative,
-    message: 'Campanha enviada. A MinhaTela confirma antes de o anúncio passar na app.',
+    message:
+      'Campanha criada. Pague o orçamento por transferência IBAN (comprovativo) ou Multicaixa Express. Só depois da confirmação do pagamento e da aprovação da MinhaTela o anúncio entra no ar.',
   };
 }
 
@@ -644,11 +633,26 @@ async function adminModerateCampaign(adminId, campaignId, status, { reason } = {
   ) {
     throw createError(404, 'Campanha não encontrada', 'NOT_FOUND');
   }
+  if (status === 'active' && !previous.funded) {
+    throw createError(
+      409,
+      'O orçamento ainda não está pago. Confirme o pagamento antes de pôr no ar.',
+      'AD_NOT_FUNDED'
+    );
+  }
   const row = await adRepository.moderateCampaign(campaignId, status, {
     reason: String(reason || '').trim() || null,
     reviewerId: adminId,
   });
-  if (!row) throw createError(404, 'Campanha não encontrada', 'NOT_FOUND');
+  if (!row) {
+    throw createError(
+      status === 'active' ? 409 : 404,
+      status === 'active'
+        ? 'O orçamento ainda não está pago. Confirme o pagamento antes de pôr no ar.'
+        : 'Campanha não encontrada',
+      status === 'active' ? 'AD_NOT_FUNDED' : 'NOT_FOUND'
+    );
+  }
 
   const action =
     status === 'active'
@@ -727,4 +731,5 @@ module.exports = {
   BILLING,
   unitKz,
   requiredWatchSeconds,
+  MIN_AD_BUDGET_KZ,
 };

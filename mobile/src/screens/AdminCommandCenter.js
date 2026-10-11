@@ -1038,9 +1038,15 @@ export default function AdminCommandCenter({ onBack }) {
                     {c.companyName} · {c.placementLabel || 'Antes do filme'} ·{' '}
                     {c.budgetKz?.toLocaleString('pt-AO')} Kz
                   </Text>
+                  <Text style={{ color: colors.gold, marginTop: 6 }}>
+                    {c.lifecycle?.label || (c.funded ? 'Em análise' : 'Pagar orçamento')}
+                  </Text>
+                  {c.lifecycle?.hint ? (
+                    <Text style={{ color: colors.muted, marginTop: 4 }}>{c.lifecycle.hint}</Text>
+                  ) : null}
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
                     <AdminButton
-                      label="Pôr no ar"
+                      label={c.funded ? 'Pôr no ar' : 'Pagamento em falta'}
                       onPress={() => run(c.id, () => reviewCampaign(c.id, 'active'))}
                     />
                     <AdminButton

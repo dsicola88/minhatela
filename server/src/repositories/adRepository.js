@@ -20,6 +20,7 @@ async function findActiveDecision({
        AND c.placement = $1
        AND c.starts_at <= NOW()
        AND c.ends_at > NOW()
+       AND c.funded = TRUE
        AND c.spent_kz < c.budget_kz
        AND COALESCE(c.targeting->>'territory', 'AO') IN ('AO', 'ALL')
        AND (
@@ -222,11 +223,18 @@ async function listCampaigns(advertiserId, { status, q, limit = 80 } = {}) {
   const result = await query(
     `SELECT c.*,
             cr.media_url, cr.click_url, cr.title AS creative_title, cr.cta_label,
-            cr.duration_seconds
+            cr.duration_seconds,
+            tx.status AS payment_status
      FROM campaigns c
      LEFT JOIN LATERAL (
        SELECT * FROM ad_creatives x WHERE x.campaign_id = c.id ORDER BY x.created_at DESC LIMIT 1
      ) cr ON TRUE
+     LEFT JOIN LATERAL (
+       SELECT t.status FROM transactions t
+       WHERE t.id = c.transaction_id OR t.campaign_id = c.id
+       ORDER BY t.created_at DESC
+       LIMIT 1
+     ) tx ON TRUE
      WHERE c.advertiser_id = $1
        AND ($2::text IS NULL OR c.status::text = $2)
        AND ($3::text IS NULL OR LOWER(c.name) LIKE $3)
@@ -241,11 +249,18 @@ async function getOwnedCampaign(advertiserId, campaignId) {
   const result = await query(
     `SELECT c.*,
             cr.id AS creative_id, cr.media_url, cr.click_url, cr.title AS creative_title,
-            cr.cta_label, cr.duration_seconds
+            cr.cta_label, cr.duration_seconds,
+            tx.status AS payment_status
      FROM campaigns c
      LEFT JOIN LATERAL (
        SELECT * FROM ad_creatives x WHERE x.campaign_id = c.id ORDER BY x.created_at DESC LIMIT 1
      ) cr ON TRUE
+     LEFT JOIN LATERAL (
+       SELECT t.status FROM transactions t
+       WHERE t.id = c.transaction_id OR t.campaign_id = c.id
+       ORDER BY t.created_at DESC
+       LIMIT 1
+     ) tx ON TRUE
      WHERE c.advertiser_id = $1 AND c.id = $2`,
     [advertiserId, campaignId]
   );
@@ -293,6 +308,13 @@ async function advertiserPause(advertiserId, campaignId) {
   return result.rows[0] || null;
 }
 
+async function attachTransaction(campaignId, transactionId) {
+  await query(
+    `UPDATE campaigns SET transaction_id = $2, updated_at = NOW() WHERE id = $1`,
+    [campaignId, transactionId]
+  );
+}
+
 async function moderateCampaign(id, status, { reason, reviewerId } = {}) {
   const result = await query(
     `UPDATE campaigns
@@ -302,6 +324,10 @@ async function moderateCampaign(id, status, { reason, reviewerId } = {}) {
          reviewed_at = NOW(),
          updated_at = NOW()
      WHERE id = $1
+       AND (
+         $2::text <> 'active'
+         OR funded = TRUE
+       )
      RETURNING *`,
     [id, status, reason || null, reviewerId || null]
   );
@@ -414,6 +440,7 @@ module.exports = {
   listHistory,
   addHistory,
   advertiserPause,
+  attachTransaction,
   moderateCampaign,
   findCampaignWithAdvertiser,
   campaignStats,

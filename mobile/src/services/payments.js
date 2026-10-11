@@ -8,12 +8,13 @@ export async function fetchPaymentMethods() {
   return api.get('/api/payments/methods');
 }
 
-export async function submitCheckout({ type, paymentMethod, videoId, packId, proof }) {
+export async function submitCheckout({ type, paymentMethod, videoId, packId, campaignId, proof }) {
   const form = new FormData();
   form.append('type', type);
   form.append('paymentMethod', paymentMethod);
   if (videoId) form.append('videoId', videoId);
   if (packId) form.append('packId', packId);
+  if (campaignId) form.append('campaignId', campaignId);
 
   form.append('proof', {
     uri: proof.uri,
@@ -28,10 +29,10 @@ export async function submitCheckout({ type, paymentMethod, videoId, packId, pro
   });
 }
 
-export async function startWeframeSession({ type, videoId, packId }) {
+export async function startWeframeSession({ type, videoId, packId, campaignId }) {
   return api.post(
     '/api/payments/weframe/session',
-    { type, videoId, packId },
+    { type, videoId, packId, campaignId },
     { headers: { 'Idempotency-Key': makeIdempotencyKey() } }
   );
 }

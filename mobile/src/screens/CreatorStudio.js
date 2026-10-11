@@ -310,11 +310,10 @@ export default function CreatorStudio({ onBack, onCompany }) {
             padding: 16,
           }}
         >
-          <Pressable onPress={onBack} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Ionicons name="arrow-back" size={18} color={colors.text} />
-            <Text style={{ color: colors.textSecondary }}>Catálogo</Text>
-          </Pressable>
-          <Text style={{ color: colors.red, fontWeight: '800', letterSpacing: 1, marginTop: 12 }}>ESTÚDIO</Text>
+          <Text style={{ color: colors.gold, fontSize: 11, fontWeight: '800', letterSpacing: 1.4 }}>
+            MINHATELA
+          </Text>
+          <Text style={{ color: colors.red, fontWeight: '800', letterSpacing: 1, marginTop: 4 }}>ESTÚDIO</Text>
           <Text style={{ color: colors.text, fontWeight: '800', fontSize: 18, marginBottom: 12 }}>
             {creator?.displayName || 'MinhaTela'}
           </Text>
@@ -326,6 +325,12 @@ export default function CreatorStudio({ onBack, onCompany }) {
                 </Text>
               </Pressable>
             ))}
+            {onBack ? (
+              <Pressable onPress={onBack} style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="play-outline" size={16} color={colors.muted} />
+                <Text style={{ color: colors.muted, fontSize: 13 }}>Ver catálogo</Text>
+              </Pressable>
+            ) : null}
           </View>
         </View>
 

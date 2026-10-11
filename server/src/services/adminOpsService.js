@@ -195,13 +195,21 @@ async function listAudit(queryParams = {}) {
 async function listPendingCampaigns() {
   const result = await query(
     `SELECT c.id, c.name, c.placement, c.budget_kz, c.status, c.starts_at, c.ends_at,
-            c.created_at, c.objective, c.rejection_reason, a.company_name, a.contact_email,
+            c.created_at, c.objective, c.rejection_reason, c.funded, c.transaction_id,
+            tx.status AS payment_status,
+            a.company_name, a.contact_email,
             cr.media_url, cr.click_url, cr.cta_label, cr.title AS creative_title
      FROM campaigns c
      JOIN advertisers a ON a.id = c.advertiser_id
      LEFT JOIN LATERAL (
        SELECT * FROM ad_creatives x WHERE x.campaign_id = c.id ORDER BY x.created_at DESC LIMIT 1
      ) cr ON TRUE
+     LEFT JOIN LATERAL (
+       SELECT t.status FROM transactions t
+       WHERE t.id = c.transaction_id OR t.campaign_id = c.id
+       ORDER BY t.created_at DESC
+       LIMIT 1
+     ) tx ON TRUE
      WHERE c.status = 'pending_review'
        AND ${opsVideoSql('c')}
      ORDER BY c.created_at ASC
@@ -214,6 +222,15 @@ async function listPendingCampaigns() {
       placement: row.placement,
       placementLabel: require('../utils/opsCopy').placementLabel(row.placement),
       budgetKz: row.budget_kz,
+      funded: Boolean(row.funded),
+      transactionId: row.transaction_id || null,
+      paymentStatus: row.payment_status || null,
+      lifecycle: require('../utils/adsLifecycle').campaignLifecycle({
+        status: row.status,
+        funded: row.funded,
+        paymentStatus: row.payment_status,
+        transactionId: row.transaction_id,
+      }),
       status: row.status,
       statusLabel: require('../utils/opsCopy').campaignStatusLabel(row.status),
       startsAt: row.starts_at,

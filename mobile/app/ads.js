@@ -10,5 +10,10 @@ export default function AdsRoute() {
     return <Redirect href="/login" />;
   }
 
-  return <AdPortalScreen onBack={() => router.replace('/home')} />;
+  return (
+    <AdPortalScreen
+      onCatalog={() => router.replace('/home')}
+      onAccount={() => router.push('/account')}
+    />
+  );
 }

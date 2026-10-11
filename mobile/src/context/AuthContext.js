@@ -73,6 +73,7 @@ export function AuthProvider({ children }) {
       isAuthenticated: Boolean(token && user),
       hasProfile: Boolean(profile),
       markAuthenticated,
+      refreshSession: markAuthenticated,
       selectProfile,
       logout,
     }),

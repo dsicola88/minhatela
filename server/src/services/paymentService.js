@@ -73,13 +73,48 @@ function getMethods() {
     premiumPriceKz: env.premiumPriceKz,
     instant: require('./paymentPspService').publicStatus(),
     weframe,
+    ads: {
+      minBudgetKz: 5000,
+      weframeOnly: process.env.ADS_WEFRAME_ONLY === 'true',
+      note:
+        process.env.ADS_WEFRAME_ONLY === 'true'
+          ? 'Publicidade só com Multicaixa Express (WeFrame).'
+          : 'Publicidade: pague o orçamento por IBAN (comprovativo) ou Multicaixa Express. Quando a EMIS certificar, fica só WeFrame.',
+    },
   };
 }
 
-async function resolveCheckoutAmount({ type, videoId, packId }) {
+async function resolveOwnedAdCampaign(userId, campaignId) {
+  if (!campaignId) {
+    throw createError(400, 'Campanha obrigatória', 'VALIDATION');
+  }
+  const adRepository = require('../repositories/adRepository');
+  const advertiser = await adRepository.findAdvertiserByUser(userId);
+  if (!advertiser) {
+    throw createError(403, 'Conta de publicidade necessária', 'ADVERTISER_REQUIRED');
+  }
+  const campaign = await adRepository.getOwnedCampaign(advertiser.id, campaignId);
+  if (!campaign) {
+    throw createError(404, 'Campanha não encontrada', 'NOT_FOUND');
+  }
+  if (campaign.funded) {
+    throw createError(409, 'Este orçamento já está pago', 'AD_ALREADY_FUNDED');
+  }
+  return campaign;
+}
+
+async function resolveCheckoutAmount({ type, videoId, packId, campaignId, userId }) {
   let amountKz = env.premiumPriceKz;
   let resolvedVideoId = null;
   let resolvedPackId = null;
+  let resolvedCampaignId = null;
+
+  if (type === 'ad_campaign') {
+    const campaign = await resolveOwnedAdCampaign(userId, campaignId);
+    amountKz = assertPositiveKz(campaign.budget_kz);
+    resolvedCampaignId = campaign.id;
+    return { amountKz, resolvedVideoId, resolvedPackId, resolvedCampaignId };
+  }
 
   if (type === 'pack') {
     await featureFlagService.assertEnabled('tvod_packs_enabled', 'Lotes de filmes indisponíveis');
@@ -111,7 +146,7 @@ async function resolveCheckoutAmount({ type, videoId, packId }) {
     amountKz = assertPositiveKz(amountKz);
   }
 
-  return { amountKz, resolvedVideoId, resolvedPackId };
+  return { amountKz, resolvedVideoId, resolvedPackId, resolvedCampaignId };
 }
 
 async function submitCheckout({
@@ -120,6 +155,7 @@ async function submitCheckout({
   paymentMethod,
   videoId,
   packId,
+  campaignId,
   file,
   idempotencyKey,
 }) {
@@ -129,8 +165,11 @@ async function submitCheckout({
     'Checkout temporariamente indisponível'
   );
 
-  if (!['subscription', 'rental', 'pack'].includes(type)) {
+  if (!['subscription', 'rental', 'pack', 'ad_campaign'].includes(type)) {
     throw createError(400, 'Tipo de transação inválido', 'VALIDATION');
+  }
+  if (type === 'ad_campaign' && process.env.ADS_WEFRAME_ONLY === 'true') {
+    throw createError(400, 'Publicidade só com Multicaixa Express', 'ADS_WEFRAME_ONLY');
   }
   if (!['iban', 'multicaixa'].includes(paymentMethod)) {
     throw createError(400, 'Método de pagamento inválido', 'VALIDATION');
@@ -157,11 +196,14 @@ async function submitCheckout({
     }
   }
 
-  const { amountKz, resolvedVideoId, resolvedPackId } = await resolveCheckoutAmount({
-    type,
-    videoId,
-    packId,
-  });
+  const { amountKz, resolvedVideoId, resolvedPackId, resolvedCampaignId } =
+    await resolveCheckoutAmount({
+      type,
+      videoId,
+      packId,
+      campaignId,
+      userId,
+    });
 
   const proofUrl = `/uploads/proofs/${file.filename}`;
   let proofBytes = null;
@@ -180,6 +222,7 @@ async function submitCheckout({
       userId,
       videoId: resolvedVideoId,
       packId: resolvedPackId,
+      campaignId: resolvedCampaignId,
       type,
       paymentMethod,
       amountKz,
@@ -231,11 +274,20 @@ async function submitCheckout({
     /* scoring never blocks checkout */
   }
 
+  if (resolvedCampaignId && tx?.id) {
+    await require('../repositories/adRepository')
+      .attachTransaction(resolvedCampaignId, tx.id)
+      .catch(() => {});
+  }
+
   await notificationService.notifyPaymentSubmitted(userId, {
     transactionId: tx.id,
     amountKz,
     type,
   });
+
+  const adsCopy =
+    'Comprovativo recebido. O anúncio só entra no ar depois de a MinhaTela confirmar o pagamento e a campanha.';
 
   return {
     transaction: {
@@ -245,13 +297,16 @@ async function submitCheckout({
       createdAt: tx.created_at,
       proofUrl,
       packId: resolvedPackId,
+      campaignId: resolvedCampaignId || null,
       riskScore: risk.riskScore,
       riskDecision: risk.decision,
     },
     message:
-      risk.decision === 'block_review' || risk.decision === 'review'
-        ? 'Comprovativo recebido e sinalizado para revisão prioritária de risco.'
-        : 'Comprovativo recebido. O conteúdo será libertado quando o administrador confirmar o pagamento.',
+      type === 'ad_campaign'
+        ? adsCopy
+        : risk.decision === 'block_review' || risk.decision === 'review'
+          ? 'Comprovativo recebido e sinalizado para revisão prioritária de risco.'
+          : 'Comprovativo recebido. O conteúdo será libertado quando o administrador confirmar o pagamento.',
   };
 }
 
@@ -415,7 +470,9 @@ async function getReceipt(userId, transactionId) {
         ? 'Aluguer'
         : row.type === 'pack'
           ? 'Lote de filmes'
-          : row.type;
+          : row.type === 'ad_campaign'
+            ? 'Publicidade'
+            : row.type;
 
   const receipt = {
     receiptNumber: `MT-${String(row.id).slice(0, 8).toUpperCase()}`,
@@ -440,7 +497,7 @@ async function getReceipt(userId, transactionId) {
   return receipt;
 }
 
-async function createWeframeSession({ userId, type, videoId, packId, idempotencyKey }) {
+async function createWeframeSession({ userId, type, videoId, packId, campaignId, idempotencyKey }) {
   await featureFlagService.assertNotMaintenance();
   await featureFlagService.assertEnabled(
     'checkout_enabled',
@@ -450,7 +507,7 @@ async function createWeframeSession({ userId, type, videoId, packId, idempotency
   if (!weframe.isEnabled()) {
     throw createError(503, 'WeFrame está desligado', 'WEFRAME_DISABLED');
   }
-  if (!['subscription', 'rental', 'pack'].includes(type)) {
+  if (!['subscription', 'rental', 'pack', 'ad_campaign'].includes(type)) {
     throw createError(400, 'Tipo de transação inválido', 'VALIDATION');
   }
 
@@ -476,11 +533,14 @@ async function createWeframeSession({ userId, type, videoId, packId, idempotency
     }
   }
 
-  const { amountKz, resolvedVideoId, resolvedPackId } = await resolveCheckoutAmount({
-    type,
-    videoId,
-    packId,
-  });
+  const { amountKz, resolvedVideoId, resolvedPackId, resolvedCampaignId } =
+    await resolveCheckoutAmount({
+      type,
+      videoId,
+      packId,
+      campaignId,
+      userId,
+    });
 
   let tx;
   try {
@@ -488,6 +548,7 @@ async function createWeframeSession({ userId, type, videoId, packId, idempotency
       userId,
       videoId: resolvedVideoId,
       packId: resolvedPackId,
+      campaignId: resolvedCampaignId,
       type,
       paymentMethod: 'weframe',
       amountKz,
@@ -505,6 +566,12 @@ async function createWeframeSession({ userId, type, videoId, packId, idempotency
     throw err;
   }
 
+  if (resolvedCampaignId && tx?.id) {
+    await require('../repositories/adRepository')
+      .attachTransaction(resolvedCampaignId, tx.id)
+      .catch(() => {});
+  }
+
   await notificationService.notifyPaymentSubmitted(userId, {
     transactionId: tx.id,
     amountKz,
@@ -516,17 +583,23 @@ async function createWeframeSession({ userId, type, videoId, packId, idempotency
     userId,
     amountKz,
   });
+  const adsWait =
+    'Confirme no Multicaixa Express. O anúncio só entra no ar depois do pagamento e da aprovação da MinhaTela.';
   return {
     transaction: {
       id: tx.id,
       status: toApiStatus(tx.status),
       amountKz: tx.amount_kz,
+      campaignId: resolvedCampaignId || null,
     },
     embedUrl: `${weframe.apiPublicBase()}/pay/weframe?s=${encodeURIComponent(token)}`,
     live: weframe.hasTags(),
-    message: weframe.hasTags()
-      ? 'Confirme o pagamento no Multicaixa Express.'
-      : 'Página de checkout criada. O terminal EMIS aparece aqui quando as tags WeFrame estiverem no Railway.',
+    message:
+      type === 'ad_campaign'
+        ? adsWait
+        : weframe.hasTags()
+          ? 'Confirme o pagamento no Multicaixa Express.'
+          : 'Página de checkout criada. O terminal EMIS aparece aqui quando as tags WeFrame estiverem no Railway.',
   };
 }
 

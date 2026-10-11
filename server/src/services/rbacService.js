@@ -87,6 +87,7 @@ function capabilities(roles = []) {
   return {
     adminConsole: isStaff(roles),
     creatorStudio: isStudio(roles),
+    adsPortal: roles.includes('advertiser'),
     companyPortal: roles.some((r) =>
       ['producer', 'production_owner', 'production_manager', 'production_editor', 'production_finance'].includes(r)
     ),

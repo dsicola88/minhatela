@@ -38,16 +38,27 @@ async function findProofByUrl(proofUrl) {
   return result.rows[0] || null;
 }
 
-async function create({ userId, videoId, packId, type, paymentMethod, amountKz, proofUrl, idempotencyKey }) {
+async function create({
+  userId,
+  videoId,
+  packId,
+  campaignId,
+  type,
+  paymentMethod,
+  amountKz,
+  proofUrl,
+  idempotencyKey,
+}) {
   const result = await query(
     `INSERT INTO transactions
-      (user_id, video_id, pack_id, type, payment_method, amount_kz, status, proof_url, idempotency_key)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-     RETURNING id, status, amount_kz, created_at, proof_url, idempotency_key, pack_id`,
+      (user_id, video_id, pack_id, campaign_id, type, payment_method, amount_kz, status, proof_url, idempotency_key)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     RETURNING id, status, amount_kz, created_at, proof_url, idempotency_key, pack_id, campaign_id`,
     [
       userId,
       videoId || null,
       packId || null,
+      campaignId || null,
       type,
       paymentMethod,
       amountKz,

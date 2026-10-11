@@ -11,21 +11,29 @@ export default function CheckoutRoute() {
     return <Redirect href="/login" />;
   }
 
+  const one = (value) => (Array.isArray(value) ? value[0] : value);
+  const typeRaw = one(params.type);
   const type =
-    params.type === 'rental' ? 'rental' : params.type === 'pack' ? 'pack' : 'subscription';
-  const video = params.videoId
+    typeRaw === 'rental'
+      ? 'rental'
+      : typeRaw === 'pack'
+        ? 'pack'
+        : typeRaw === 'ad_campaign'
+          ? 'ad_campaign'
+          : 'subscription';
+  const video = one(params.videoId)
     ? {
-        id: params.videoId,
-        title: params.title || 'Conteúdo',
-        rentalPriceKz: params.price ? Number(params.price) : 1500,
+        id: one(params.videoId),
+        title: one(params.title) || 'Conteúdo',
+        rentalPriceKz: one(params.price) ? Number(one(params.price)) : 1500,
       }
     : null;
   const pack =
     type === 'pack'
       ? {
-          id: params.packId,
-          title: params.packTitle || 'Lote de filmes',
-          priceKz: params.priceKz ? Number(params.priceKz) : 2500,
+          id: one(params.packId),
+          title: one(params.packTitle) || 'Lote de filmes',
+          priceKz: one(params.priceKz) ? Number(one(params.priceKz)) : 2500,
         }
       : null;
 
@@ -35,8 +43,14 @@ export default function CheckoutRoute() {
       video={video}
       pack={pack}
       onBack={() => router.back()}
+      campaignId={one(params.campaignId) || null}
+      campaignTitle={one(params.title) || ''}
+      campaignPriceKz={one(params.priceKz) ? Number(one(params.priceKz)) : null}
       onSubmitted={() => {
-        setTimeout(() => router.replace('/home'), 1200);
+        setTimeout(
+          () => router.replace(type === 'ad_campaign' ? '/ads' : '/home'),
+          1200
+        );
       }}
     />
   );

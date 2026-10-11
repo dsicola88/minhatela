@@ -27,6 +27,9 @@ export default function Checkout({
   type = 'subscription',
   video = null,
   pack = null,
+  campaignId = null,
+  campaignTitle = '',
+  campaignPriceKz = null,
   onBack,
   onSubmitted,
 }) {
@@ -47,7 +50,16 @@ export default function Checkout({
       ? video?.rentalPriceKz || 1500
       : type === 'pack'
         ? pack?.priceKz || 2500
-        : methods?.premiumPriceKz || 4990;
+        : type === 'ad_campaign'
+          ? campaignPriceKz || 5000
+          : methods?.premiumPriceKz || 4990;
+
+  const visibleMethods = (methods?.methods || []).filter((method) => {
+    if (type === 'ad_campaign' && methods?.ads?.weframeOnly) {
+      return method.id === 'weframe';
+    }
+    return true;
+  });
 
   useEffect(() => {
     let mounted = true;
@@ -56,7 +68,10 @@ export default function Checkout({
         const data = await fetchPaymentMethods();
         if (!mounted) return;
         setMethods(data);
-        const first = data?.methods?.[0]?.id;
+        const adsWeframeOnly = type === 'ad_campaign' && data?.ads?.weframeOnly;
+        const first = (data?.methods || []).find((method) =>
+          adsWeframeOnly ? method.id === 'weframe' : true
+        )?.id;
         if (first) setPaymentMethod(first);
       } catch (err) {
         if (mounted) setError(err.message || 'Falha ao carregar métodos de pagamento');
@@ -67,7 +82,7 @@ export default function Checkout({
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [type]);
 
   async function pickImage() {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -137,6 +152,7 @@ export default function Checkout({
           type,
           videoId: video?.id,
           packId: pack?.id,
+          campaignId,
         });
         setEmbedUrl(result.embedUrl);
         setWeframeTxId(result.transaction?.id || null);
@@ -160,6 +176,7 @@ export default function Checkout({
         paymentMethod,
         videoId: video?.id,
         packId: pack?.id,
+        campaignId,
         proof,
       });
       setSuccess(result.message);
@@ -203,12 +220,17 @@ export default function Checkout({
           Pagar
         </Text>
         <Text style={{ color: colors.textSecondary, marginBottom: 28, lineHeight: 22 }}>
-          Multicaixa Express neste ecrã, ou IBAN com comprovativo.
+          {type === 'ad_campaign'
+            ? methods?.ads?.note ||
+              'Pague o orçamento do anúncio. IBAN com comprovativo por agora; Multicaixa Express (WeFrame) já está neste ecrã.'
+            : 'Multicaixa Express neste ecrã, ou IBAN com comprovativo.'}
           {type === 'rental'
             ? ' Aluguer: 48 horas depois da confirmação.'
             : type === 'pack'
               ? ' Lote de filmes: o tempo começa na confirmação.'
-              : ' Premium: a conta não fecha no fim do mês — só volta ao plano gratuito.'}
+              : type === 'ad_campaign'
+                ? ' O anúncio só passa depois do pagamento confirmado e da aprovação da MinhaTela.'
+                : ' Premium: a conta não fecha no fim do mês — só volta ao plano gratuito.'}
         </Text>
 
         <View
@@ -231,7 +253,9 @@ export default function Checkout({
               ? `Aluguer · ${video?.title}`
               : type === 'pack'
                 ? `Lote · ${pack?.title}`
-                : 'Premium · um mês'}
+                : type === 'ad_campaign'
+                  ? `Publicidade · ${campaignTitle || 'Campanha'}`
+                  : 'Premium · um mês'}
           </Text>
           <Text style={{ color: colors.text, fontSize: 28, fontWeight: '800' }}>
             {Number(amount).toLocaleString('pt-AO')} Kz
@@ -240,7 +264,7 @@ export default function Checkout({
 
         <FieldLabel>Método de pagamento</FieldLabel>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
-          {(methods?.methods || []).map((method) => {
+          {visibleMethods.map((method) => {
             const active = paymentMethod === method.id;
             return (
               <Pressable
@@ -312,7 +336,11 @@ export default function Checkout({
                   try {
                     const payload = JSON.parse(event.nativeEvent.data);
                     if (payload?.paid) {
-                      setSuccess('Pagamento confirmado. O acesso já está libertado.');
+                      setSuccess(
+                        type === 'ad_campaign'
+                          ? 'Pagamento confirmado. O anúncio espera a aprovação da MinhaTela.'
+                          : 'Pagamento confirmado. O acesso já está libertado.'
+                      );
                     }
                   } catch {
                     /* ignore */

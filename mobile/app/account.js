@@ -1,6 +1,7 @@
 import { Redirect, useRouter } from 'expo-router';
 import AccountScreen from '../src/screens/Account';
 import { useAuth } from '../src/context/AuthContext';
+import { isAdvertiserUser, isCreatorUser } from '../src/navigation/destinations';
 
 export default function AccountRoute() {
   const router = useRouter();
@@ -31,7 +32,9 @@ export default function AccountRoute() {
       onInvoices={() => router.push('/invoices')}
       onCatalog={() => router.replace('/home')}
       onCreatorStudio={() => router.push('/creator-studio')}
+      creatorMember={isCreatorUser(user)}
       onAds={() => router.push('/ads')}
+      adsMember={isAdvertiserUser(user)}
       onAdmin={
         user?.capabilities?.adminConsole || user?.isAdmin ? () => router.push('/admin') : undefined
       }

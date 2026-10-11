@@ -3,6 +3,7 @@ import { useState } from 'react';
 import HomeScreen from '../src/screens/Home';
 import Details from '../src/screens/Details';
 import { useAuth } from '../src/context/AuthContext';
+import { isAdvertiserUser, isCreatorUser } from '../src/navigation/destinations';
 
 export default function HomeRoute() {
   const router = useRouter();
@@ -26,8 +27,10 @@ export default function HomeRoute() {
           setDetailsOpen(true);
         }}
         onPlay={(item) => router.push(`/watch/${item.id}`)}
-        onCreatorStudio={() => router.push('/creator-studio')}
-        onAds={() => router.push('/ads')}
+        onCreatorStudio={
+          isCreatorUser(user) ? () => router.push('/creator-studio') : undefined
+        }
+        onAds={isAdvertiserUser(user) ? () => router.push('/ads') : undefined}
         onSearch={() => router.push('/search')}
         onAdmin={
           user?.capabilities?.adminConsole || user?.isAdmin

@@ -4,11 +4,13 @@
  * Ads Manager · testes de entrega, faturação e isolamento
  * Uso: E2E_DISABLE_RATE_LIMIT=true API_BASE_URL=http://127.0.0.1:4000 node scripts/ads-manager.js
  */
+const fs = require('fs');
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 const { SUPERADMIN } = require('../../database/seed/002_superadmin');
 
 const BASE = process.env.API_BASE_URL || 'http://localhost:4000';
+const PROOF = path.join(__dirname, 'fixtures/comprovativo-ao.png');
 const results = [];
 let failed = 0;
 
@@ -50,13 +52,16 @@ function creative(url) {
   };
 }
 
-async function req(method, urlPath, { body, token, retries = 0 } = {}) {
+async function req(method, urlPath, { body, token, formData, headers, retries = 0 } = {}) {
   const h = {
     Accept: 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...headers,
   };
   let bodyOut;
-  if (body !== undefined) {
+  if (formData) {
+    bodyOut = formData;
+  } else if (body !== undefined) {
     h['Content-Type'] = 'application/json';
     bodyOut = JSON.stringify(body);
   }
@@ -70,9 +75,44 @@ async function req(method, urlPath, { body, token, retries = 0 } = {}) {
   }
   if (res.status === 429 && retries < 4) {
     await new Promise((r) => setTimeout(r, 1200 * (retries + 1)));
-    return req(method, urlPath, { body, token, retries: retries + 1 });
+    return req(method, urlPath, { body, token, formData, headers, retries: retries + 1 });
   }
   return { status: res.status, json, ok: res.ok };
+}
+
+async function checkoutAdBudget(token, campaignId) {
+  const form = new FormData();
+  form.append('type', 'ad_campaign');
+  form.append('paymentMethod', 'iban');
+  form.append('campaignId', campaignId);
+  const buf = fs.readFileSync(PROOF);
+  form.append('proof', new Blob([buf], { type: 'image/png' }), 'comprovativo-ao.png');
+  return req('POST', '/api/payments/checkout', {
+    token,
+    formData: form,
+    headers: { 'Idempotency-Key': `ads_pay_${uid()}` },
+  });
+}
+
+async function fundCampaign({ advertiserToken, adminToken, campaignId }) {
+  assert(campaignId, 'campaign id');
+  const unpaid = await req('PATCH', `/api/admin/campaigns/${campaignId}/status`, {
+    token: adminToken,
+    body: { status: 'active' },
+  });
+  assert(unpaid.status === 409, `unpaid activate ${unpaid.status}`);
+  const pay = await checkoutAdBudget(advertiserToken, campaignId);
+  assert([200, 201].includes(pay.status), `pay ${pay.status} ${pay.json?.message || pay.json?.code}`);
+  const txId = pay.json?.transaction?.id;
+  assert(txId, 'ad tx');
+  const st = pay.json.transaction.status;
+  assert(st === 'pending' || st === 'pendente', `pay status ${st}`);
+  const ap = await req('PATCH', `/api/admin/transactions/${txId}/status`, {
+    token: adminToken,
+    body: { status: 'paid', adminNotes: 'E2E publicidade IBAN' },
+  });
+  assert(ap.status === 200, `fund ${ap.status}`);
+  return txId;
 }
 
 async function registerUser(label) {
@@ -149,6 +189,24 @@ async function run() {
     });
     assert([200, 201].includes(r.status), `reg ${r.status}`);
   });
+  await step('SuperAdmin · login', async () => {
+    adminToken = await adminLogin();
+  });
+
+  await step('Isolar o laboratório · pausar campanhas já no ar', async () => {
+    const list = await req('GET', '/api/admin/ads/campaigns?status=active&limit=100', {
+      token: adminToken,
+    });
+    const rows = list.json?.campaigns || [];
+    for (const c of rows) {
+      await req('PATCH', `/api/admin/campaigns/${c.id}/status`, {
+        token: adminToken,
+        body: { status: 'paused' },
+      });
+    }
+    return `paused=${rows.length}`;
+  });
+
   await step('Anunciante B · registo empresa', async () => {
     const r = await req('POST', '/api/ads/advertisers/register', {
       token: b.token,
@@ -210,10 +268,6 @@ async function run() {
     assert(r.status === 403 || r.status === 401, `got ${r.status}`);
   });
 
-  await step('SuperAdmin · login', async () => {
-    adminToken = await adminLogin();
-  });
-
   await step('Recusa sem motivo → 400', async () => {
     const r = await req('PATCH', `/api/admin/campaigns/${campaignId}/status`, {
       token: adminToken,
@@ -253,6 +307,7 @@ async function run() {
   });
 
   await step('Pôr no ar', async () => {
+    await fundCampaign({ advertiserToken: a.token, adminToken, campaignId });
     const r = await req('PATCH', `/api/admin/campaigns/${campaignId}/status`, {
       token: adminToken,
       body: { status: 'active' },
@@ -313,6 +368,7 @@ async function run() {
       },
     });
     const id = r.json?.campaign?.id;
+    await fundCampaign({ advertiserToken: a.token, adminToken, campaignId: id });
     const ap = await req('PATCH', `/api/admin/campaigns/${id}/status`, {
       token: adminToken,
       body: { status: 'active' },
@@ -330,13 +386,14 @@ async function run() {
       token: a.token,
       body: {
         name: 'Saldo curto',
-        budgetKz: unit,
+        budgetKz: 5000,
         startsAt: new Date().toISOString(),
         endsAt: new Date(Date.now() + 86400000).toISOString(),
         creative: creative('https://example.com/short.mp4'),
       },
     });
     const id = r.json?.campaign?.id;
+    await fundCampaign({ advertiserToken: a.token, adminToken, campaignId: id });
     const ap = await req('PATCH', `/api/admin/campaigns/${id}/status`, {
       token: adminToken,
       body: { status: 'active' },
@@ -363,11 +420,11 @@ async function run() {
     ]);
     const billed = [c1.json?.billedKz || 0, c2.json?.billedKz || 0];
     const sum = billed[0] + billed[1];
-    assert(sum === unit, `sum ${sum} billed=${billed}`);
+    assert(sum === unit * 2, `sum ${sum} billed=${billed} unit=${unit}`);
     const portal = await req('GET', '/api/ads/portal', { token: a.token });
     const camp = (portal.json?.campaigns || []).find((c) => c.id === id);
     assert(camp && camp.spentKz <= camp.budgetKz, 'no negative');
-    assert(camp.spentKz === unit, `spent ${camp.spentKz}`);
+    assert(camp.spentKz === unit * 2, `spent ${camp.spentKz}`);
   });
 
   await step('Relatório com métricas separadas', async () => {
@@ -379,14 +436,22 @@ async function run() {
     assert(typeof r.json.measurement.clicks === 'number', 'clicks');
   });
 
-  await step('Falha do anúncio · filme segue (decision vazia)', async () => {
+  await step('Espectador B vê o anúncio pago de A', async () => {
     const r = await req('POST', '/api/ads/decision', {
       token: b.token,
       body: { contentId, monetization: 'avod' },
     });
     assert(r.status === 200);
-    assert(r.json?.decision?.enabled !== true, 'B has no live ad');
-    assert(r.json?.decision?.required === false || r.json?.decision?.placeholder === true, 'no delay payload');
+    assert(r.json?.decision?.enabled === true, 'funded ad must reach other viewers');
+  });
+
+  await step('Premium/SVOD não leva anúncio — o filme segue', async () => {
+    const r = await req('POST', '/api/ads/decision', {
+      token: b.token,
+      body: { contentId, monetization: 'svod' },
+    });
+    assert(r.status === 200);
+    assert(!r.json?.decision || r.json.decision.enabled !== true, 'svod blocked ads');
   });
 
   console.log(`\n══ RESULTADO ADS ══\nPASS ${results.length - failed}/${results.length} · FAIL ${failed}`);
