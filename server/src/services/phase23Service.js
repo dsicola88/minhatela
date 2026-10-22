@@ -96,10 +96,10 @@ async function whatsappShare(userId, contentId) {
   const row = await contentRepository.findPublishedById(contentId);
   if (!row) throw createError(404, 'Conteúdo não encontrado', 'CONTENT_NOT_FOUND');
 
-  const base = env.appPublicUrl || 'https://minhatela.ao';
+  const base = String(env.appPublicUrl || 'https://minhatela.net').replace(/\/$/, '');
   const shareUrl = `${base}/share/${row.id}`;
   const title = row.title;
-  const text = `Vê «${title}» na MinhaTela 🇦🇴\n${shareUrl}`;
+  const text = `Vê «${title}» na MinhaTela\n${shareUrl}`;
   const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
 
   return {

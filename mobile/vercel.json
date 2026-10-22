@@ -5,7 +5,22 @@
   "buildCommand": "npx expo export --platform web",
   "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/((?!_expo|assets|favicon\\.png|.*\\..*).*)", "destination": "/index.html" }
+    {
+      "source": "/share/:id",
+      "destination": "https://minhatela-production.up.railway.app/share/:id"
+    },
+    {
+      "source": "/robots.txt",
+      "destination": "https://minhatela-production.up.railway.app/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "https://minhatela-production.up.railway.app/sitemap.xml"
+    },
+    {
+      "source": "/((?!_expo|assets|favicon\\.png|.*\\..*).*)",
+      "destination": "/index.html"
+    }
   ],
   "headers": [
     {

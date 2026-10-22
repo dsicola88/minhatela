@@ -277,14 +277,32 @@ function createApp() {
     })
   );
 
-  // Deep link SEO / Open Graph (crawlers WhatsApp/Facebook)
+  // Deep link SEO / Open Graph (crawlers WhatsApp/Facebook/Google)
   app.get(
     '/share/:id',
     require('./utils/asyncHandler').asyncHandler(async (req, res) => {
       const card = await require('./services/catalogService').getShareCard(req.params.id);
       const { renderShareOgHtml } = require('./utils/ogShare');
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=300');
       res.send(renderShareOgHtml(card));
+    })
+  );
+
+  app.get('/robots.txt', (_req, res) => {
+    const { robotsTxt } = require('./services/seoService');
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.send(robotsTxt());
+  });
+
+  app.get(
+    '/sitemap.xml',
+    require('./utils/asyncHandler').asyncHandler(async (_req, res) => {
+      const { sitemapXml } = require('./services/seoService');
+      res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=900');
+      res.send(await sitemapXml());
     })
   );
 

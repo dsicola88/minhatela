@@ -492,7 +492,9 @@ async function getShareCard(contentId) {
     throw createError(404, 'Conteúdo não encontrado', 'CONTENT_NOT_FOUND');
   }
   const content = mapContentPublic(row);
-  const base = env.appPublicUrl;
+  const base = String(env.appPublicUrl || '').replace(/\/$/, '');
+  const shareUrl = `${base}/share/${content.id}`;
+  const openUrl = `${base}/title/${content.id}`;
   return {
     id: content.id,
     title: content.title,
@@ -502,12 +504,13 @@ async function getShareCard(contentId) {
     kind: content.kind,
     monetization: content.monetization,
     releaseYear: content.releaseYear,
-    shareUrl: `${base}/title/${content.id}`,
+    shareUrl,
+    openUrl,
     og: {
       title: `${content.title} · MinhaTela`,
       description: content.synopsisShort,
       image: content.backdropUrl || content.posterUrl,
-      url: `${base}/title/${content.id}`,
+      url: shareUrl,
     },
   };
 }

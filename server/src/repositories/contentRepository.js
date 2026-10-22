@@ -86,6 +86,22 @@ async function findHomeRows(maturityMax = 18) {
   return result.rows;
 }
 
+async function listPublishedForSitemap(limit = 2000) {
+  const safeLimit = Math.min(5000, Math.max(1, Number(limit) || 2000));
+  const result = await query(
+    `SELECT v.id, v.slug, v.title, v.kind, v.updated_at
+     FROM videos v
+     WHERE v.is_published = TRUE
+       AND v.workflow_status = 'published'
+       AND ${BROWSE_KINDS}
+       AND ${videoTenantSql('v')}
+     ORDER BY v.updated_at DESC
+     LIMIT $1`,
+    [safeLimit]
+  );
+  return result.rows;
+}
+
 async function hasActiveRights(contentId, territory = 'AO', modality = null) {
   const rightsService = require('../services/rightsService');
   const decision = await rightsService.canDistribute({ contentId, territory, modality });
@@ -96,5 +112,6 @@ module.exports = {
   findPublishedById,
   findFeatured,
   findHomeRows,
+  listPublishedForSitemap,
   hasActiveRights,
 };

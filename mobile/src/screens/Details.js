@@ -173,7 +173,7 @@ export default function Details({
       Constants.expoConfig?.extra?.appPublicUrl ||
       process.env.EXPO_PUBLIC_APP_PUBLIC_URL ||
       getApiBaseUrl().replace(':4000', ':8081');
-    const url = `${appBase}/title/${video.id}`;
+    const url = `${String(appBase).replace(/\/$/, '')}/share/${video.id}`;
     const message = `Assista «${video.title}» na MinhaTela\n${url}`;
     try {
       if (Platform.OS === 'web' && navigator?.share) {

@@ -45,6 +45,25 @@ export default function TitleShareScreen() {
     };
   }, [id]);
 
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined' || !card?.title) return undefined;
+    const previous = document.title;
+    document.title = `${card.title} · MinhaTela`;
+    const description = card.synopsis || 'Assista na MinhaTela — cinema e séries de Angola.';
+    let meta = document.querySelector('meta[name="description"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.setAttribute('name', 'description');
+      document.head.appendChild(meta);
+    }
+    const previousDescription = meta.getAttribute('content');
+    meta.setAttribute('content', description);
+    return () => {
+      document.title = previous;
+      if (previousDescription != null) meta.setAttribute('content', previousDescription);
+    };
+  }, [card]);
+
   if (!ready) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.black, justifyContent: 'center' }}>
