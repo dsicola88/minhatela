@@ -433,6 +433,7 @@ async function registerUpload(actorId, file, body = {}) {
 }
 
 async function listProofUploads(limit = 40) {
+  const { toApiStatus, paymentStatusLabel } = require('../utils/transactionStatus');
   const result = await query(
     `SELECT t.id, t.proof_url, t.status, t.amount_kz, t.created_at, u.email, u.full_name
      FROM transactions t
@@ -446,7 +447,8 @@ async function listProofUploads(limit = 40) {
     proofs: result.rows.map((r) => ({
       transactionId: r.id,
       proofUrl: r.proof_url,
-      status: r.status,
+      status: toApiStatus(r.status),
+      statusLabel: paymentStatusLabel(r.status),
       amountKz: r.amount_kz,
       email: r.email,
       fullName: r.full_name,
@@ -458,17 +460,25 @@ async function listProofUploads(limit = 40) {
 /* ─── Ads ───────────────────────────────────────────────── */
 
 async function listAllCampaigns({ status, limit = 50 } = {}) {
+  const { campaignLifecycle } = require('../utils/adsLifecycle');
   const result = await query(
     `SELECT c.id, c.name, c.placement, c.budget_kz, c.spent_kz, c.status, c.created_at,
-            c.objective, c.rejection_reason, c.starts_at, c.ends_at,
+            c.objective, c.rejection_reason, c.starts_at, c.ends_at, c.funded, c.transaction_id,
             a.company_name, a.contact_email,
             cr.media_url, cr.click_url, cr.cta_label, cr.title AS creative_title,
-            cr.media_kind, cr.cards
+            cr.media_kind, cr.cards,
+            tx.status AS payment_status
      FROM campaigns c
      JOIN advertisers a ON a.id = c.advertiser_id
      LEFT JOIN LATERAL (
        SELECT * FROM ad_creatives x WHERE x.campaign_id = c.id ORDER BY x.created_at DESC LIMIT 1
      ) cr ON TRUE
+     LEFT JOIN LATERAL (
+       SELECT t.status FROM transactions t
+       WHERE t.id = c.transaction_id OR t.campaign_id = c.id
+       ORDER BY t.created_at DESC
+       LIMIT 1
+     ) tx ON TRUE
      WHERE ($1::text IS NULL OR c.status::text = $1)
        AND ${require('../utils/tenantScope').opsVideoSql('c')}
      ORDER BY c.created_at DESC
@@ -476,32 +486,43 @@ async function listAllCampaigns({ status, limit = 50 } = {}) {
     [status || null, Math.min(100, Number(limit) || 50)]
   );
   return {
-    campaigns: result.rows.map((r) => ({
-      id: r.id,
-      name: r.name,
-      placement: r.placement,
-      placementLabel: require('../utils/opsCopy').placementLabel(r.placement),
-      budgetKz: r.budget_kz,
-      spentKz: r.spent_kz,
-      status: r.status,
-      statusLabel: require('../utils/opsCopy').campaignStatusLabel(r.status),
-      companyName: r.company_name,
-      contactEmail: r.contact_email,
-      createdAt: r.created_at,
-      startsAt: r.starts_at,
-      endsAt: r.ends_at,
-      objective: r.objective,
-      rejectionReason: r.rejection_reason,
-      creative: r.media_url
-        ? {
-            title: r.creative_title,
-            mediaUrl: r.media_url,
-            mediaKind: r.media_kind || 'video',
-            clickUrl: r.click_url,
-            ctaLabel: r.cta_label,
-          }
-        : null,
-    })),
+    campaigns: result.rows.map((r) => {
+      const funded = Boolean(r.funded);
+      const lifecycle = campaignLifecycle({
+        status: r.status,
+        funded,
+        paymentStatus: r.payment_status,
+        transactionId: r.transaction_id,
+      });
+      return {
+        id: r.id,
+        name: r.name,
+        placement: r.placement,
+        placementLabel: require('../utils/opsCopy').placementLabel(r.placement),
+        budgetKz: r.budget_kz,
+        spentKz: r.spent_kz,
+        funded,
+        status: r.status,
+        statusLabel: lifecycle.label || require('../utils/opsCopy').campaignStatusLabel(r.status),
+        lifecycle,
+        companyName: r.company_name,
+        contactEmail: r.contact_email,
+        createdAt: r.created_at,
+        startsAt: r.starts_at,
+        endsAt: r.ends_at,
+        objective: r.objective,
+        rejectionReason: r.rejection_reason,
+        creative: r.media_url
+          ? {
+              title: r.creative_title,
+              mediaUrl: r.media_url,
+              mediaKind: r.media_kind || 'video',
+              clickUrl: r.click_url,
+              ctaLabel: r.cta_label,
+            }
+          : null,
+      };
+    }),
   };
 }
 

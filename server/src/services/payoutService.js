@@ -153,8 +153,14 @@ async function listPendingAdmin() {
 }
 
 async function review(adminId, payoutId, { status, notes }) {
-  if (!['paid', 'rejected'].includes(status)) {
-    throw createError(400, 'Estado inválido', 'VALIDATION');
+  const raw = String(status || '').toLowerCase();
+  const normalized =
+    ['paid', 'pago'].includes(raw) ? 'paid' : ['rejected', 'rejeitado', 'recusado'].includes(raw) ? 'rejected' : null;
+  if (!normalized) {
+    throw createError(400, 'Estado inválido. Use paid/pago ou rejected/rejeitado', 'VALIDATION');
+  }
+  if (normalized === 'rejected' && !String(notes || '').trim()) {
+    throw createError(400, 'Indique o motivo da recusa do levantamento', 'VALIDATION');
   }
 
   const result = await query(
@@ -166,7 +172,7 @@ async function review(adminId, payoutId, { status, notes }) {
          paid_at = CASE WHEN $2 = 'paid' THEN NOW() ELSE paid_at END
      WHERE id = $1 AND status = 'pending'
      RETURNING *`,
-    [payoutId, status, notes || null, adminId]
+    [payoutId, normalized, notes || null, adminId]
   );
 
   if (!result.rowCount) {
@@ -175,10 +181,10 @@ async function review(adminId, payoutId, { status, notes }) {
 
   await auditRepository.write({
     actorId: adminId,
-    action: status === 'paid' ? 'CREATOR_PAYOUT_PAID' : 'CREATOR_PAYOUT_REJECTED',
+    action: normalized === 'paid' ? 'CREATOR_PAYOUT_PAID' : 'CREATOR_PAYOUT_REJECTED',
     entity: 'creator_payout',
     entityId: payoutId,
-    metadata: { status, notes: notes || null },
+    metadata: { status: normalized, notes: notes || null },
   });
 
   return { payout: mapPayout(result.rows[0]) };

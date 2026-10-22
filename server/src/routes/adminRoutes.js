@@ -55,7 +55,8 @@ router.patch(
     const result = await creatorStudioService.adminReviewCreator(
       req.user.id,
       req.params.id,
-      req.body.status
+      req.body.status,
+      req.body.reason || req.body.rejectionReason
     );
     res.json(result);
   })
@@ -63,6 +64,7 @@ router.patch(
 
 router.get(
   '/content/pending',
+  requirePermission('catalog.moderate'),
   asyncHandler(async (req, res) => {
     const status = req.query.status || 'submitted';
     const result = await creatorStudioService.adminListContent(status);

@@ -13,7 +13,7 @@ const featureFlagService = require('./featureFlagService');
 const { env } = require('../config/env');
 const { createError } = require('../utils/errors');
 const { assertPositiveKz } = require('../utils/money');
-const { STATUS, toApiStatus } = require('../utils/transactionStatus');
+const { STATUS, toApiStatus, paymentStatusLabel } = require('../utils/transactionStatus');
 const { mapContentInternal } = require('../utils/mappers');
 
 const proofsDir = path.join(env.uploadsDir, 'proofs');
@@ -338,6 +338,7 @@ async function listPendingAdmin() {
       paymentMethod: row.payment_method,
       amountKz: row.amount_kz,
       status: toApiStatus(row.status),
+      statusLabel: paymentStatusLabel(row.status),
       email: row.email,
       fullName: row.full_name,
       videoTitle: row.video_title,
@@ -484,7 +485,7 @@ async function getReceipt(userId, transactionId) {
     paymentMethod: row.payment_method,
     amountKz: row.amount_kz,
     status: toApiStatus(row.status),
-    statusLabel: toApiStatus(row.status),
+    statusLabel: paymentStatusLabel(row.status),
     contentTitle: row.video_title,
     contentId: row.video_id,
     paidAt: row.paid_at

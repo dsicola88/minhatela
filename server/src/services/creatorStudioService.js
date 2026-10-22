@@ -413,9 +413,13 @@ async function adminListCreators() {
   };
 }
 
-async function adminReviewCreator(adminId, creatorId, status) {
+async function adminReviewCreator(adminId, creatorId, status, reason) {
   if (!['active', 'rejected', 'suspended'].includes(status)) {
     throw createError(400, 'Estado inválido', 'VALIDATION');
+  }
+  const note = String(reason || '').trim();
+  if (status === 'rejected' && !note) {
+    throw createError(400, 'Indique o motivo da recusa', 'VALIDATION');
   }
   const row = await creatorRepository.updateStatus(creatorId, status);
   if (!row) throw createError(404, 'Criador não encontrado', 'NOT_FOUND');
@@ -434,8 +438,8 @@ async function adminReviewCreator(adminId, creatorId, status) {
         body:
           status === 'active'
             ? 'Já pode enviar filmes. A equipa publica-os no catálogo da MinhaTela.'
-            : 'A candidatura ao estúdio não foi aceite.',
-        data: { creatorId: creatorId, status },
+            : note || 'A candidatura ao estúdio não foi aceite.',
+        data: { creatorId: creatorId, status, reason: note || null },
       });
     }
   } catch {
@@ -447,7 +451,7 @@ async function adminReviewCreator(adminId, creatorId, status) {
     action: status === 'active' ? 'CREATOR_APPROVED' : 'CREATOR_REJECTED',
     entity: 'creator',
     entityId: creatorId,
-    metadata: { status },
+    metadata: { status, reason: note || null },
   });
 
   return { creator: mapCreator(row) };

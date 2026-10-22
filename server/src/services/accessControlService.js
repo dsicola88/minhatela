@@ -10,11 +10,44 @@ const { formatKz } = require('../utils/money');
  * Fonte de verdade do paywall AVOD / SVOD / TVOD.
  * Usado pela API de detalhes e pela API de play.
  */
+async function resolvePremium(user, userId) {
+  if (require('./subscriptionService').isPremiumActive(user)) {
+    return { active: true, source: 'self' };
+  }
+  try {
+    const householdService = require('./householdService');
+    const effective = await householdService.resolveEffectiveSubscription(userId);
+    if (effective.status === 'premium_active') {
+      return { active: true, source: effective.source || 'household' };
+    }
+  } catch {
+    /* household optional */
+  }
+  return { active: false, source: null };
+}
+
 async function resolveAccess(userId, content) {
   const user = await userRepository.findById(userId);
   const monetization = content.monetization;
 
+  const premium = await resolvePremium(user, userId);
+
   if (monetization === 'avod') {
+    if (premium.active) {
+      return {
+        canWatch: true,
+        monetization,
+        action: 'watch',
+        label: 'Assistir',
+        message:
+          premium.source === 'household'
+            ? 'Premium da sua casa — sem anúncios.'
+            : 'Incluído no seu Premium — sem anúncios.',
+        denialCode: null,
+        requiresAds: false,
+        premiumSource: premium.source,
+      };
+    }
     return {
       canWatch: true,
       monetization,
@@ -27,21 +60,8 @@ async function resolveAccess(userId, content) {
   }
 
   if (monetization === 'svod') {
-    let premiumActive = require('./subscriptionService').isPremiumActive(user);
-    let premiumSource = 'self';
-
-    if (!premiumActive) {
-      try {
-        const householdService = require('./householdService');
-        const effective = await householdService.resolveEffectiveSubscription(userId);
-        if (effective.status === 'premium_active') {
-          premiumActive = true;
-          premiumSource = effective.source || 'household';
-        }
-      } catch {
-        /* household optional */
-      }
-    }
+    const premiumActive = premium.active;
+    const premiumSource = premium.source;
 
     if (premiumActive) {
       return {

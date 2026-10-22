@@ -474,16 +474,48 @@ async function run() {
   await step('Superadmin · fila pagamentos + risco', async () => {
     const pending = await req('GET', '/api/admin/transactions/pending', { token: adminToken });
     assert(pending.status === 200, `pending ${pending.status}`);
+    for (const tx of pending.json?.transactions || []) {
+      assert(tx.statusLabel, `statusLabel em falta · ${tx.id}`);
+      assert(
+        ['Pendente', 'Pago', 'Recusado'].includes(tx.statusLabel) || typeof tx.statusLabel === 'string',
+        `rótulo ${tx.statusLabel}`
+      );
+    }
     const risk = await req('GET', '/api/admin/payments/risk?minScore=0', { token: adminToken });
     assert(risk.status === 200, `risk ${risk.status}`);
+    const proofs = await req('GET', '/api/admin/uploads/proofs', { token: adminToken });
+    assert([200, 404].includes(proofs.status), `proofs ${proofs.status}`);
+    if (proofs.status === 200) {
+      for (const p of proofs.json?.proofs || []) {
+        assert(p.statusLabel, `proof statusLabel · ${p.transactionId}`);
+      }
+    }
     return `pending=${pending.json?.transactions?.length || 0}`;
+  });
+
+  await step('Superadmin · filas moderação (filmes + anúncios + payouts)', async () => {
+    const films = await req('GET', '/api/admin/content/pending?status=submitted', { token: adminToken });
+    assert(films.status === 200, `films ${films.status} ${films.json?.message || ''}`);
+    const ads = await req('GET', '/api/admin/campaigns/pending', { token: adminToken });
+    assert(ads.status === 200, `ads pending ${ads.status}`);
+    const allAds = await req('GET', '/api/admin/ads/campaigns', { token: adminToken });
+    assert([200, 404].includes(allAds.status), `ads all ${allAds.status}`);
+    if (allAds.status === 200) {
+      for (const c of allAds.json?.campaigns || []) {
+        assert('funded' in c, `funded em falta · ${c.id}`);
+        assert(c.lifecycle?.label || c.statusLabel, `lifecycle · ${c.id}`);
+      }
+    }
+    const payouts = await req('GET', '/api/admin/payouts/pending', { token: adminToken });
+    assert(payouts.status === 200, `payouts ${payouts.status}`);
+    return `films=${films.json?.contents?.length || films.json?.items?.length || 0}`;
   });
 
   await step('Superadmin · aprovar assinatura (liberta Premium)', async () => {
     assert(subTxId, 'need sub tx');
     const r = await req('PATCH', `/api/admin/transactions/${subTxId}/status`, {
       token: adminToken,
-      body: { status: 'paid', adminNotes: 'E2E · comprovativo IBAN validado' },
+      body: { status: 'pago', adminNotes: 'E2E · comprovativo IBAN validado' },
     });
     assert(r.status === 200, `approve ${r.status} ${JSON.stringify(r.json).slice(0, 160)}`);
     const st = r.json?.transaction?.status;

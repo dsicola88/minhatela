@@ -44,8 +44,11 @@ export async function fetchPendingCreators() {
   return api.get('/api/admin/creators/pending');
 }
 
-export async function reviewCreator(creatorId, status) {
-  return api.patch(`/api/admin/creators/${creatorId}/status`, { status });
+export async function reviewCreator(creatorId, status, reason) {
+  return api.patch(`/api/admin/creators/${creatorId}/status`, {
+    status,
+    reason: reason || undefined,
+  });
 }
 
 export async function fetchPendingContent(status = 'submitted') {

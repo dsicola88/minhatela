@@ -746,7 +746,11 @@ export function UploadsTab({ uploads, proofs, onPickUpload, busy }) {
               {p.fullName} · {p.email}
             </Text>
             <Text style={{ color: colors.muted }}>
-              {p.status} · {p.amountKz?.toLocaleString('pt-AO')} Kz
+              {p.statusLabel ||
+                ({ pending: 'Pendente', paid: 'Pago', rejected: 'Recusado', pendente: 'Pendente', pago: 'Pago', rejeitado: 'Recusado' }[
+                  p.status
+                ] || p.status)}{' '}
+              · {p.amountKz?.toLocaleString('pt-AO')} Kz
             </Text>
             {p.proofUrl ? (
               <AdminButton
@@ -790,8 +794,14 @@ export function AdsTab({ campaigns, run }) {
             <Text style={{ color: colors.muted }}>
               {c.companyName} · {c.placementLabel || 'Antes do filme'} · orçamento{' '}
               {c.budgetKz?.toLocaleString('pt-AO')} Kz · gasto {c.spentKz?.toLocaleString('pt-AO')}{' '}
-              Kz · {c.statusLabel || c.status}
+              Kz
             </Text>
+            <Text style={{ color: colors.gold, marginTop: 6 }}>
+              {c.lifecycle?.label || c.statusLabel || c.status}
+            </Text>
+            {c.lifecycle?.hint ? (
+              <Text style={{ color: colors.muted, marginTop: 4, lineHeight: 18 }}>{c.lifecycle.hint}</Text>
+            ) : null}
             {c.creative?.mediaUrl ? (
               <Text style={{ color: colors.gold, marginTop: 8 }} numberOfLines={2}>
                 {c.creative.mediaKind === 'image'
@@ -831,15 +841,21 @@ export function AdsTab({ campaigns, run }) {
               </View>
             ) : (
               <View style={{ flexDirection: 'row', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
-                <AdminButton
-                  label="Pôr no ar"
-                  onPress={() => run(`ad-a-${c.id}`, () => reviewCampaign(c.id, 'active'))}
-                />
-                <AdminButton
-                  label="Pausar"
-                  variant="outline"
-                  onPress={() => run(`ad-p-${c.id}`, () => reviewCampaign(c.id, 'paused'))}
-                />
+                {c.funded ? (
+                  <AdminButton
+                    label="Pôr no ar"
+                    onPress={() => run(`ad-a-${c.id}`, () => reviewCampaign(c.id, 'active'))}
+                  />
+                ) : (
+                  <AdminButton label="Pagamento em falta" variant="outline" disabled onPress={() => {}} />
+                )}
+                {c.status === 'active' ? (
+                  <AdminButton
+                    label="Pausar"
+                    variant="outline"
+                    onPress={() => run(`ad-p-${c.id}`, () => reviewCampaign(c.id, 'paused'))}
+                  />
+                ) : null}
                 <AdminButton
                   label="Recusar"
                   variant="outline"

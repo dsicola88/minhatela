@@ -212,7 +212,11 @@ export default function Watch({
         } else {
           positionRef.current = 5;
         }
-        const hasPreroll = Boolean(data?.ads?.enabled && data?.ads?.creative?.mediaUrl);
+        const premiumAdFree =
+          data?.ads?.skipped === 'premium' || data?.access?.requiresAds === false;
+        const hasPreroll = Boolean(
+          !premiumAdFree && data?.ads?.enabled && data?.ads?.creative?.mediaUrl
+        );
         setAdPlaying(hasPreroll);
         setPaused(hasPreroll);
         if (hasPreroll && data?.ads?.decisionId) {

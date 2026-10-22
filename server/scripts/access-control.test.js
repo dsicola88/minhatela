@@ -63,6 +63,11 @@ async function run() {
   assert.strictEqual(r.requiresAds, false);
 
   access = loadAccess({ user: PREMIUM });
+  r = await access.resolveAccess('user-prem', { id: 'v1', monetization: 'avod' });
+  assert.strictEqual(r.canWatch, true);
+  assert.strictEqual(r.requiresAds, false);
+  assert.strictEqual(r.premiumSource, 'self');
+
   r = await access.resolveAccess('user-prem', { id: 'v2', monetization: 'svod' });
   assert.strictEqual(r.canWatch, true);
   assert.strictEqual(r.requiresAds, false);
@@ -81,6 +86,11 @@ async function run() {
   assert.strictEqual(r.canWatch, true);
   assert.strictEqual(r.premiumSource, 'household');
   assert.strictEqual(r.requiresAds, false);
+
+  r = await access.resolveAccess('user-free', { id: 'v1', monetization: 'avod' });
+  assert.strictEqual(r.canWatch, true);
+  assert.strictEqual(r.requiresAds, false);
+  assert.strictEqual(r.premiumSource, 'household');
 
   access = loadAccess({
     user: FREE,

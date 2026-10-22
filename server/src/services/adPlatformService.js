@@ -553,6 +553,33 @@ async function decideAd({
     return null;
   }
 
+  if (userId) {
+    try {
+      const userRepository = require('../repositories/userRepository');
+      const user = await userRepository.findById(userId);
+      let adFree = require('./subscriptionService').isPremiumActive(user);
+      if (!adFree) {
+        const household = await require('./householdService').resolveEffectiveSubscription(
+          userId
+        );
+        adFree = household?.status === 'premium_active';
+      }
+      if (adFree) {
+        return {
+          required: false,
+          placement,
+          enabled: false,
+          placeholder: false,
+          billed: false,
+          skipped: 'premium',
+          message: 'Premium: sem anúncios neste filme.',
+        };
+      }
+    } catch {
+      /* se a verificação falhar, segue o caminho AVOD com anúncios */
+    }
+  }
+
   const active = await adRepository.findActiveDecision({
     placement,
     userId,

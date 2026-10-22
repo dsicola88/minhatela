@@ -680,7 +680,12 @@ export default function AdminCommandCenter({ onBack }) {
                     · {tx.amountKz?.toLocaleString('pt-AO')} Kz · {(tx.paymentMethod || '').toUpperCase()}
                   </Text>
                   <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-                    <StatusBadge tone="warning">{tx.status || 'pendente'}</StatusBadge>
+                    <StatusBadge tone="warning">
+                      {tx.statusLabel ||
+                        ({ pending: 'Pendente', paid: 'Pago', rejected: 'Recusado' }[tx.status] ||
+                          tx.status ||
+                          'Pendente')}
+                    </StatusBadge>
                     {tx.riskScore != null ? (
                       <StatusBadge tone={tx.riskScore >= 70 ? 'danger' : 'warning'}>
                         Risco {tx.riskScore}
@@ -959,7 +964,9 @@ export default function AdminCommandCenter({ onBack }) {
                     <AdminButton
                       label="Rejeitar"
                       variant="outline"
-                      onPress={() => run(p.id, () => reviewPayout(p.id, { status: 'rejected' }))}
+                      onPress={() =>
+                        setRejectTarget({ type: 'payout', id: p.id, title: p.displayName || p.creatorName })
+                      }
                     />
                   </View>
                 </View>
@@ -1555,7 +1562,11 @@ export default function AdminCommandCenter({ onBack }) {
               placeholder={
                 rejectTarget?.type === 'campaign'
                   ? 'O anunciante vê este texto'
-                  : 'O cineasta e o cliente vêem este texto'
+                  : rejectTarget?.type === 'payout'
+                    ? 'O cineasta vê este texto'
+                    : rejectTarget?.type === 'creator'
+                      ? 'O candidato ao estúdio vê este texto'
+                      : 'O cineasta e o cliente vêem este texto'
               }
               placeholderTextColor={colors.muted}
               style={inputStyle({ minHeight: 80, textAlignVertical: 'top' })}
@@ -1584,10 +1595,13 @@ export default function AdminCommandCenter({ onBack }) {
                     );
                   }
                   if (target?.type === 'creator') {
-                    run(target.id, () => reviewCreator(target.id, 'rejected'));
+                    run(target.id, () => reviewCreator(target.id, 'rejected', reason));
                   }
                   if (target?.type === 'campaign') {
                     run(target.id, () => reviewCampaign(target.id, 'rejected', reason));
+                  }
+                  if (target?.type === 'payout') {
+                    run(target.id, () => reviewPayout(target.id, { status: 'rejected', notes: reason }));
                   }
                 }}
               />

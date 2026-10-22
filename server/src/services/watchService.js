@@ -170,13 +170,23 @@ async function startPlayback({
       : String(platform || '').toLowerCase().includes('android')
         ? 'android'
         : null;
-  const ads = await adDecisionService.decide({
-    contentId: content.id,
-    monetization: content.monetization,
-    userId,
-    contentGenre: content.genre || row.genre || null,
-    device: deviceNorm,
-  });
+  const ads =
+    access.requiresAds === false
+      ? {
+          required: false,
+          placement: 'pre_roll',
+          enabled: false,
+          billed: false,
+          skipped: 'premium',
+          message: 'Premium: sem anúncios neste filme.',
+        }
+      : await adDecisionService.decide({
+          contentId: content.id,
+          monetization: content.monetization,
+          userId,
+          contentGenre: content.genre || row.genre || null,
+          device: deviceNorm,
+        });
 
   const signed = bunnyService.signPlayback(content.bunnyVideoId, {
     userIp: ip,
@@ -333,6 +343,7 @@ async function startPlayback({
       label: access.label,
       expiresAt: access.expiresAt || null,
       premiumSource: access.premiumSource || null,
+      requiresAds: Boolean(access.requiresAds),
     },
     series,
     nextEpisode,
