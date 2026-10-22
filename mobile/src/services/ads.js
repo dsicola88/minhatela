@@ -38,6 +38,10 @@ export async function pauseCampaign(id) {
   return api.post(`/api/ads/campaigns/${id}/pause`, {});
 }
 
+export async function resumeCampaign(id) {
+  return api.post(`/api/ads/campaigns/${id}/resume`, {});
+}
+
 export async function withdrawCampaign(id) {
   return api.post(`/api/ads/campaigns/${id}/withdraw`, {});
 }
@@ -84,6 +88,7 @@ export default {
   createCampaign,
   uploadAdCreative,
   pauseCampaign,
+  resumeCampaign,
   fetchAdReports,
   startAdImpression,
   completeAdImpression,

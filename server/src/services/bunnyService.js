@@ -225,7 +225,25 @@ async function createVideo({ title }) {
       status: response.status,
       message: payload?.Message || payload?.message,
     });
-    throw createError(502, 'Falha ao criar vídeo no Bunny Stream', 'BUNNY_CREATE_FAILED');
+    if (response.status === 401 || response.status === 403) {
+      throw createError(
+        502,
+        'A Bunny Stream recusou a chave da API. No Railway, BUNNY_API_KEY tem de ser a chave da biblioteca Stream (não a chave da conta).',
+        'BUNNY_CREATE_FAILED'
+      );
+    }
+    if (response.status === 404) {
+      throw createError(
+        502,
+        'A biblioteca Bunny Stream não foi encontrada. Confirme BUNNY_LIBRARY_ID no Railway.',
+        'BUNNY_CREATE_FAILED'
+      );
+    }
+    throw createError(
+      502,
+      'Não foi possível abrir o envio na Bunny Stream. Tente outra vez ou peça à equipa para rever a ligação Bunny.',
+      'BUNNY_CREATE_FAILED'
+    );
   }
   const videoId = payload.guid || payload.videoId || payload.id;
   if (!videoId) {

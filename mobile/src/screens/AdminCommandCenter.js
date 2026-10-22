@@ -1044,18 +1044,30 @@ export default function AdminCommandCenter({ onBack }) {
                   {c.lifecycle?.hint ? (
                     <Text style={{ color: colors.muted, marginTop: 4 }}>{c.lifecycle.hint}</Text>
                   ) : null}
-                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-                    <AdminButton
-                      label={c.funded ? 'Pôr no ar' : 'Pagamento em falta'}
-                      onPress={() => run(c.id, () => reviewCampaign(c.id, 'active'))}
-                    />
+                  {!c.funded ? (
+                    <Text style={{ color: colors.muted, marginTop: 8, lineHeight: 18 }}>
+                      Confirme o pagamento na fila de comprovativos antes de pôr no ar.
+                    </Text>
+                  ) : null}
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
+                    {c.funded ? (
+                      <AdminButton
+                        label="Pôr no ar"
+                        onPress={() => run(c.id, () => reviewCampaign(c.id, 'active'))}
+                      />
+                    ) : (
+                      <AdminButton
+                        label="Pagamento em falta"
+                        variant="outline"
+                        onPress={() => {}}
+                        disabled
+                      />
+                    )}
                     <AdminButton
                       label="Recusar"
                       variant="outline"
                       onPress={() =>
-                        run(c.id, () =>
-                          reviewCampaign(c.id, 'rejected', 'Não cumpre as regras de publicidade MinhaTela')
-                        )
+                        setRejectTarget({ type: 'campaign', id: c.id, title: c.name })
                       }
                     />
                   </View>
@@ -1540,7 +1552,11 @@ export default function AdminCommandCenter({ onBack }) {
             <TextInput
               value={rejectReason}
               onChangeText={setRejectReason}
-              placeholder="O cineasta e o cliente vêem este texto"
+              placeholder={
+                rejectTarget?.type === 'campaign'
+                  ? 'O anunciante vê este texto'
+                  : 'O cineasta e o cliente vêem este texto'
+              }
               placeholderTextColor={colors.muted}
               style={inputStyle({ minHeight: 80, textAlignVertical: 'top' })}
               multiline
@@ -1569,6 +1585,9 @@ export default function AdminCommandCenter({ onBack }) {
                   }
                   if (target?.type === 'creator') {
                     run(target.id, () => reviewCreator(target.id, 'rejected'));
+                  }
+                  if (target?.type === 'campaign') {
+                    run(target.id, () => reviewCampaign(target.id, 'rejected', reason));
                   }
                 }}
               />

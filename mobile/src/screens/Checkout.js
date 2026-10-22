@@ -126,7 +126,11 @@ export default function Checkout({
         if (!cancelled && (status === 'paid' || status === 'pago')) {
           settled = true;
           if (id) clearInterval(id);
-          setSuccess('Pagamento confirmado. O acesso já está libertado.');
+          setSuccess(
+            type === 'ad_campaign'
+              ? 'Pagamento confirmado. O anúncio espera a aprovação da MinhaTela.'
+              : 'Pagamento confirmado. O acesso já está libertado.'
+          );
           onSubmitted?.(data);
         }
       } catch {
@@ -139,7 +143,7 @@ export default function Checkout({
       cancelled = true;
       clearInterval(id);
     };
-  }, [weframeTxId, onSubmitted]);
+  }, [weframeTxId, onSubmitted, type]);
 
   async function handleSubmit() {
     setError('');
@@ -406,8 +410,11 @@ export default function Checkout({
             maxWidth: layout.maxContentWidth,
           }}
         >
-          O acesso abre quando a MinhaTela confirmar. No aluguer, as 48 horas contam a partir dessa
-          confirmação — não do envio do comprovativo.
+          {type === 'ad_campaign'
+            ? 'O pagamento confirmado não põe o anúncio no ar. A MinhaTela analisa o criativo e só então publica.'
+            : type === 'rental'
+              ? 'O aluguer abre quando a MinhaTela confirmar. As 48 horas contam a partir dessa confirmação — não do envio do comprovativo.'
+              : 'O acesso abre quando a MinhaTela confirmar o pagamento — não do envio do comprovativo.'}
         </Text>
       </ScrollView>
     </View>

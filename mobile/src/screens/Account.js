@@ -946,7 +946,7 @@ export default function Account({
               ) : null}
               {onAds ? (
                 <Row
-                  label={adsMember ? 'Consola de anúncios' : 'Anunciar na MinhaTela'}
+                  label={adsMember ? 'Anúncios' : 'Anunciar na MinhaTela'}
                   value={
                     adsMember
                       ? 'Campanhas e orçamento'

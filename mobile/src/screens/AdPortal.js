@@ -22,6 +22,7 @@ import {
   fetchAdPortal,
   createCampaign,
   pauseCampaign,
+  resumeCampaign,
   withdrawCampaign,
   fetchAdReports,
   resolveAdMediaUrl,
@@ -49,7 +50,18 @@ const STEPS = [
 const AD_FORMATS = [
   { id: 'image', label: 'Imagem', hint: 'Uma imagem no ecrã, como um anúncio de display.' },
   { id: 'video', label: 'Vídeo', hint: 'Um vídeo curto antes do filme.' },
-  { id: 'carousel', label: 'Carrossel', hint: '2 a 10 imagens, como no Meta.' },
+  { id: 'carousel', label: 'Carrossel', hint: '2 a 10 imagens que o espectador pode passar.' },
+];
+
+const LIFECYCLE_FILTERS = [
+  { id: '', label: 'Todas' },
+  { id: 'awaiting_payment', label: 'Pagar orçamento' },
+  { id: 'payment_review', label: 'Pagamento em análise' },
+  { id: 'creative_review', label: 'Em análise' },
+  { id: 'live', label: 'No ar' },
+  { id: 'paused', label: 'Pausadas' },
+  { id: 'rejected', label: 'Recusadas' },
+  { id: 'completed', label: 'Orçamento esgotado' },
 ];
 
 const emptyDraft = () => ({
@@ -117,7 +129,7 @@ export default function AdPortal({ onCatalog, onAccount }) {
   const filtered = useMemo(() => {
     const list = data?.campaigns || [];
     return list.filter((c) => {
-      if (statusFilter && c.status !== statusFilter) return false;
+      if (statusFilter && c.lifecycle?.id !== statusFilter) return false;
       if (query && !String(c.name || '').toLowerCase().includes(query.toLowerCase())) return false;
       return true;
     });
@@ -261,10 +273,11 @@ export default function AdPortal({ onCatalog, onAccount }) {
         }}
       >
         <Text style={{ color: colors.text, fontSize: 28, fontWeight: '800', marginBottom: 8 }}>
-          Consola de publicidade
+          Anúncios
         </Text>
         <Text style={{ color: colors.muted, marginBottom: 22, lineHeight: 22 }}>
-          Anúncios antes dos filmes gratuitos, em Angola. O saldo desce só quando o anúncio é visto até ao fim.
+          Antes dos filmes gratuitos, em Angola. Criar e pagar não publicam. A MinhaTela põe no ar; o saldo
+          desce só quando o anúncio é visto até ao fim.
         </Text>
 
         {data?.guide && !wizard ? (
@@ -330,7 +343,7 @@ export default function AdPortal({ onCatalog, onAccount }) {
                 try {
                   await registerAdvertiser({ companyName, contactEmail });
                   await refreshSession?.();
-                  setInfo('Consola de anúncios aberta. Crie a primeira campanha e pague o orçamento.');
+                  setInfo('Conta aberta. Crie a primeira campanha e pague o orçamento.');
                   await load();
                 } catch (err) {
                   setError(err.message);
@@ -375,7 +388,7 @@ export default function AdPortal({ onCatalog, onAccount }) {
             {stats ? (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
                 <MiniStat
-                  label="Investido (Kz)"
+                  label="Orçamento (Kz)"
                   value={Number(stats.budgetKz || 0).toLocaleString('pt-AO')}
                 />
                 <MiniStat
@@ -419,30 +432,26 @@ export default function AdPortal({ onCatalog, onAccount }) {
                 placeholderTextColor={colors.muted}
                 style={{ ...fieldStyle(), flex: 1, minWidth: 180, marginBottom: 0 }}
               />
-              {['', 'pending_review', 'active', 'paused', 'rejected', 'completed'].map((s) => (
+              {LIFECYCLE_FILTERS.map((filter) => (
                 <Pressable
-                  key={s || 'all'}
-                  onPress={() => setStatusFilter(s)}
+                  key={filter.id || 'all'}
+                  onPress={() => setStatusFilter(filter.id)}
                   style={{
                     borderWidth: 1,
-                    borderColor: statusFilter === s ? colors.gold : colors.border,
+                    borderColor: statusFilter === filter.id ? colors.gold : colors.border,
+                    backgroundColor:
+                      statusFilter === filter.id
+                        ? colors.id === 'light'
+                          ? 'rgba(201,160,10,0.12)'
+                          : 'rgba(247,212,23,0.12)'
+                        : 'transparent',
                     paddingHorizontal: 10,
                     paddingVertical: 8,
                     borderRadius: 4,
                   }}
                 >
-                  <Text style={{ color: colors.text, fontSize: 12 }}>
-                    {s === ''
-                      ? 'Todas'
-                      : s === 'pending_review'
-                        ? 'À espera'
-                        : s === 'active'
-                          ? 'No ar'
-                          : s === 'paused'
-                            ? 'Pausadas'
-                            : s === 'rejected'
-                              ? 'Recusadas'
-                              : 'Esgotadas'}
+                  <Text style={{ color: colors.text, fontSize: 12, fontWeight: '700' }}>
+                    {filter.label}
                   </Text>
                 </Pressable>
               ))}
@@ -481,62 +490,108 @@ export default function AdPortal({ onCatalog, onAccount }) {
                     {Number(item.spentKz || 0).toLocaleString('pt-AO')} Kz · saldo{' '}
                     {Number(item.remainingKz || 0).toLocaleString('pt-AO')} Kz
                   </Text>
-                  {item.lifecycle?.canPay ? (
-                    <Pressable
-                      onPress={() =>
-                        router.push({
-                          pathname: '/checkout',
-                          params: {
-                            type: 'ad_campaign',
-                            campaignId: item.id,
-                            title: item.name,
-                            priceKz: String(item.budgetKz || ''),
-                          },
-                        })
-                      }
-                      style={{ marginTop: 10 }}
-                    >
-                      <Text style={{ color: colors.gold, fontWeight: '700' }}>Pagar orçamento</Text>
-                    </Pressable>
-                  ) : null}
-                  {item.rejectionReason ? (
-                    <Text style={{ color: colors.red, marginTop: 6 }}>Motivo: {item.rejectionReason}</Text>
-                  ) : null}
-                  {['draft', 'pending_review', 'paused'].includes(item.status) ? (
-                    <Pressable
-                      onPress={async () => {
-                        try {
-                          await withdrawCampaign(item.id);
-                          await load();
-                        } catch (err) {
-                          setError(err.message);
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 12 }}>
+                    {item.lifecycle?.canPay ? (
+                      <Pressable
+                        onPress={() =>
+                          router.push({
+                            pathname: '/checkout',
+                            params: {
+                              type: 'ad_campaign',
+                              campaignId: item.id,
+                              title: item.name,
+                              priceKz: String(item.budgetKz || ''),
+                            },
+                          })
                         }
-                      }}
-                      style={{ marginTop: 10 }}
-                    >
-                      <Text style={{ color: colors.red, fontWeight: '700' }}>Retirar campanha</Text>
-                    </Pressable>
+                      >
+                        <Text style={{ color: colors.gold, fontWeight: '700' }}>Pagar orçamento</Text>
+                      </Pressable>
+                    ) : null}
+                    {item.status === 'active' ? (
+                      <Pressable
+                        onPress={async () => {
+                          try {
+                            await pauseCampaign(item.id);
+                            setInfo('Campanha pausada. Deixa de aparecer antes dos filmes até a retomar.');
+                            await load();
+                          } catch (err) {
+                            setError(err.message);
+                          }
+                        }}
+                      >
+                        <Text style={{ color: colors.gold, fontWeight: '700' }}>Pausar</Text>
+                      </Pressable>
+                    ) : null}
+                    {item.lifecycle?.id === 'paused' ? (
+                      <Pressable
+                        onPress={async () => {
+                          try {
+                            await resumeCampaign(item.id);
+                            setInfo('Campanha no ar outra vez.');
+                            await load();
+                          } catch (err) {
+                            setError(err.message);
+                          }
+                        }}
+                      >
+                        <Text style={{ color: colors.gold, fontWeight: '700' }}>Retomar</Text>
+                      </Pressable>
+                    ) : null}
+                    {item.lifecycle?.id === 'rejected' ? (
+                      <Pressable
+                        onPress={() => {
+                          setDraft(emptyDraft());
+                          setStep(1);
+                          setWizard(true);
+                          setError('');
+                          setInfo('Crie uma nova campanha com o criativo corrigido.');
+                        }}
+                      >
+                        <Text style={{ color: colors.gold, fontWeight: '700' }}>Criar outra campanha</Text>
+                      </Pressable>
+                    ) : null}
+                    {item.lifecycle?.id === 'completed' ? (
+                      <Pressable
+                        onPress={() => {
+                          setDraft({
+                            ...emptyDraft(),
+                            name: `${item.name} · reforço`.slice(0, 80),
+                            objective: item.objective || 'brand',
+                          });
+                          setStep(1);
+                          setWizard(true);
+                          setInfo('O orçamento esgotou. Crie uma campanha nova com novo saldo.');
+                        }}
+                      >
+                        <Text style={{ color: colors.gold, fontWeight: '700' }}>Nova campanha com orçamento</Text>
+                      </Pressable>
+                    ) : null}
+                    {['draft', 'pending_review', 'paused'].includes(item.status) ? (
+                      <Pressable
+                        onPress={async () => {
+                          try {
+                            await withdrawCampaign(item.id);
+                            setInfo('Campanha retirada.');
+                            await load();
+                          } catch (err) {
+                            setError(err.message);
+                          }
+                        }}
+                      >
+                        <Text style={{ color: colors.red, fontWeight: '700' }}>Retirar</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                  {item.rejectionReason ? (
+                    <Text style={{ color: colors.red, marginTop: 8, lineHeight: 20 }}>
+                      Motivo: {item.rejectionReason}
+                    </Text>
                   ) : null}
                   {item.creative?.mediaUrl ? (
                     <Text style={{ color: colors.muted, marginTop: 6 }} numberOfLines={1}>
                       {creativeKindLabel(item.creative)} · {mediaFileLabel(item.creative.mediaUrl)}
                     </Text>
-                  ) : null}
-                  {item.status === 'active' ? (
-                    <Pressable
-                      onPress={async () => {
-                        try {
-                          await pauseCampaign(item.id);
-                          setInfo('Campanha pausada. Novas sessões já não a vêem.');
-                          await load();
-                        } catch (err) {
-                          setError(err.message);
-                        }
-                      }}
-                      style={{ marginTop: 10 }}
-                    >
-                      <Text style={{ color: colors.gold, fontWeight: '700' }}>Pausar</Text>
-                    </Pressable>
                   ) : null}
                 </View>
               ))
@@ -656,7 +711,7 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
             Formato do anúncio
           </Text>
           <Text style={{ color: colors.muted, marginBottom: 12, lineHeight: 20 }}>
-            O anúncio ocupa o ecrã do filme, no telemóvel e no computador. Pode substituir ou remover o ficheiro a qualquer momento.
+            O anúncio ocupa o ecrã do filme, no telemóvel e no computador. Pode substituir o ficheiro enquanto cria a campanha.
           </Text>
           <View style={{ flexDirection: wideFormats ? 'row' : 'column', gap: 8, marginBottom: 8 }}>
             {AD_FORMATS.map((format) => {
@@ -758,7 +813,7 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
                       }
                       style={[fieldStyle(), { marginTop: 8, marginBottom: 0 }]}
                       autoCapitalize="none"
-                      placeholder="Ou cole uma ligação HTTPS"
+                      placeholder="Ou cole um link HTTPS"
                       placeholderTextColor={colors.muted}
                     />
                   ) : null}
@@ -810,7 +865,7 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
               )}
               {!draft.mediaUrl && !pasteOpen ? (
                 <Pressable onPress={() => setPasteOpen(true)} style={{ marginTop: 10 }}>
-                  <Text style={{ color: colors.text, fontWeight: '700' }}>Colar uma ligação HTTPS</Text>
+                  <Text style={{ color: colors.text, fontWeight: '700' }}>Colar um link HTTPS</Text>
                 </Pressable>
               ) : null}
               {(pasteOpen || pastedLink) && !String(draft.mediaUrl || '').startsWith('/uploads/') ? (
@@ -928,10 +983,20 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
           <Text style={{ color: colors.text, fontWeight: '800', marginTop: 12, marginBottom: 8 }}>
             Onde o anúncio passa
           </Text>
-          <View style={choice(true)}>
+          <View
+            style={{
+              borderWidth: 1,
+              borderColor: colors.border,
+              borderRadius: 8,
+              padding: 14,
+              marginBottom: 14,
+              backgroundColor: colors.id === 'light' ? '#FFFFFF' : colors.elevated,
+            }}
+          >
             <Text style={{ color: colors.text, fontWeight: '800' }}>Antes do filme gratuito</Text>
-            <Text style={{ color: colors.muted, marginTop: 4, lineHeight: 20 }}>
-              Angola · telemóvel e computador · quem abre um filme grátis
+            <Text style={{ color: colors.muted, marginTop: 6, lineHeight: 20 }}>
+              Em Angola, no telemóvel e no computador, quando alguém abre um filme grátis. Este é o
+              único sítio de publicação neste momento.
             </Text>
           </View>
           <FieldLabel>Tema dos filmes</FieldLabel>
@@ -942,7 +1007,9 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
             placeholder="Opcional. Ex.: Cinema angolano"
             placeholderTextColor={colors.muted}
           />
-          <Text style={{ color: colors.text, fontWeight: '700', marginBottom: 8 }}>Vezes por pessoa, por dia</Text>
+          <Text style={{ color: colors.text, fontWeight: '700', marginBottom: 8 }}>
+            Limite diário por pessoa
+          </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             {[
               ['0', 'Sem limite'],
@@ -1031,9 +1098,24 @@ function Wizard({ step, setStep, draft, setField, advertiser, busy, onCancel, on
             kind={draft.mediaKind === 'carousel' ? 'image' : draft.mediaKind}
             ctaLabel={draft.ctaLabel}
           />
-          <Text style={{ color: colors.gold, marginTop: 12, lineHeight: 20 }}>
-            A seguir paga por IBAN ou Multicaixa Express. O anúncio só entra na fila depois do pagamento.
-          </Text>
+          <View
+            style={{
+              marginTop: 14,
+              padding: 14,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: colors.border,
+              borderLeftWidth: 3,
+              borderLeftColor: colors.gold,
+            }}
+          >
+            <Text style={{ color: colors.text, fontWeight: '800', marginBottom: 6 }}>Próximos passos</Text>
+            <Text style={{ color: colors.muted, lineHeight: 20 }}>
+              1. Pague o orçamento (IBAN com comprovativo ou Multicaixa Express).{'\n'}
+              2. A MinhaTela confirma o pagamento e analisa o anúncio.{'\n'}
+              3. Só depois o anúncio passa antes dos filmes gratuitos.
+            </Text>
+          </View>
         </>
       ) : null}
 

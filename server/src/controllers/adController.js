@@ -94,6 +94,10 @@ async function pauseCampaign(req, res) {
   res.json(await adPlatformService.pauseMyCampaign(req.user.id, req.params.id));
 }
 
+async function resumeCampaign(req, res) {
+  res.json(await adPlatformService.resumeMyCampaign(req.user.id, req.params.id));
+}
+
 async function withdrawCampaign(req, res) {
   res.json(await adPlatformService.withdrawMyCampaign(req.user.id, req.params.id));
 }
@@ -155,6 +159,7 @@ module.exports = {
   getCampaign,
   createCampaign,
   pauseCampaign,
+  resumeCampaign,
   withdrawCampaign,
   reports,
   uploadCreative,

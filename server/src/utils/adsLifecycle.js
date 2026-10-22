@@ -82,7 +82,7 @@ function portalStage(advertiser, campaigns = []) {
     return {
       step: 1,
       of: 4,
-      title: 'Conta aberta',
+      title: 'Abrir conta',
       body: 'Identifique a empresa ou o particular. Depois cria a campanha e paga o orçamento.',
     };
   }
@@ -91,7 +91,7 @@ function portalStage(advertiser, campaigns = []) {
       step: 2,
       of: 4,
       title: 'Criar campanha',
-      body: 'Vídeo, orçamento em Kwanza e datas. Criar não publica.',
+      body: 'Criativo, orçamento em Kwanza e datas. Criar não publica.',
     };
   }
   if (campaigns.some((c) => c.lifecycle?.id === 'awaiting_payment')) {
@@ -99,7 +99,7 @@ function portalStage(advertiser, campaigns = []) {
       step: 3,
       of: 4,
       title: 'Pagar orçamento',
-      body: 'Transferência IBAN ou Multicaixa Express. Pendente não liberta o anúncio.',
+      body: 'IBAN com comprovativo ou Multicaixa Express. Sem pagamento confirmado o anúncio não entra no ar.',
     };
   }
   if (campaigns.some((c) => ['payment_review', 'creative_review'].includes(c.lifecycle?.id))) {
@@ -107,7 +107,7 @@ function portalStage(advertiser, campaigns = []) {
       step: 4,
       of: 4,
       title: 'Em análise',
-      body: 'A MinhaTela confirma o pagamento e o anúncio. Só então entra no ar.',
+      body: 'A MinhaTela confirma o pagamento e o anúncio. Só depois entra no ar.',
     };
   }
   if (campaigns.some((c) => c.lifecycle?.id === 'live' || c.status === 'active')) {
@@ -122,7 +122,7 @@ function portalStage(advertiser, campaigns = []) {
     step: 4,
     of: 4,
     title: 'Campanhas',
-    body: 'Pausada ou recusada não toca no catálogo.',
+    body: 'Pausada, recusada ou esgotada não toca no catálogo.',
   };
 }
 

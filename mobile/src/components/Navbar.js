@@ -177,7 +177,7 @@ export default function Navbar({
               </Focusable>
             ) : null}
             {onAds ? (
-              <Focusable id="nav-ads" onPress={onAds} accessibilityLabel="Consola de anúncios">
+              <Focusable id="nav-ads" onPress={onAds} accessibilityLabel="Anúncios">
                 <Ionicons name="megaphone-outline" size={isTV ? 28 : 22} color={colors.text} />
               </Focusable>
             ) : null}
@@ -251,7 +251,7 @@ export default function Navbar({
               { label: t('navMyList'), onPress: onMyList },
               { label: 'Conta e definições', onPress: onProfile },
               onCreatorStudio ? { label: 'Estúdio', onPress: onCreatorStudio } : null,
-              onAds ? { label: 'Consola de anúncios', onPress: onAds } : null,
+              onAds ? { label: 'Anúncios', onPress: onAds } : null,
               onAdmin ? { label: 'Administração', onPress: onAdmin } : null,
             ]
               .filter((item) => item?.onPress)

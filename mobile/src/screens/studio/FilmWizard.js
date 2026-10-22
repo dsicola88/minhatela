@@ -173,8 +173,8 @@ export default function FilmWizard({ form, setForm, step, setStep, busy, onCreat
         <>
           <Text style={helpStyle()}>
             {form.bunnyVideoId
-              ? 'O ficheiro está associado a este título. Se precisar de o substituir, abra o envio outra vez.'
-              : 'Abre uma janela para enviar o filme. Quando terminar, volte a este passo.'}
+              ? 'O ficheiro está associado a este título. Se precisar de o substituir, abra o envio outra vez na Bunny e volte aqui.'
+              : 'O filme não se cola neste ecrã. Toque em «Enviar o filme»: abre a Bunny Stream. Aí escolhe o ficheiro no computador (MP4, MKV, etc.). Quando o envio acabar, volte a este passo e continue.'}
           </Text>
           <PrimaryButton
             label={form.bunnyVideoId ? 'Abrir o envio outra vez' : 'Enviar o filme'}
@@ -184,6 +184,11 @@ export default function FilmWizard({ form, setForm, step, setStep, busy, onCreat
           <Text style={{ color: form.bunnyVideoId ? colors.gold : colors.muted, marginTop: 12, fontWeight: '700' }}>
             {form.bunnyVideoId ? 'Ficheiro associado' : 'Ainda sem ficheiro'}
           </Text>
+          {!form.bunnyVideoId ? (
+            <Text style={{ color: colors.muted, marginTop: 8, lineHeight: 20 }}>
+              Se o browser bloquear a janela, permita pop-ups para minhatela.vercel.app.
+            </Text>
+          ) : null}
         </>
       ) : null}
 

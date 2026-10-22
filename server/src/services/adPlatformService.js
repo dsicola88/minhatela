@@ -437,6 +437,34 @@ async function pauseMyCampaign(userId, campaignId) {
   return { campaign: mapCampaign(row) };
 }
 
+async function resumeMyCampaign(userId, campaignId) {
+  const advertiser = await requireAdvertiser(userId);
+  const previous = await adRepository.getOwnedCampaign(advertiser.id, campaignId);
+  if (!previous) throw createError(404, 'Campanha não encontrada', 'NOT_FOUND');
+  if (previous.status !== 'paused') {
+    throw createError(409, 'Só pode retomar uma campanha pausada', 'NOT_PAUSED');
+  }
+  if (!previous.funded) {
+    throw createError(409, 'Pague o orçamento antes de retomar', 'AD_NOT_FUNDED');
+  }
+  const row = await adRepository.advertiserResume(advertiser.id, campaignId);
+  if (!row) {
+    throw createError(
+      409,
+      'Não dá para retomar: confirme datas, saldo e pagamento.',
+      'RESUME_BLOCKED'
+    );
+  }
+  await adRepository.addHistory({
+    campaignId,
+    actorId: userId,
+    action: 'resumed_by_advertiser',
+    fromStatus: 'paused',
+    toStatus: 'active',
+  });
+  return { campaign: mapCampaign(row) };
+}
+
 async function getReports(userId, query = {}) {
   const advertiser = await requireAdvertiser(userId);
   const from = query.from ? new Date(query.from) : null;
@@ -769,6 +797,7 @@ module.exports = {
   createCampaign,
   withdrawMyCampaign,
   pauseMyCampaign,
+  resumeMyCampaign,
   getReports,
   reportsToCsv,
   decideAd,

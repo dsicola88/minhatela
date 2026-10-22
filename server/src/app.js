@@ -156,7 +156,12 @@ function createApp() {
         ready: ok,
         postgres: ok ? 'ok' : 'down',
         market: env.market.country,
-        bunny: env.bunny.libraryId ? 'configured' : 'missing',
+        bunny:
+          env.bunny.libraryId && env.bunny.apiKey
+            ? 'configured'
+            : env.bunny.libraryId
+              ? 'library_without_key'
+              : 'missing',
         timestamp: new Date().toISOString(),
       });
     } catch (error) {

@@ -341,6 +341,23 @@ async function advertiserPause(advertiserId, campaignId) {
   return result.rows[0] || null;
 }
 
+async function advertiserResume(advertiserId, campaignId) {
+  const result = await query(
+    `UPDATE campaigns
+     SET status = 'active', updated_at = NOW()
+     WHERE id = $1
+       AND advertiser_id = $2
+       AND status = 'paused'
+       AND funded = TRUE
+       AND spent_kz < budget_kz
+       AND starts_at <= NOW()
+       AND ends_at > NOW()
+     RETURNING *`,
+    [campaignId, advertiserId]
+  );
+  return result.rows[0] || null;
+}
+
 async function attachTransaction(campaignId, transactionId) {
   await query(
     `UPDATE campaigns SET transaction_id = $2, updated_at = NOW() WHERE id = $1`,
@@ -475,6 +492,7 @@ module.exports = {
   addHistory,
   advertiserWithdraw,
   advertiserPause,
+  advertiserResume,
   attachTransaction,
   moderateCampaign,
   findCampaignWithAdvertiser,

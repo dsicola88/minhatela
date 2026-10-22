@@ -17,6 +17,7 @@ router.get('/campaigns', requireAuth, asyncHandler(adController.listCampaigns));
 router.get('/campaigns/:id', requireAuth, asyncHandler(adController.getCampaign));
 router.post('/campaigns', requireAuth, asyncHandler(adController.createCampaign));
 router.post('/campaigns/:id/pause', requireAuth, asyncHandler(adController.pauseCampaign));
+router.post('/campaigns/:id/resume', requireAuth, asyncHandler(adController.resumeCampaign));
 router.post('/campaigns/:id/withdraw', requireAuth, asyncHandler(adController.withdrawCampaign));
 
 router.get('/reports', requireAuth, asyncHandler(adController.reports));
